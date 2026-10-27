@@ -1,0 +1,6 @@
+{
+  "name": "OPD Token & Clinic Queue Manager",
+  "description": "Real-time doctor status tracking, live OPD token queues, ₹20 online booking, and clinic staff management system.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
