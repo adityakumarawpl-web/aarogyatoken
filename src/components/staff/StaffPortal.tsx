@@ -251,7 +251,10 @@ export const StaffPortal: React.FC = () => {
               <button
                 key={st}
                 type="button"
-                onClick={() => updateDoctorStatus(currentDoctor.id, st)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  updateDoctorStatus(currentDoctor.id, st);
+                  }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
                   currentDoctor.status === st
                     ? st === 'AVAILABLE'
