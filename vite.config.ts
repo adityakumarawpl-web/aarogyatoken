@@ -4,7 +4,7 @@ import path from 'path';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  base: '/aarogyatoken/',
+  base: '/', // Ise '/aarogyatoken/' se badal kar '/' kar dein
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
