@@ -134,12 +134,7 @@ const handleProcessPayment = () => {
       setIsProcessingPayment(false);
       setErrorMsg('Payment gateway initialization failed.');
     }
-  }; catch {
-        // ignore
-      }
-    }, 1400);
   };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs overflow-y-auto animate-in fade-in">
       <div className="relative w-full max-w-lg rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-6">
