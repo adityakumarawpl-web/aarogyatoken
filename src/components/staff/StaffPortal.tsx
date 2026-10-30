@@ -207,20 +207,22 @@ export const StaffPortal: React.FC = () => {
       complaint: walkInForm.complaint.trim() || 'OPD Checkup',
       isEmergency: walkInForm.isEmergency,
     });
-// === Yeh WhatsApp notification wala code yahan jodein ===
-    try {
-    fetch('/api/send-whatsapp', 
-      {method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: '91' + walkInForm.mobile.trim(),
-          patientName: walkInForm.name.trim(),
-          doctorName: currentDoctor.name, // Agar doctor ka naam available hai
-        }),
-      });
-    } catch (err) {
-      console.error('WhatsApp trigger error:', err);
-    }
+    // === Yeh WhatsApp notification wala code yahan jodein ===
+    // === WhatsApp notification trigger with console logs ===
+    console.log("Triggering WhatsApp fetch for:", walkInForm.mobile.trim());
+    
+    fetch('/api/send-whatsapp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phone: '91' + walkInForm.mobile.trim(),
+        patientName: walkInForm.name.trim(),
+        doctorName: currentDoctor.name,
+      }),
+    })
+    .then(res => res.json())
+    .then(data => console.log('WhatsApp API Response:', data))
+    .catch(err => console.error('WhatsApp trigger error:', err));
     // ========================================================
     setWalkInForm({
       name: '',
