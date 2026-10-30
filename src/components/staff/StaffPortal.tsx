@@ -209,8 +209,8 @@ export const StaffPortal: React.FC = () => {
     });
 // === Yeh WhatsApp notification wala code yahan jodein ===
     try {
-      await fetch('/api/send-whatsapp', {
-        method: 'POST',
+    fetch('/api/send-whatsapp', 
+      {method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           phone: '91' + walkInForm.mobile.trim(),
