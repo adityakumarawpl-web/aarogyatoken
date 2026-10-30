@@ -135,6 +135,33 @@ const handleProcessPayment = () => {
       setErrorMsg('Payment gateway initialization failed.');
     }
   };
+
+  const sendWhatsAppNotification = async (patientData) => {
+  try {
+    const response = await fetch('/api/send-whatsapp', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        phone: '91' + patientData.phone, // 10-digit number ke aage country code '91' lagana zaroori hai
+        patientName: patientData.name,
+        tokenNumber: patientData.tokenNumber,
+        doctorName: patientData.doctorName,
+      }),
+    });
+
+    const result = await response.json();
+    if (response.ok) {
+      console.log('WhatsApp message sent successfully:', result);
+    } else {
+      console.error('Failed to send WhatsApp:', result);
+    }
+  } catch (err) {
+    console.error('Error triggering WhatsApp:', err);
+  }
+};
+  
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs overflow-y-auto animate-in fade-in">
       <div className="relative w-full max-w-lg rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-6">
