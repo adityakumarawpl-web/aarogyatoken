@@ -62,31 +62,72 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
     setStep('PAYMENT');
   };
 
-  const handleProcessPayment = () => {
+ const handleProcessPayment = () => {
+    const razorpayKey = activeRazorpayKey;
+    if (!razorpayKey) {
+      setErrorMsg('Razorpay Key ID missing! Please configure key.');
+      return;
+    }
+    if (!(window as any).Razorpay) {
+      setErrorMsg('Razorpay SDK failed to load. Please check your internet connection.');
+      return;
+    }
     setIsProcessingPayment(true);
-    setTimeout(() => {
-      setIsProcessingPayment(false);
-      const result = bookOnlineAppointment({
-        doctorId: doctor.id,
-        name: formData.name.trim(),
-        mobile: formData.mobile.trim(),
-        age: parseInt(formData.age, 10) || 28,
-        gender: formData.gender,
-        address: formData.address.trim(),
-        complaint: formData.complaint.trim() || 'General OPD Consultation',
-        isEmergency: false,
-      });
-
-      setConfirmedPatient(result.patient);
-      setStep('SUCCESS');
-
-      try {
-        confetti({
-          particleCount: 80,
-          spread: 60,
-          origin: { y: 0.6 },
+    setErrorMsg('');
+    const options = {
+      key: razorpayKey,
+      amount: 20 * 100, // ₹20 in paise
+      currency: "INR",
+      name: doctor.clinicName || "Aarogya Token Clinic",
+      description: `OPD Consultation Fee - Dr. ${doctor.name}`,
+      handler: function (response: any) {
+        setIsProcessingPayment(false);
+        const result = bookOnlineAppointment({
+          doctorId: doctor.id,
+          name: formData.name.trim(),
+          mobile: formData.mobile.trim(),
+          age: parseInt(formData.age, 10) || 28,
+          gender: formData.gender,
+          address: formData.address.trim(),
+          complaint: formData.complaint.trim() || 'General OPD Consultation',
+          isEmergency: false,
+          paymentId: response.razorpay_payment_id,
         });
-      } catch {
+        setConfirmedPatient(result.patient);
+        setStep('SUCCESS');
+        try {
+          confetti({
+            particleCount: 80,
+            spread: 60,
+            origin: { y: 0.6 },
+          });
+        } catch {
+          // ignore
+        }
+      },
+      prefill: {
+        name: formData.name.trim(),
+        contact: formData.mobile.trim(),
+      },
+      theme: {
+        color: "#2563eb",
+      },
+      modal: {
+        ondismiss: function () {
+          setIsProcessingPayment(false);
+        },
+      },
+    };
+
+    try {
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
+    } catch (err) {
+      console.error(err);
+      setIsProcessingPayment(false);
+      setErrorMsg('Payment gateway initialization failed.');
+    }
+  }; catch {
         // ignore
       }
     }, 1400);
