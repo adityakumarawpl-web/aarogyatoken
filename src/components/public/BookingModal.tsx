@@ -62,18 +62,22 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
     setStep('PAYMENT');
   };
 
- const handleProcessPayment = () => {
+const handleProcessPayment = () => {
     const razorpayKey = activeRazorpayKey;
+
     if (!razorpayKey) {
       setErrorMsg('Razorpay Key ID missing! Please configure key.');
       return;
     }
+
     if (!(window as any).Razorpay) {
       setErrorMsg('Razorpay SDK failed to load. Please check your internet connection.');
       return;
     }
+
     setIsProcessingPayment(true);
     setErrorMsg('');
+
     const options = {
       key: razorpayKey,
       amount: 20 * 100, // ₹20 in paise
@@ -82,6 +86,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
       description: `OPD Consultation Fee - Dr. ${doctor.name}`,
       handler: function (response: any) {
         setIsProcessingPayment(false);
+        
         const result = bookOnlineAppointment({
           doctorId: doctor.id,
           name: formData.name.trim(),
@@ -93,8 +98,10 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
           isEmergency: false,
           paymentId: response.razorpay_payment_id,
         });
+
         setConfirmedPatient(result.patient);
         setStep('SUCCESS');
+
         try {
           confetti({
             particleCount: 80,
@@ -127,7 +134,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
       setIsProcessingPayment(false);
       setErrorMsg('Payment gateway initialization failed.');
     }
-  }; catch {
+  };
+  catch {
         // ignore
       }
     }, 1400);
