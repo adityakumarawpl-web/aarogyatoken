@@ -1436,54 +1436,10 @@ export const SuperAdminDashboard: React.FC = () => {
 
   <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
-              Clinic Image 2
-            </label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                  const img = new Image();
-                  img.src = event.target?.result as string;
-                  img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 400;
-                    const MAX_HEIGHT = 400;
-                    let width = img.width;
-                    let height = img.height;
 
-                    if (width > height) {
-                      if (width > MAX_WIDTH) {
-                        height *= MAX_WIDTH / width;
-                        width = MAX_WIDTH;
-                      }
-                    } else {
-                      if (height > MAX_HEIGHT) {
-                        width *= MAX_HEIGHT / height;
-                        height = MAX_HEIGHT;
-                      }
-                    }
 
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx?.drawImage(img, 0, 0, width, height);
-
-                    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
-                    setNewDoctorForm(prev => {
-                      const imgs = [...(prev.clinicImages || ['', ''])];
-                      imgs[1] = compressedBase64;
-                      return { ...prev, clinicImages: imgs };
-                    });
-                  };
-                };
-                reader.readAsDataURL(file);
-              }}
-
-              <div>
+            {/* Clinic Image 2 */}
+          <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
               Clinic Image 2
             </label>
@@ -1541,25 +1497,6 @@ export const SuperAdminDashboard: React.FC = () => {
 
         {/* Modal Action Buttons */}
         <div className="pt-2 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setShowAddDoctorModal(false)}
-            className="flex-1 rounded-xl border border-slate-300 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className="flex-1 rounded-xl bg-blue-600 py-2.5 text-xs font-bold text-white shadow-md hover:bg-blue-500"
-          >
-            Create & Launch Clinic
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-)}
-              
           <button
             type="button"
             onClick={() => setShowAddDoctorModal(false)}
