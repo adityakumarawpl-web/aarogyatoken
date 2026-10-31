@@ -1320,4 +1320,4 @@ export const SuperAdminDashboard: React.FC = () => {
       />
     </div>
   </div>
-</div>
+
