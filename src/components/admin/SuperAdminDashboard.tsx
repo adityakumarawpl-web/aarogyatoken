@@ -109,7 +109,7 @@ export const SuperAdminDashboard: React.FC = () => {
     className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white"
   />
 </div>
-
+<>
   <div className="flex items-center gap-3">
   <img 
     src={currentDoctor.doctorImageUrl || '/default-doctor.png'} 
@@ -121,7 +121,7 @@ export const SuperAdminDashboard: React.FC = () => {
     <p className="text-xs text-gray-400">Cabin {currentDoctor.cabinNumber}</p>
   </div>
 </div>
-  
+</>
   // ==========================================
   // LAYER 1: ADMIN USERNAME & PASSWORD LOGIN
   // ==========================================
