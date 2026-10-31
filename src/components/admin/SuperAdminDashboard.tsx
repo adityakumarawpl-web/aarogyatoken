@@ -1487,7 +1487,7 @@ export const SuperAdminDashboard: React.FC = () => {
             {newDoctorForm.clinicImages?.[1] && (
               <p className="text-[10px] text-emerald-600 font-semibold mt-1">✓ Clinic Img 2 ready</p>
 
-              <div>
+          <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
               Clinic Image 2
             </label>
@@ -1540,7 +1540,6 @@ export const SuperAdminDashboard: React.FC = () => {
             {newDoctorForm.clinicImages?.[1] && (
               <p className="text-[10px] text-emerald-600 font-semibold mt-1">✓ Clinic Img 2 ready</p>
             )}
-          </div>
         </div>
 
         {/* Modal Action Buttons */}
