@@ -93,7 +93,62 @@ export const SuperAdminDashboard: React.FC = () => {
     razorpayKeySecret: 'sec_new_doc_live',
     razorpayAccountType: 'PLATFORM_SPLIT' as 'DIRECT' | 'PLATFORM_SPLIT',
   });
+  {/* Doctor DP Image URL Input */}
+<div>
+  <label className="block text-sm font-medium text-gray-300 mb-1">Doctor Profile Photo (DP) URL</label>
+  <input
+    type="text"
+    value={newDoctorForm.doctorImageUrl}
+    onChange={(e) => setNewDoctorForm({ ...newDoctorForm, doctorImageUrl: e.target.value })}
+    placeholder="e.g., /doctor-dp.jpg ya image link"
+    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white"
+  />
+</div>
 
+{/* Clinic Image 1 Input */}
+<div>
+  <label className="block text-sm font-medium text-gray-300 mb-1">Clinic Image 1 URL</label>
+  <input
+    type="text"
+    value={newDoctorForm.clinicImages[0]}
+    onChange={(e) => {
+      const updatedImages = [...newDoctorForm.clinicImages];
+      updatedImages[0] = e.target.value;
+      setNewDoctorForm({ ...newDoctorForm, clinicImages: updatedImages });
+    }}
+    placeholder="Clinic photo link 1"
+    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white"
+  />
+</div>
+
+{/* Clinic Image 2 Input */}
+<div>
+  <label className="block text-sm font-medium text-gray-300 mb-1">Clinic Image 2 URL</label>
+  <input
+    type="text"
+    value={newDoctorForm.clinicImages[1]}
+    onChange={(e) => {
+      const updatedImages = [...newDoctorForm.clinicImages];
+      updatedImages[1] = e.target.value;
+      setNewDoctorForm({ ...newDoctorForm, clinicImages: updatedImages });
+    }}
+    placeholder="Clinic photo link 2"
+    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white"
+  />
+</div>
+
+  <div className="flex items-center gap-3">
+  <img 
+    src={currentDoctor.doctorImageUrl || '/default-doctor.png'} 
+    alt={currentDoctor.name} 
+    className="w-12 h-12 rounded-full object-cover border-2 border-emerald-500 shadow"
+  />
+  <div>
+    <h2 className="font-bold text-lg">{currentDoctor.name}</h2>
+    <p className="text-xs text-gray-400">Cabin {currentDoctor.cabinNumber}</p>
+  </div>
+</div>
+  
   // ==========================================
   // LAYER 1: ADMIN USERNAME & PASSWORD LOGIN
   // ==========================================
