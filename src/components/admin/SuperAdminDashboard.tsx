@@ -110,7 +110,8 @@ export const SuperAdminDashboard: React.FC = () => {
   />
 </div>
 
-  <div className="flex items-center gap-3">
+  <div> 
+    <label className="flex items-center gap-3" </label>
   <img 
     src={currentDoctor.doctorImageUrl || '/default-doctor.png'} 
     alt={currentDoctor.name} 
