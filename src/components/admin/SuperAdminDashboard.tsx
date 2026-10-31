@@ -1263,255 +1263,61 @@ export const SuperAdminDashboard: React.FC = () => {
                   </div>
                 </div>
 
-{/* ========================================== */}
-{/* SAFE DEVICE UPLOAD WITH COMPRESSION & STATUS */}
+
+                {/* ========================================== */}
+{/* DOCTOR & CLINIC PHOTOS UPLOAD SECTION      */}
 {/* ========================================== */}
 <div className="space-y-4 pt-2 border-t border-slate-200">
-  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Doctor & Clinic Photos (Device Upload)</h4>
+  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Doctor & Clinic Photos</h4>
 
-  {/* Doctor Profile Photo */}
+  {/* Doctor Profile Photo (DP) */}
   <div>
     <label className="block text-xs font-bold text-slate-700 mb-1">
-      Doctor Profile Photo (DP) *
+      Doctor Profile Photo (DP) URL *
     </label>
     <input
-      type="file"
-      accept="image/*"
-      onChange={(e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const img = new Image();
-          img.src = event.target?.result as string;
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            const MAX_WIDTH = 300;
-            const MAX_HEIGHT = 300;
-            let width = img.width;
-            let height = img.height;
-
-            if (width > height) {
-              if (width > MAX_WIDTH) {
-                height *= MAX_WIDTH / width;
-                width = MAX_WIDTH;
-              }
-            } else {
-              if (height > MAX_HEIGHT) {
-                width *= MAX_HEIGHT / height;
-                height = MAX_HEIGHT;
-              }
-            }
-
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            ctx?.drawImage(img, 0, 0, width, height);
-            
-            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
-            setNewDoctorForm(prev => ({ ...prev, profilePic: compressedBase64 }));
-          };
-        };
-        reader.readAsDataURL(file);
-      }}
-      className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+      type="text"
+      required
+      value={newDoctorForm.profilePic}
+      onChange={(e) => setNewDoctorForm({ ...newDoctorForm, profilePic: e.target.value })}
+      placeholder="Paste image link here (e.g. https://...)"
+      className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs focus:border-blue-600 focus:outline-none"
     />
-    {newDoctorForm.profilePic && (
-      <p className="text-[10px] text-emerald-600 font-semibold mt-1">✓ Doctor DP loaded successfully</p>
-    )}
   </div>
 
-  {/* Clinic Images (1 & 2 Side-by-Side) */}
+  {/* Clinic Images (1 & 2) */}
   <div className="grid grid-cols-2 gap-3">
     <div>
       <label className="block text-xs font-bold text-slate-700 mb-1">
-        Clinic Image 1
+        Clinic Image 1 URL
       </label>
       <input
-        type="file"
-        accept="image/*"
+        type="text"
+        value={newDoctorForm.clinicImages?.[0] || ''}
         onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (!file) return;
-          const reader = new FileReader();
-          reader.onload = (event) => {
-            const img = new Image();
-            img.src = event.target?.result as string;
-            img.onload = () => {
-              const canvas = document.createElement('canvas');
-              const MAX_WIDTH = 400;
-              const MAX_HEIGHT = 400;
-              let width = img.width;
-              let height = img.height;
-
-              if (width > height) {
-                if (width > MAX_WIDTH) {
-                  height *= MAX_WIDTH / width;
-                  width = MAX_WIDTH;
-                }
-              } else {
-                if (height > MAX_HEIGHT) {
-                  width *= MAX_HEIGHT / height;
-                  height = MAX_HEIGHT;
-                }
-              }
-
-              canvas.width = width;
-              canvas.height = height;
-              const ctx = canvas.getContext('2d');
-              ctx?.drawImage(img, 0, 0, width, height);
-
-              const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
-              setNewDoctorForm(prev => {
-                const imgs = [...(prev.clinicImages || ['', ''])];
-                imgs[0] = compressedBase64;
-                return { ...prev, clinicImages: imgs };
-              });
-            };
-          };
-          reader.readAsDataURL(file);
+          const imgs = [...(newDoctorForm.clinicImages || ['', ''])];
+          imgs[0] = e.target.value;
+          setNewDoctorForm({ ...newDoctorForm, clinicImages: imgs });
         }}
-        className="w-full text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 cursor-pointer"
+        placeholder="Clinic image link 1"
+        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs focus:border-blue-600 focus:outline-none"
       />
-      {newDoctorForm.clinicImages?.[0] && (
-        <p className="text-[10px] text-emerald-600 font-semibold mt-1">✓ Clinic Img 1 ready</p>
-      )}
     </div>
-
     <div>
       <label className="block text-xs font-bold text-slate-700 mb-1">
-        Clinic Image 2
+        Clinic Image 2 URL
       </label>
       <input
-        type="file"
-        accept="image/*"
+        type="text"
+        value={newDoctorForm.clinicImages?.[1] || ''}
         onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (!file) return;
-          const reader = new FileReader();
-          reader.onload = (event) => {
-            const img = new Image();
-            img.src = event.target?.result as string;
-            img.onload = () => {
-              const canvas = document.createElement('canvas');
-              const MAX_WIDTH = 400;
-              const MAX_HEIGHT = 400;
-              let width = img.width;
-              let height = img.height;
-
-              if (width > height) {
-                if (width > MAX_WIDTH) {
-                  height *= MAX_WIDTH / width;
-                  width = MAX_WIDTH;
-                }
-              } else {
-                if (height > MAX_HEIGHT) {
-                  width *= MAX_HEIGHT / height;
-                  height = MAX_HEIGHT;
-                }
-              }
-
-              canvas.width = width;
-              canvas.height = height;
-              const ctx = canvas.getContext('2d');
-              ctx?.drawImage(img, 0, 0, width, height);
-
-              const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
-              setNewDoctorForm(prev => {
-                const imgs = [...(prev.clinicImages || ['', ''])];
-                imgs[1] = compressedBase64;
-                return { ...prev, clinicImages: imgs };
-              });
-            };
-          };
-          reader.readAsDataURL(file);
+          const imgs = [...(newDoctorForm.clinicImages || ['', ''])];
+          imgs[1] = e.target.value;
+          setNewDoctorForm({ ...newDoctorForm, clinicImages: imgs });
         }}
-        className="w-full text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 cursor-pointer"
+        placeholder="Clinic image link 2"
+        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs focus:border-blue-600 focus:outline-none"
       />
-      {newDoctorForm.clinicImages?.[1] && (
-        <p className="text-[10px] text-emerald-600 font-semibold mt-1">✓ Clinic Img 2 ready</p>
-      )}
     </div>
   </div>
-
-  <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-
-
-            {/* Clinic Image 2 */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Clinic Image 2
-            </label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                  const img = new Image();
-                  img.src = event.target?.result as string;
-                  img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 400;
-                    const MAX_HEIGHT = 400;
-                    let width = img.width;
-                    let height = img.height;
-
-                    if (width > height) {
-                      if (width > MAX_WIDTH) {
-                        height *= MAX_WIDTH / width;
-                        width = MAX_WIDTH;
-                      }
-                    } else {
-                      if (height > MAX_HEIGHT) {
-                        width *= MAX_HEIGHT / height;
-                        height = MAX_HEIGHT;
-                      }
-                    }
-
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx?.drawImage(img, 0, 0, width, height);
-
-                    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
-                    setNewDoctorForm(prev => {
-                      const imgs = [...(prev.clinicImages || ['', ''])];
-                      imgs[1] = compressedBase64;
-                      return { ...prev, clinicImages: imgs };
-                    });
-                  };
-                };
-                reader.readAsDataURL(file);
-              }}
-              className="w-full text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 cursor-pointer"
-            />
-            {newDoctorForm.clinicImages?.[1] && (
-              <p className="text-[10px] text-emerald-600 font-semibold mt-1">✓ Clinic Img 2 ready</p>
-            )}
-          </div>
-        </div>
-
-        {/* Modal Action Buttons */}
-        <div className="pt-2 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setShowAddDoctorModal(false)}
-            className="flex-1 rounded-xl border border-slate-300 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className="flex-1 rounded-xl bg-blue-600 py-2.5 text-xs font-bold text-white shadow-md hover:bg-blue-500"
-          >
-            Create & Launch Clinic
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-)}
+</div>
