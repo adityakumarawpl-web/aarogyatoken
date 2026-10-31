@@ -110,19 +110,6 @@ export const SuperAdminDashboard: React.FC = () => {
   />
 </div>
 
-  <div> 
-    <label className="flex items-center gap-3" </label>
-  <img 
-    src={currentDoctor.doctorImageUrl || '/default-doctor.png'} 
-    alt={currentDoctor.name} 
-    className="w-12 h-12 rounded-full object-cover border-2 border-emerald-500 shadow"
-  />
-  <div>
-    <h2 className="font-bold text-lg">{currentDoctor.name}</h2>
-    <p className="text-xs text-gray-400">Cabin {currentDoctor.cabinNumber}</p>
-  </div>
-</div>
-
   // ==========================================
   // LAYER 1: ADMIN USERNAME & PASSWORD LOGIN
   // ==========================================
