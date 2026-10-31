@@ -1263,53 +1263,72 @@ export const SuperAdminDashboard: React.FC = () => {
                   </div>
                 </div>
 
-              {/* Doctor DP / Profile Picture URL Input */}
+{/* Doctor Profile Photo Direct Upload from Device */}
 <div>
   <label className="block text-xs font-bold text-slate-700 mb-1">
-    Doctor Profile Picture (DP) URL *
+    Doctor Profile Photo (Device se upload karein) *
   </label>
   <input
-    type="text"
-    required
-    value={newDoctorForm.profilePic}
-    onChange={(e) => setNewDoctorForm({ ...newDoctorForm, profilePic: e.target.value })}
-    placeholder="e.g. /doctor-dp.jpg or image link"
-    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs focus:border-blue-600 focus:outline-none"
+    type="file"
+    accept="image/*"
+    onChange={(e) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setNewDoctorForm({ ...newDoctorForm, profilePic: reader.result as string });
+        };
+        reader.readAsDataURL(file);
+      }
+    }}
+    className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
   />
 </div>
 
-{/* Clinic Images Inputs */}
+{/* Clinic Images Direct Upload from Device */}
 <div className="grid grid-cols-2 gap-3">
   <div>
     <label className="block text-xs font-bold text-slate-700 mb-1">
-      Clinic Image 1 URL
+      Clinic Image 1 (Device se)
     </label>
     <input
-      type="text"
-      value={newDoctorForm.clinicImages?.[0] || ''}
+      type="file"
+      accept="image/*"
       onChange={(e) => {
-        const imgs = [...(newDoctorForm.clinicImages || ['', ''])];
-        imgs[0] = e.target.value;
-        setNewDoctorForm({ ...newDoctorForm, clinicImages: imgs });
+        const file = e.target.files?.[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const imgs = [...(newDoctorForm.clinicImages || ['', ''])];
+            imgs[0] = reader.result as string;
+            setNewDoctorForm({ ...newDoctorForm, clinicImages: imgs });
+          };
+          reader.readAsDataURL(file);
+        }
       }}
-      placeholder="Clinic photo link 1"
-      className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs focus:border-blue-600 focus:outline-none"
+      className="w-full text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 cursor-pointer"
     />
   </div>
   <div>
     <label className="block text-xs font-bold text-slate-700 mb-1">
-      Clinic Image 2 URL
+      Clinic Image 2 (Device se)
     </label>
     <input
-      type="text"
-      value={newDoctorForm.clinicImages?.[1] || ''}
+      type="file"
+      accept="image/*"
       onChange={(e) => {
-        const imgs = [...(newDoctorForm.clinicImages || ['', ''])];
-        imgs[1] = e.target.value;
-        setNewDoctorForm({ ...newDoctorForm, clinicImages: imgs });
+        const file = e.target.files?.[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const imgs = [...(newDoctorForm.clinicImages || ['', ''])];
+            imgs[1] = reader.result as string;
+            setNewDoctorForm({ ...newDoctorForm, clinicImages: imgs });
+          };
+          reader.readAsDataURL(file);
+        }
       }}
-      placeholder="Clinic photo link 2"
-      className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs focus:border-blue-600 focus:outline-none"
+      className="w-full text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 cursor-pointer"
     />
   </div>
 </div>
