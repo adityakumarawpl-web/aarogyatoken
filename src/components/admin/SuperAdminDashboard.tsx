@@ -80,6 +80,8 @@ export const SuperAdminDashboard: React.FC = () => {
     address: '',
     city: 'Kanpur, UP',
     phone: '',
+    doctorImageUrl: '',
+    clinicImages: ['', ''], // Do clinic images ke liye
     timings: '10:00 AM - 02:00 PM & 05:00 PM - 08:00 PM',
     consultationFee: 500,
     staffUsername: '',
