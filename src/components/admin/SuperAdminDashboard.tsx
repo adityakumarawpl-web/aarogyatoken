@@ -1506,6 +1506,6 @@ export const SuperAdminDashboard: React.FC = () => {
           Create & Launch Clinic
         </button>
       </div>
-    </form>
-  </div>
+    
+  
 
