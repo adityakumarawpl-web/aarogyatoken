@@ -1482,12 +1482,8 @@ export const SuperAdminDashboard: React.FC = () => {
                 };
                 reader.readAsDataURL(file);
               }}
-              className="w-full text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 cursor-pointer"
-            />
-            {newDoctorForm.clinicImages?.[1] && (
-              <p className="text-[10px] text-emerald-600 font-semibold mt-1">✓ Clinic Img 2 ready</p>
 
-          <div>
+              <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
               Clinic Image 2
             </label>
@@ -1540,10 +1536,30 @@ export const SuperAdminDashboard: React.FC = () => {
             {newDoctorForm.clinicImages?.[1] && (
               <p className="text-[10px] text-emerald-600 font-semibold mt-1">✓ Clinic Img 2 ready</p>
             )}
+          </div>
         </div>
 
         {/* Modal Action Buttons */}
         <div className="pt-2 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setShowAddDoctorModal(false)}
+            className="flex-1 rounded-xl border border-slate-300 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="flex-1 rounded-xl bg-blue-600 py-2.5 text-xs font-bold text-white shadow-md hover:bg-blue-500"
+          >
+            Create & Launch Clinic
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+)}
+              
           <button
             type="button"
             onClick={() => setShowAddDoctorModal(false)}
