@@ -80,7 +80,7 @@ export const SuperAdminDashboard: React.FC = () => {
     address: '',
     city: 'Kanpur, UP',
     phone: '',
-    doctorImageUrl: '',
+    profilePic: '',
     clinicImages: ['', ''], // Do clinic images ke liye
     timings: '10:00 AM - 02:00 PM & 05:00 PM - 08:00 PM',
     consultationFee: 500,
@@ -93,33 +93,6 @@ export const SuperAdminDashboard: React.FC = () => {
     razorpayKeySecret: 'sec_new_doc_live',
     razorpayAccountType: 'PLATFORM_SPLIT' as 'DIRECT' | 'PLATFORM_SPLIT',
   });
-  {/* Doctor DP Image URL Input */}
-<div>
-  <label className="block text-sm font-medium text-gray-300 mb-1">Doctor Profile Photo (DP) URL</label>
-  <input
-    type="text"
-    value={newDoctorForm.doctorImageUrl}
-    onChange={(e) => setNewDoctorForm({ ...newDoctorForm, doctorImageUrl: e.target.value })}
-    placeholder="e.g., /doctor-dp.jpg ya image link"
-    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white"
-  />
-</div>
-
-{/* Clinic Image 1 Input */}
-<div>
-  <label className="block text-sm font-medium text-gray-300 mb-1">Clinic Image 1 URL</label>
-  <input
-    type="text"
-    value={newDoctorForm.clinicImages[0]}
-    onChange={(e) => {
-      const updatedImages = [...newDoctorForm.clinicImages];
-      updatedImages[0] = e.target.value;
-      setNewDoctorForm({ ...newDoctorForm, clinicImages: updatedImages });
-    }}
-    placeholder="Clinic photo link 1"
-    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white"
-  />
-</div>
 
 {/* Clinic Image 2 Input */}
 <div>
@@ -1301,6 +1274,58 @@ export const SuperAdminDashboard: React.FC = () => {
                     </select>
                   </div>
                 </div>
+
+              {/* Doctor DP / Profile Picture URL Input */}
+<div>
+  <label className="block text-xs font-bold text-slate-700 mb-1">
+    Doctor Profile Picture (DP) URL *
+  </label>
+  <input
+    type="text"
+    required
+    value={newDoctorForm.profilePic}
+    onChange={(e) => setNewDoctorForm({ ...newDoctorForm, profilePic: e.target.value })}
+    placeholder="e.g. /doctor-dp.jpg or image link"
+    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs focus:border-blue-600 focus:outline-none"
+  />
+</div>
+
+{/* Clinic Images Inputs */}
+<div className="grid grid-cols-2 gap-3">
+  <div>
+    <label className="block text-xs font-bold text-slate-700 mb-1">
+      Clinic Image 1 URL
+    </label>
+    <input
+      type="text"
+      value={newDoctorForm.clinicImages?.[0] || ''}
+      onChange={(e) => {
+        const imgs = [...(newDoctorForm.clinicImages || ['', ''])];
+        imgs[0] = e.target.value;
+        setNewDoctorForm({ ...newDoctorForm, clinicImages: imgs });
+      }}
+      placeholder="Clinic photo link 1"
+      className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs focus:border-blue-600 focus:outline-none"
+    />
+  </div>
+  <div>
+    <label className="block text-xs font-bold text-slate-700 mb-1">
+      Clinic Image 2 URL
+    </label>
+    <input
+      type="text"
+      value={newDoctorForm.clinicImages?.[1] || ''}
+      onChange={(e) => {
+        const imgs = [...(newDoctorForm.clinicImages || ['', ''])];
+        imgs[1] = e.target.value;
+        setNewDoctorForm({ ...newDoctorForm, clinicImages: imgs });
+      }}
+      placeholder="Clinic photo link 2"
+      className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs focus:border-blue-600 focus:outline-none"
+    />
+  </div>
+</div>
+                
               </div>
 
               <div className="pt-2 flex items-center gap-3">
