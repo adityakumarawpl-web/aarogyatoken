@@ -78,7 +78,7 @@ export const SuperAdminDashboard: React.FC = () => {
     clinicName: '',
     cabinNumber: '',
     address: '',
-    city: '', '',
+    city: '',
     phone: '',
     profilePic: '',
     clinicImages: ['', ''], // Do clinic images ke liye
@@ -299,7 +299,7 @@ export const SuperAdminDashboard: React.FC = () => {
       clinicName: '',
       cabinNumber: '',
       address: '',
-      city: '', '',
+      city: '',
       phone: '',
       profilePic: '',
       clinicImages: ['', ''],
