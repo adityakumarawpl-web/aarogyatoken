@@ -95,36 +95,33 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
         </div>
 
 {/* Clinic Images Gallery Section */}
-{doctor.clinicImages && (
-  (() => {
-    // Array ho ya Object (Firebase map), dono ko handle karne ke liye
-    const imagesArray = Array.isArray(doctor.clinicImages)
-      ? doctor.clinicImages
-      : Object.values(doctor.clinicImages);
+        {(() => {
+          const imgs = doctor.clinicImages;
+          if (!imgs) return null;
+          
+          const imagesArray = Array.isArray(imgs) ? imgs : Object.values(imgs);
+          const validImages = imagesArray.filter(url => typeof url === 'string' && url.trim().length > 0);
 
-    const validImages = imagesArray.filter((img): img is string => typeof img === 'string' && img.trim() !== '');
+          if (validImages.length === 0) return null;
 
-    if (validImages.length === 0) return null;
-
-    return (
-      <div className="my-3">
-        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
-          Clinic Photos
-        </span>
-        <div className="grid grid-cols-2 gap-2">
-          {validImages.map((imgUrl, index) => (
-            <img
-              key={index}
-              src={imgUrl}
-              alt={`Clinic ${index + 1}`}
-              className="w-full h-24 object-cover rounded-xl border border-slate-200 shadow-xs"
-            />
-          ))}
-        </div>
-      </div>
-    );
-  })()
-)}
+          return (
+            <div className="mt-4">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
+                Clinic Photos
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                {validImages.map((imgUrl, index) => (
+                  <img
+                    key={index}
+                    src={imgUrl}
+                    alt={`Clinic ${index + 1}`}
+                    className="w-full h-24 object-cover rounded-xl border border-slate-200 shadow-xs"
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })()}
         
         {/* ONLY CURRENT TOKEN DISPLAY (Zero Privacy Leak - No Patient Names or Lists) */}
         <div className="mt-5 rounded-2xl bg-gradient-to-br from-blue-900 to-indigo-950 p-4 text-center text-white shadow-md relative overflow-hidden">
