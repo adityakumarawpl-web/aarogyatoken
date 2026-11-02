@@ -1270,60 +1270,62 @@ export const SuperAdminDashboard: React.FC = () => {
     />
   </div>
 
-  {/* Clinic Images (1 & 2) */}
-  <div className="grid grid-cols-2 gap-3">
-    <div>
-      <label className="block text-xs font-bold text-slate-700 mb-1">
-        Clinic Image 1 URL
-      </label>
-      <input
-        type="text"
-        value={newDoctorForm.clinicImages?.[0] || ''}
-        onChange={(e) => {
-          const imgs = [...(newDoctorForm.clinicImages || ['', ''])];
-          imgs[0] = e.target.value;
-          setNewDoctorForm({ ...newDoctorForm, clinicImages: imgs });
-        }}
-        placeholder="Clinic image link 1"
-        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs focus:border-blue-600 focus:outline-none"
-      />
-    </div>
+{/* Clinic Images (1 & 2) */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Clinic Image 1 URL
+              </label>
+              <input
+                type="text"
+                value={newDoctorForm.clinicImages?.[0] || ''}
+                onChange={(e) => {
+                  const imgs = [...(newDoctorForm.clinicImages || ['', ''])];
+                  imgs[0] = e.target.value;
+                  setNewDoctorForm({ ...newDoctorForm, clinicImages: imgs });
+                }}
+                placeholder="Clinic image link 1"
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs focus:border-blue-600 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Clinic Image 2 URL
+              </label>
+              <input
+                type="text"
+                value={newDoctorForm.clinicImages?.[1] || ''}
+                onChange={(e) => {
+                  const imgs = [...(newDoctorForm.clinicImages || ['', ''])];
+                  imgs[1] = e.target.value;
+                  setNewDoctorForm({ ...newDoctorForm, clinicImages: imgs });
+                }}
+                placeholder="Clinic image link 2"
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs focus:border-blue-600 focus:outline-none"
+              />
+            </div>
+          </div>
+        </div>
 
-    <div>
-      <label className="block text-xs font-bold text-slate-700 mb-1">
-        Clinic Image 2 URL
-      </label>
-      <input
-        type="text"
-        value={newDoctorForm.clinicImages?.[1] || ''}
-        onChange={(e) => {
-          const imgs = [...(newDoctorForm.clinicImages || ['', ''])];
-          imgs[1] = e.target.value;
-          setNewDoctorForm({ ...newDoctorForm, clinicImages: imgs });
-        }}
-        placeholder="Clinic image link 2"
-        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs focus:border-blue-600 focus:outline-none"
-      />
+        {/* Modal Action Buttons */}
+        <div className="pt-2 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setShowAddDoctorModal(false)}
+            className="flex-1 rounded-xl border border-slate-300 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="flex-1 rounded-xl bg-blue-600 py-2.5 text-xs font-bold text-white shadow-md hover:bg-blue-500"
+          >
+            Create & Launch Clinic
+          </button>
+        </div>
+      </form>
     </div>
   </div>
-
-  {/* Modal Action Buttons */}
-  <div className="pt-2 flex items-center gap-3">
-    <button
-      type="button"
-      onClick={() => setShowAddDoctorModal(false)}
-      className="flex-1 rounded-xl border border-slate-300 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100"
-    >
-      Cancel
-    </button>
-    <button
-      type="submit"
-      className="flex-1 rounded-xl bg-blue-600 py-2.5 text-xs font-bold text-white shadow-md hover:bg-blue-500"
-    >
-      Create & Launch Clinic
-    </button>
-  </div>
-</form>
-</div>
-</div>
 )}
+
+  
