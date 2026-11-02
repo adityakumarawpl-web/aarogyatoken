@@ -1351,4 +1351,4 @@ export const SuperAdminDashboard: React.FC = () => {
         </div>
       </form>
   </div>
-  )
+  )}
