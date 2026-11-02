@@ -73,7 +73,7 @@ export const SuperAdminDashboard: React.FC = () => {
   // New Doctor Form with Razorpay settings
   const [newDoctorForm, setNewDoctorForm] = useState({
     name: '',
-    degree: '', '',
+    degree: '',
     specialty: '',
     clinicName: '',
     cabinNumber: '',
@@ -294,7 +294,7 @@ export const SuperAdminDashboard: React.FC = () => {
 
     setNewDoctorForm({
       name: '',
-      degree: '', '',
+      degree: '',
       specialty: '',
       clinicName: '',
       cabinNumber: '',
