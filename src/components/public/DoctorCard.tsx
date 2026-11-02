@@ -94,6 +94,27 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
           </div>
         </div>
 
+{/* Clinic Images Gallery Section */}
+{doctor.clinicImages && doctor.clinicImages.length > 0 && (
+  <div className="my-3">
+    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
+      Clinic Photos
+    </span>
+    <div className="grid grid-cols-2 gap-2">
+      {doctor.clinicImages.map((imgUrl, index) => (
+        imgUrl ? (
+          <img
+            key={index}
+            src={imgUrl}
+            alt={`Clinic ${index + 1}`}
+            className="w-full h-24 object-cover rounded-xl border border-slate-200 shadow-xs"
+          />
+        ) : null
+      ))}
+    </div>
+  </div>
+)}
+        
         {/* ONLY CURRENT TOKEN DISPLAY (Zero Privacy Leak - No Patient Names or Lists) */}
         <div className="mt-5 rounded-2xl bg-gradient-to-br from-blue-900 to-indigo-950 p-4 text-center text-white shadow-md relative overflow-hidden">
           <span className="text-[11px] uppercase font-bold text-blue-300 tracking-wider block">
