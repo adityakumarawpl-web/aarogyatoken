@@ -285,8 +285,7 @@ export const SuperAdminDashboard: React.FC = () => {
     }
 
     addNewDoctor({
-      ...newDoctorForm,
-      profilePic: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=300',
+    ...newDoctorForm,
     });
 
     setShowAddDoctorModal(false);
@@ -1263,7 +1262,7 @@ export const SuperAdminDashboard: React.FC = () => {
       Doctor Profile Photo (DP) URL *
     </label>
     <input
-      type="text"
+      type="url"
       required
       value={newDoctorForm.profilePic}
       onChange={(e) => setNewDoctorForm({ ...newDoctorForm, profilePic: e.target.value })}
@@ -1279,7 +1278,7 @@ export const SuperAdminDashboard: React.FC = () => {
                 Clinic Image 1 URL
               </label>
               <input
-                type="text"
+                type="url"
                 value={newDoctorForm.clinicImages?.[0] || ''}
                 onChange={(e) => {
                   const imgs = [...(newDoctorForm.clinicImages || ['', ''])];
@@ -1295,7 +1294,7 @@ export const SuperAdminDashboard: React.FC = () => {
                 Clinic Image 2 URL
               </label>
               <input
-                type="text"
+                type="url"
                 value={newDoctorForm.clinicImages?.[1] || ''}
                 onChange={(e) => {
                   const imgs = [...(newDoctorForm.clinicImages || ['', ''])];
