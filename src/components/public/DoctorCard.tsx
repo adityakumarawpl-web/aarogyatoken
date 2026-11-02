@@ -22,7 +22,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
 }) => {
   const { patients } = useClinic();
   const currentServingToken = getCurrentlyServingToken(patients, doctor.id);
-
+console.log("Doctor Data Check:", doctor.name, doctor.clinicImages);
   const getStatusBadge = () => {
     switch (doctor.status) {
       case 'AVAILABLE':
