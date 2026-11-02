@@ -1285,7 +1285,8 @@ export const SuperAdminDashboard: React.FC = () => {
     />
   )}
 </div>
-
+</div>
+            
 {/* Clinic Image 1 */}
 <div>
   <label className="block text-sm font-medium mb-1">
@@ -1348,10 +1349,9 @@ export const SuperAdminDashboard: React.FC = () => {
             Create & Launch Clinic
           </button>
         </div>
-      </form>
-    </div>
+      </div>
+    </form>
   </div>
-)}
     </div>
   );
 };
