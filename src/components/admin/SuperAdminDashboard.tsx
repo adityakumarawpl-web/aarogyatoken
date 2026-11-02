@@ -73,12 +73,12 @@ export const SuperAdminDashboard: React.FC = () => {
   // New Doctor Form with Razorpay settings
   const [newDoctorForm, setNewDoctorForm] = useState({
     name: '',
-    degree: 'MBBS, MD',
+    degree: '', '',
     specialty: '',
     clinicName: '',
-    cabinNumber: 'Cabin 1',
+    cabinNumber: '',
     address: '',
-    city: 'Kanpur, UP',
+    city: '', '',
     phone: '',
     profilePic: '',
     clinicImages: ['', ''], // Do clinic images ke liye
