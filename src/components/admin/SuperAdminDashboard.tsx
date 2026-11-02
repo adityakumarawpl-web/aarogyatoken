@@ -1332,7 +1332,7 @@ export const SuperAdminDashboard: React.FC = () => {
     className="w-full border rounded-lg p-2"
   />
 </div>
-</div>
+            </form>
             
         {/* Modal Action Buttons */}
         <div className="pt-2 flex items-center gap-3">
@@ -1350,7 +1350,6 @@ export const SuperAdminDashboard: React.FC = () => {
             Create & Launch Clinic
           </button>
         </div>
-      </form>
        </div>
         </div>
       )}
