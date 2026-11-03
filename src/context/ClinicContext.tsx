@@ -488,15 +488,30 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const addNewDoctor = useCallback((data: Omit<Doctor, 'id' | 'status' | 'onlineTokenFee' | 'createdAt'>): Doctor => {
     const customId = `doc-${Date.now()}`;
-    const newDoc: Doctor = {
+    
+    // Clean data taaki profilePic save ho aur undefined values Firestore ko crash na karein
+    const cleanedData = {
       ...data,
+      profilePic: data.profilePic && data.profilePic.trim() !== ''
+        ? data.profilePic.trim()
+        : 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=300',
+      clinicImages: Array.isArray(data.clinicImages)
+        ? data.clinicImages.filter(img => typeof img === 'string' && img.trim() !== '')
+        : []
+    };
+
+    const newDoc: Doctor = {
+      ...cleanedData,
       id: customId,
       status: 'AVAILABLE',
       onlineTokenFee: 20,
       createdAt: new Date().toISOString(),
     };
 
-    setDoc(doc(db, 'doctors', customId), newDoc).catch(err => {
+    // undefined values completely strip karne ke liye safe payload
+    const safePayload = JSON.parse(JSON.stringify(newDoc));
+
+    setDoc(doc(db, 'doctors', customId), safePayload).catch(err => {
       console.error("Error adding new doctor:", err);
     });
 
