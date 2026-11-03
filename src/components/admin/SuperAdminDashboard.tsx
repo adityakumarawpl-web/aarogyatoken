@@ -641,7 +641,7 @@ export const SuperAdminDashboard: React.FC = () => {
                         <td className="py-3.5 px-4">
                           <div className="flex items-center gap-3">
                             <img
-                              src={doc.profilePic || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=300'}
+                              src={doc.profilePic || ''}
                               alt={doc.name}
                               className="h-10 w-10 rounded-xl object-cover border border-slate-200"
                             />
