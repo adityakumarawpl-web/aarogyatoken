@@ -284,14 +284,13 @@ export const SuperAdminDashboard: React.FC = () => {
       return;
     }
 
-const finalProfilePic =
-      newDoctorForm.profilePic && newDoctorForm.profilePic.trim() !== ''
-        ? newDoctorForm.profilePic.trim()
-        : 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=300';
+const picToSave = newDoctorForm.profilePic && newDoctorForm.profilePic.trim() !== ''
+      ? newDoctorForm.profilePic.trim()
+      : 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=300';
 
     addNewDoctor({
       ...newDoctorForm,
-      profilePic: finalProfilePic,
+      profilePic: picToSave,
       clinicImages: newDoctorForm.clinicImages || ['', ''],
     });
     
@@ -1269,19 +1268,19 @@ const finalProfilePic =
             <label className="block text-sm font-medium mb-1">
               Profile Picture URL
             </label>
-            <input
-              type="text"
-              placeholder="Paste direct image URL (e.g. ImgBB, Unsplash)"
-              value={newDoctorForm.profilePic || ''}
-            onChange={(e) => {
-              const val = e.target.value;
-              setNewDoctorForm((prev) => ({
-                ...prev,
-                profilePic: val,
-              }));
-            }}
-              className="w-full border rounded-lg p-2"
-            />
+          <input
+  type="text"
+  placeholder="Paste direct image URL"
+  value={newDoctorForm.profilePic || ''}
+  onChange={(e) => {
+    const val = e.target.value;
+    setNewDoctorForm(prev => ({
+      ...prev,
+      profilePic: val
+    }));
+  }}
+  className="w-full border rounded-lg p-2"
+/>
           </div>
             
 
