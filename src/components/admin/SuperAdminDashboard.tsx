@@ -1313,7 +1313,7 @@ addNewDoctor({
     />
   </div>
 </div>
-              
+</div>      
             </form>
             
         {/* Modal Action Buttons */}
