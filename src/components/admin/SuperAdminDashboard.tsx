@@ -284,11 +284,17 @@ export const SuperAdminDashboard: React.FC = () => {
       return;
     }
 
-addNewDoctor({
+const finalProfilePic =
+      newDoctorForm.profilePic && newDoctorForm.profilePic.trim() !== ''
+        ? newDoctorForm.profilePic.trim()
+        : 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=300';
+
+    addNewDoctor({
       ...newDoctorForm,
-      profilePic: newDoctorForm.profilePic?.trim() || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=300',
+      profilePic: finalProfilePic,
       clinicImages: newDoctorForm.clinicImages || ['', ''],
     });
+    
     setShowAddDoctorModal(false);
     setSaveSuccessMsg(`New Doctor Clinic "${newDoctorForm.name}" created successfully with Razorpay payment setting!`);
     setTimeout(() => setSaveSuccessMsg(''), 4000);
@@ -1266,13 +1272,14 @@ addNewDoctor({
             <input
               type="text"
               placeholder="Paste direct image URL (e.g. ImgBB, Unsplash)"
-              value={newDoctorForm.profilePic}
-              onChange={(e) =>
-                setNewDoctorForm({
-                  ...newDoctorForm,
-                  profilePic: e.target.value.trim(),
-                })
-              }
+              value={newDoctorForm.profilePic || ''}
+            onChange={(e) => {
+              const val = e.target.value;
+              setNewDoctorForm((prev) => ({
+                ...prev,
+                profilePic: val,
+              }));
+            }}
               className="w-full border rounded-lg p-2"
             />
           </div>
