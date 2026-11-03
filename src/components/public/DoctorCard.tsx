@@ -63,7 +63,7 @@ console.log("Doctor Data Check:", doctor.name, doctor.clinicImages);
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3.5">
             <img
-              src={doctor.profilePic || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=300'}
+              src={doctor.profilePic || ''}
               alt={doctor.name}
               className="h-16 w-16 rounded-2xl object-cover border-2 border-slate-100 shadow-xs group-hover:scale-105 transition-transform"
             />
