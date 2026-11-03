@@ -284,10 +284,11 @@ export const SuperAdminDashboard: React.FC = () => {
       return;
     }
 
-    addNewDoctor({
-    ...newDoctorForm,
+addNewDoctor({
+      ...newDoctorForm,
+      profilePic: newDoctorForm.profilePic?.trim() || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=300',
+      clinicImages: newDoctorForm.clinicImages || ['', ''],
     });
-
     setShowAddDoctorModal(false);
     setSaveSuccessMsg(`New Doctor Clinic "${newDoctorForm.name}" created successfully with Razorpay payment setting!`);
     setTimeout(() => setSaveSuccessMsg(''), 4000);
@@ -1256,36 +1257,25 @@ export const SuperAdminDashboard: React.FC = () => {
 <div className="space-y-4 pt-2 border-t border-slate-200">
   <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Doctor & Clinic Photos</h4>
 
-  {/* Doctor Profile Photo (DP) */}
 
   {/* Doctor Profile Picture */}
-<div>
-  <label className="block text-sm font-medium mb-1">
-    Profile Picture URL
-  </label>
-
-  <input
-    type="text"
-    placeholder="Paste Google Drive image URL"
-    value={newDoctorForm.profilePic}
-    onChange={(e) =>
-      setNewDoctorForm({
-        ...newDoctorForm,
-        profilePic: e.target.value.trim (),
-      })
-    }
-    className="w-full border rounded-lg p-2"
-  />
-
-  {newDoctorForm.profilePic && (
-    <img
-      src={newDoctorForm.profilePic}
-      alt="Doctor Profile"
-      className="w-20 h-20 object-cover rounded-full mt-2"
-    />
-  )}
-</div>
-</div>
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Profile Picture URL
+            </label>
+            <input
+              type="text"
+              placeholder="Paste direct image URL (e.g. ImgBB, Unsplash)"
+              value={newDoctorForm.profilePic}
+              onChange={(e) =>
+                setNewDoctorForm({
+                  ...newDoctorForm,
+                  profilePic: e.target.value.trim(),
+                })
+              }
+              className="w-full border rounded-lg p-2"
+            />
+          </div>
             
 
 {/* Clinic Images (1 & 2) */}
