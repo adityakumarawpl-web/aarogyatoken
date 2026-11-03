@@ -24,6 +24,7 @@ export interface Doctor {
   staffUsername: string;
   staffPassword: string;
   profilePic?: string;
+  clinicImages?: string[];
   avgTimePerPatientMinutes: number;
   createdAt: string;
   // Razorpay Payment Configuration for this doctor/clinic
