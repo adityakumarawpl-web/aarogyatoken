@@ -1265,13 +1265,13 @@ export const SuperAdminDashboard: React.FC = () => {
   </label>
 
   <input
-    type="url"
+    type="text"
     placeholder="Paste Google Drive image URL"
     value={newDoctorForm.profilePic}
     onChange={(e) =>
       setNewDoctorForm({
         ...newDoctorForm,
-        profilePic: e.target.value,
+        profilePic: e.target.value.trim (),
       })
     }
     className="w-full border rounded-lg p-2"
