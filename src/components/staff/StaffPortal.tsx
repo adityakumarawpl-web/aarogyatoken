@@ -40,6 +40,10 @@ export const StaffPortal: React.FC = () => {
   // Active Tab
   const [activeTab, setActiveTab] = useState<'QUEUE' | 'COMPLETED' | 'ABSENT' | 'REPORTS'>('QUEUE');
   const [searchFilter, setSearchFilter] = useState('');
+  const [selectedDateFilter, setSelectedDateFilter] = useState<string>(
+  new Date().toISOString().split('T')[0]
+);
+const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
 
   // Add Free Walk-in patient modal state
   const [showAddModal, setShowAddModal] = useState(false);
@@ -165,8 +169,18 @@ export const StaffPortal: React.FC = () => {
   // Doctor Patients list
   const doctorPatients = patients.filter((p) => p.doctorId === currentDoctor.id);
 
-  // Filtered by search
-  const filteredPatients = doctorPatients.filter((p) => {
+// 1. Date Filter
+    const patientDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
+    if (selectedDateFilter && patientDate && patientDate !== selectedDateFilter) {
+      return false;
+    }
+
+    // 2. Shift Filter
+    if (selectedShiftFilter !== 'ALL' && p.selectedShift && p.selectedShift !== selectedShiftFilter) {
+      return false;
+    }
+
+    // 3. Search Filter
     if (!searchFilter.trim()) return true;
     const term = searchFilter.toLowerCase();
     return (
@@ -430,16 +444,38 @@ export const StaffPortal: React.FC = () => {
             </button>
           </div>
 
-          {/* Search bar */}
-          <div className="relative w-full sm:w-72">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+{/* Date & Shift Filter with Search bar */}
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            {/* Date Filter */}
             <input
-              type="text"
-              value={searchFilter}
-              onChange={(e) => setSearchFilter(e.target.value)}
-              placeholder="Search token #, name, phone..."
-              className="w-full rounded-xl border border-slate-300 pl-9 pr-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none"
+              type="date"
+              value={selectedDateFilter}
+              onChange={(e) => setSelectedDateFilter(e.target.value)}
+              className="rounded-xl border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white shadow-xs focus:border-blue-500 focus:outline-none"
             />
+
+            {/* Shift Filter */}
+            <select
+              value={selectedShiftFilter}
+              onChange={(e) => setSelectedShiftFilter(e.target.value)}
+              className="rounded-xl border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white shadow-xs focus:border-blue-500 focus:outline-none"
+            >
+              <option value="ALL">All Shifts</option>
+              <option value="Morning">Morning Shift</option>
+              <option value="Evening">Evening Shift</option>
+            </select>
+
+            {/* Search Bar */}
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <input
+                type="text"
+                value={searchFilter}
+                onChange={(e) => setSearchFilter(e.target.value)}
+                placeholder="Search token #, name, phone..."
+                className="w-full rounded-xl border border-slate-300 pl-9 pr-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none"
+              />
+            </div>
           </div>
         </div>
 
