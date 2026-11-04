@@ -189,7 +189,7 @@ const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
       p.mobile.includes(term) ||
       p.complaint.toLowerCase().includes(term)
     );
-  });
+
 
   const waitingPatients = filteredPatients.filter((p) => p.status === 'WAITING' || p.status === 'IN_CABIN');
   // Sort waiting patients: Emergency first, then IN_CABIN, then token number
