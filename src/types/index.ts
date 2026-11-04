@@ -25,6 +25,8 @@ export interface Doctor {
   staffPassword: string;
   profilePic?: string;
   clinicImages?: string[];
+  morningShift?: string;   // Jaise: '10:00 AM - 02:00 PM'
+  eveningShift?: string;   // Jaise: '05:00 PM - 08:00 PM'
   avgTimePerPatientMinutes: number;
   createdAt: string;
   // Razorpay Payment Configuration for this doctor/clinic
@@ -44,6 +46,8 @@ export interface Patient {
   gender: 'Male' | 'Female' | 'Other';
   address: string;
   complaint: string;
+  appointmentDate?: string; // YYYY-MM-DD format (e.g. '2026-11-05')
+  selectedShift?: string;   // 'Morning' ya 'Evening'
   bookingType: BookingType; // WALK_IN is free; ONLINE is ₹20 paid
   status: PatientStatus;
   paymentStatus: PaymentStatus;
