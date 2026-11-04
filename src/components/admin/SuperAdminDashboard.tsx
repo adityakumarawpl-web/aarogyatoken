@@ -83,6 +83,8 @@ export const SuperAdminDashboard: React.FC = () => {
     profilePic: '',
     clinicImages: ['', ''], // Do clinic images ke liye
     timings: '10:00 AM - 02:00 PM & 05:00 PM - 08:00 PM',
+    morningShift: '10:00 AM - 02:00 PM',
+    eveningShift: '05:00 PM - 08:00 PM',
     consultationFee: 500,
     staffUsername: '',
     staffPassword: '',
@@ -310,6 +312,8 @@ const picToSave = newDoctorForm.profilePic && newDoctorForm.profilePic.trim() !=
       profilePic: '',
       clinicImages: ['', ''],
       timings: '10:00 AM - 02:00 PM & 05:00 PM - 08:00 PM',
+      morningShift: '10:00 AM - 02:00 PM',
+      eveningShift: '05:00 PM - 08:00 PM',
       consultationFee: '',
       staffUsername: '',
       staffPassword: '',
@@ -1168,6 +1172,44 @@ const picToSave = newDoctorForm.profilePic && newDoctorForm.profilePic.trim() !=
                 </div>
               </div>
 
+{/* Shift Timings */}
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Morning Shift
+              </label>
+              <input
+                type="text"
+                placeholder="10:00 AM - 02:00 PM"
+                value={newDoctorForm.morningShift}
+                onChange={(e) =>
+                  setNewDoctorForm((prev) => ({
+                    ...prev,
+                    morningShift: e.target.value,
+                  }))
+                }
+                className="w-full border rounded-lg p-2 text-xs"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Evening Shift
+              </label>
+              <input
+                type="text"
+                placeholder="05:00 PM - 08:00 PM"
+                value={newDoctorForm.eveningShift}
+                onChange={(e) =>
+                  setNewDoctorForm((prev) => ({
+                    ...prev,
+                    eveningShift: e.target.value,
+                  }))
+                }
+                className="w-full border rounded-lg p-2 text-xs"
+              />
+            </div>
+          </div>
+              
               {/* STAFF LOGIN CREDENTIALS SECTION */}
               <div className="rounded-2xl bg-amber-50 border border-amber-200 p-4 space-y-3">
                 <span className="text-xs font-bold text-amber-900 uppercase tracking-wider block">
