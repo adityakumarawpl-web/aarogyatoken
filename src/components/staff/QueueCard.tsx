@@ -163,6 +163,34 @@ export const QueueCard: React.FC<QueueCardProps> = ({
                 {patient.bookingType === 'ONLINE' ? 'Online Book' : 'Staff Walk-in (Free)'}
               </span>
 
+{/* Appointment Date Badge */}
+              {patient.appointmentDate && (
+                <span
+                  className={`text-[11px] px-2 py-0.5 rounded-md font-bold ${
+                    isInCabin
+                      ? 'bg-blue-800 text-white'
+                      : 'bg-slate-100 text-slate-800 border border-slate-300'
+                  }`}
+                >
+                  📅 {patient.appointmentDate}
+                </span>
+              )}
+
+              {/* Shift Badge */}
+              {patient.selectedShift && (
+                <span
+                  className={`text-[11px] px-2 py-0.5 rounded-md font-bold ${
+                    isInCabin
+                      ? 'bg-blue-800 text-white'
+                      : patient.selectedShift === 'Morning'
+                      ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                      : 'bg-indigo-100 text-indigo-900 border border-indigo-300'
+                  }`}
+                >
+                  🕒 {patient.selectedShift} Shift
+                </span>
+              )}
+              
               {patient.isEmergency && (
                 <span className="inline-flex items-center gap-1 rounded-md bg-rose-600 text-white px-2 py-0.5 text-[10px] font-black uppercase tracking-wider animate-pulse">
                   <Flame className="h-3 w-3" />
