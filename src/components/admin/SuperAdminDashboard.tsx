@@ -1385,12 +1385,15 @@ const handleCreateDoctor = (e: React.FormEvent) => {
           >
             Cancel
           </button>
-          <button
-            type="submit"
-            className="flex-1 rounded-xl bg-blue-600 py-2.5 text-xs font-bold text-white shadow-md hover:bg-blue-500"
+
+<button
+            type="button"
+            onClick={handleCreateDoctor}
+            className="flex-1 rounded-xl bg-blue-600 py-2.5 text-xs font-bold text-white shadow-md hover:bg-blue-500 cursor-pointer"
           >
             Create & Launch Clinic
           </button>
+          
         </div>
        </div>
         </div>
