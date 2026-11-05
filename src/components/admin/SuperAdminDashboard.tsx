@@ -311,11 +311,6 @@ const handleCreateDoctor = (e: React.FormEvent) => {
     setShowAddDoctorModal(false);
     setSaveSuccessMsg(`New Doctor Clinic "${newDoctorForm.name}" created successfully with Razorpay payment setting!`);
     setTimeout(() => setSaveSuccessMsg(''), 4000);
-  };
-    
-    setShowAddDoctorModal(false);
-    setSaveSuccessMsg(`New Doctor Clinic "${newDoctorForm.name}" created successfully with Razorpay payment setting!`);
-    setTimeout(() => setSaveSuccessMsg(''), 4000);
 
     setNewDoctorForm({
       name: '',
@@ -341,7 +336,7 @@ const handleCreateDoctor = (e: React.FormEvent) => {
       razorpayAccountType: 'PLATFORM_SPLIT',
     });
   };
-
+  
   const handleSaveRazorpaySettings = (e: React.FormEvent) => {
     e.preventDefault();
     updateRazorpaySettings(localRazorpaySettings);
