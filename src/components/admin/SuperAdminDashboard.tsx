@@ -280,13 +280,23 @@ export const SuperAdminDashboard: React.FC = () => {
     .filter((p) => p.bookingType === 'ONLINE')
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-  const handleCreateDoctor = (e: React.FormEvent) => {
+const handleCreateDoctor = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newDoctorForm.name.trim() || !newDoctorForm.clinicName.trim() || !newDoctorForm.staffUsername.trim()) {
+    
+    if (!newDoctorForm.name.trim()) {
+      alert('Kripya Doctor ka Naam bharein!');
+      return;
+    }
+    if (!newDoctorForm.clinicName.trim()) {
+      alert('Kripya Clinic / Hospital ka Naam bharein!');
+      return;
+    }
+    if (!newDoctorForm.staffUsername.trim()) {
+      alert('Kripya Staff Username bharein!');
       return;
     }
 
-const picToSave = newDoctorForm.profilePic && newDoctorForm.profilePic.trim() !== ''
+    const picToSave = newDoctorForm.profilePic && newDoctorForm.profilePic.trim() !== ''
       ? newDoctorForm.profilePic.trim()
       : 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=300';
 
@@ -294,7 +304,14 @@ const picToSave = newDoctorForm.profilePic && newDoctorForm.profilePic.trim() !=
       ...newDoctorForm,
       profilePic: picToSave,
       clinicImages: newDoctorForm.clinicImages || ['', ''],
+      morningShift: newDoctorForm.morningShift || '10:00 AM - 02:00 PM',
+      eveningShift: newDoctorForm.eveningShift || '05:00 PM - 08:00 PM',
     });
+
+    setShowAddDoctorModal(false);
+    setSaveSuccessMsg(`New Doctor Clinic "${newDoctorForm.name}" created successfully with Razorpay payment setting!`);
+    setTimeout(() => setSaveSuccessMsg(''), 4000);
+  };
     
     setShowAddDoctorModal(false);
     setSaveSuccessMsg(`New Doctor Clinic "${newDoctorForm.name}" created successfully with Razorpay payment setting!`);
