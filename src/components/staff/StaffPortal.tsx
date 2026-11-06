@@ -167,7 +167,7 @@ const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
   }
 
 // 1. Doctor Patients list with Date, Shift & Search filters
-  const filteredPatients = patients.filter((p) => {
+  const doctorPatients = patients.filter((p) => {
     // 0. Doctor ID check
     if (p.doctorId !== currentDoctor?.id) {
       return false;
@@ -206,6 +206,9 @@ const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
     );
   });
 
+  // Alias taaki agar niche kahin filteredPatients ya doctorPatients dono me se kuch bhi ho toh crash na ho
+  const filteredPatients = doctorPatients;
+
   const waitingPatients = filteredPatients.filter((p) => p.status === 'WAITING' || p.status === 'IN_CABIN');
   // Sort waiting patients: Emergency first, then IN_CABIN, then token number
   const sortedWaitingPatients = [...waitingPatients].sort((a, b) => {
@@ -221,7 +224,7 @@ const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
 
   const currentlyServing = getCurrentlyServingToken(patients, currentDoctor?.id);
   const summary = generateDoctorSummary(patients, currentDoctor?.id, reportPeriod);
-
+  
   const handleAddWalkInSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!walkInForm.name.trim() || !walkInForm.mobile.trim() || !currentDoctor?.id) return;
