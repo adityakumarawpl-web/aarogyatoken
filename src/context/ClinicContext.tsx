@@ -361,20 +361,46 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [voiceBotSettings]);
 
-  const addWalkInPatient = useCallback((data: Omit<Patient, 'id' | 'tokenNumber' | 'status' | 'bookingType' | 'paymentStatus' | 'paymentAmount' | 'createdAt' | 'botCallAlertSent'>): Patient => {
-    const nextToken = getNextTokenNumber(patients, data.doctorId);
+const addWalkInPatient = useCallback((data: Omit<Patient, 'id' | 'tokenNumber' | 'status' | 'bookingType' | 'paymentStatus' | 'paymentAmount' | 'createdAt' | 'botCallAlertSent'>): Patient => {
+    // 1. Current Target Date aur Shift nikalna
+    const targetDate = (data as any).appointmentDate || new Date().toISOString().split('T')[0];
+    const targetShift = ((data as any).selectedShift || (data as any).shift || 'Morning').trim();
+
+    // 2. Doctor, Date aur Shift teeno match karne wale patients filter karein
+    const matchingPatients = patients.filter((p) => {
+      const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
+      const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim();
+
+      return (
+        p.doctorId === data.doctorId &&
+        pDate === targetDate &&
+        pShift.toLowerCase() === targetShift.toLowerCase()
+      );
+    });
+
+    // 3. Us shift ka max token number dhundna
+    const maxToken = matchingPatients.reduce((max, p) => {
+      const num = typeof p.tokenNumber === 'number' ? p.tokenNumber : parseInt(String(p.tokenNumber), 10) || 0;
+      return num > max ? num : max;
+    }, 0);
+
+    // 4. Reset to 1 on new Date/Shift, warna max + 1
+    const nextToken = maxToken + 1;
     const customId = `p-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
     const newPatient: Patient = {
       ...data,
       id: customId,
       tokenNumber: nextToken,
+      appointmentDate: targetDate,
+      selectedShift: targetShift,
       bookingType: 'WALK_IN',
       status: 'WAITING',
       paymentStatus: 'FREE',
       paymentAmount: 0,
       createdAt: new Date().toISOString(),
       botCallAlertSent: false,
-    };
+    } as Patient;
 
     setDoc(doc(db, 'patients', customId), newPatient).catch(err => {
       console.error("Error adding walk-in patient:", err);
@@ -386,13 +412,36 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [patients, checkBotAlerts]);
 
   const bookOnlineAppointment = useCallback((data: Omit<Patient, 'id' | 'tokenNumber' | 'status' | 'bookingType' | 'paymentStatus' | 'paymentAmount' | 'createdAt' | 'botCallAlertSent'>) => {
-    const nextToken = getNextTokenNumber(patients, data.doctorId);
+    // 1. Online booking ke liye Date aur Shift filter
+    const targetDate = (data as any).appointmentDate || new Date().toISOString().split('T')[0];
+    const targetShift = ((data as any).selectedShift || (data as any).shift || 'Morning').trim();
+
+    const matchingPatients = patients.filter((p) => {
+      const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
+      const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim();
+
+      return (
+        p.doctorId === data.doctorId &&
+        pDate === targetDate &&
+        pShift.toLowerCase() === targetShift.toLowerCase()
+      );
+    });
+
+    const maxToken = matchingPatients.reduce((max, p) => {
+      const num = typeof p.tokenNumber === 'number' ? p.tokenNumber : parseInt(String(p.tokenNumber), 10) || 0;
+      return num > max ? num : max;
+    }, 0);
+
+    const nextToken = maxToken + 1;
     const paymentId = `pay_rzp_${Date.now()}`;
     const customId = `p-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
     const newPatient: Patient = {
       ...data,
       id: customId,
       tokenNumber: nextToken,
+      appointmentDate: targetDate,
+      selectedShift: targetShift,
       bookingType: 'ONLINE',
       status: 'WAITING',
       paymentStatus: 'PAID',
@@ -400,7 +449,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       paymentId,
       createdAt: new Date().toISOString(),
       botCallAlertSent: false,
-    };
+    } as Patient;
 
     setDoc(doc(db, 'patients', customId), newPatient).catch(err => {
       console.error("Error adding online patient:", err);
