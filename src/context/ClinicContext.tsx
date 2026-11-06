@@ -465,11 +465,11 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setTimeout(() => checkBotAlerts(updated), 50);
   }, [patients, checkBotAlerts]);
 
-  const updateDoctorStatus = useCallback((doctorId: string, status: DoctorStatus, note?: string) => {
+const updateDoctorStatus = useCallback((doctorId: string, status: DoctorStatus, note?: string) => {
     setDoctors((prev) =>
       prev.map((docItem) => {
         if (docItem.id === doctorId) {
-          const updatedNote = note !== undefined ? note : docItem.statusNote;
+          const updatedNote = (note !== undefined ? note : (docItem.statusNote || '')) || '';
           updateDoc(doc(db, 'doctors', doctorId), {
             status: status,
             statusNote: updatedNote
