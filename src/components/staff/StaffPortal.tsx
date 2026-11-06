@@ -166,30 +166,45 @@ const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
     );
   }
 
-  // Doctor Patients list
-  const doctorPatients = patients.filter((p) => p.doctorId === currentDoctor.id);
+// 1. Doctor Patients list with Date, Shift & Search filters
+  const filteredPatients = patients.filter((p) => {
+    // 0. Doctor ID check
+    if (p.doctorId !== currentDoctor?.id) {
+      return false;
+    }
 
-// 1. Date Filter
+    // 1. Date Filter
     const patientDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
     if (selectedDateFilter && patientDate && patientDate !== selectedDateFilter) {
       return false;
     }
 
     // 2. Shift Filter
-    if (selectedShiftFilter !== 'ALL' && p.selectedShift && p.selectedShift !== selectedShiftFilter) {
-      return false;
+    if (selectedShiftFilter && selectedShiftFilter !== 'ALL') {
+      const patientShift = (p.selectedShift || p.shift || '').trim();
+      if (patientShift && patientShift !== selectedShiftFilter) {
+        return false;
+      }
     }
 
     // 3. Search Filter
-    if (!searchFilter.trim()) return true;
-    const term = searchFilter.toLowerCase();
-    return (
-      p.tokenNumber.toString().includes(term) ||
-      p.name.toLowerCase().includes(term) ||
-      p.mobile.includes(term) ||
-      p.complaint.toLowerCase().includes(term)
-    );
+    if (!searchFilter.trim()) {
+      return true;
+    }
 
+    const term = searchFilter.toLowerCase();
+    const tokenStr = p.tokenNumber ? p.tokenNumber.toString() : '';
+    const nameStr = p.name ? p.name.toLowerCase() : '';
+    const phoneStr = (p.mobile || p.phone || '');
+    const complaintStr = p.complaint ? p.complaint.toLowerCase() : '';
+
+    return (
+      tokenStr.includes(term) ||
+      nameStr.includes(term) ||
+      phoneStr.includes(term) ||
+      complaintStr.includes(term)
+    );
+  });
 
   const waitingPatients = filteredPatients.filter((p) => p.status === 'WAITING' || p.status === 'IN_CABIN');
   // Sort waiting patients: Emergency first, then IN_CABIN, then token number
@@ -198,18 +213,18 @@ const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
     if (b.status === 'IN_CABIN') return 1;
     if (a.isEmergency && !b.isEmergency) return -1;
     if (!a.isEmergency && b.isEmergency) return 1;
-    return a.tokenNumber - b.tokenNumber;
+    return (a.tokenNumber || 0) - (b.tokenNumber || 0);
   });
 
   const completedPatients = filteredPatients.filter((p) => p.status === 'COMPLETED');
   const absentPatients = filteredPatients.filter((p) => p.status === 'NOT_AVAILABLE');
 
-  const currentlyServing = getCurrentlyServingToken(patients, currentDoctor.id);
-  const summary = generateDoctorSummary(patients, currentDoctor.id, reportPeriod);
+  const currentlyServing = getCurrentlyServingToken(patients, currentDoctor?.id);
+  const summary = generateDoctorSummary(patients, currentDoctor?.id, reportPeriod);
 
   const handleAddWalkInSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!walkInForm.name.trim() || !walkInForm.mobile.trim()) return;
+    if (!walkInForm.name.trim() || !walkInForm.mobile.trim() || !currentDoctor?.id) return;
 
     addWalkInPatient({
       doctorId: currentDoctor.id,
@@ -221,8 +236,8 @@ const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
       complaint: walkInForm.complaint.trim() || 'OPD Checkup',
       isEmergency: walkInForm.isEmergency,
     });
-    // === Yeh WhatsApp notification wala code yahan jodein ===
-    // === WhatsApp notification trigger with console logs ===
+
+    // === WhatsApp notification trigger ===
     console.log("Triggering WhatsApp fetch for:", walkInForm.mobile.trim());
     
     fetch('/api/send-whatsapp', {
@@ -237,7 +252,8 @@ const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
     .then(res => res.json())
     .then(data => console.log('WhatsApp API Response:', data))
     .catch(err => console.error('WhatsApp trigger error:', err));
-    // ========================================================
+    // =====================================
+
     setWalkInForm({
       name: '',
       mobile: '',
@@ -249,7 +265,7 @@ const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
     });
     setShowAddModal(false);
   };
-
+  
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-slate-100 pb-20">
       {/* Clinic Header Bar */}
