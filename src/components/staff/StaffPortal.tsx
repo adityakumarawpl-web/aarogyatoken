@@ -224,6 +224,25 @@ const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
 
   const currentlyServing = getCurrentlyServingToken(patients, currentDoctor?.id);
   const summary = generateDoctorSummary(patients, currentDoctor?.id, reportPeriod);
+
+  // Active Date aur Shift ke hisab se next token preview calculate karna
+  const currentActiveDate = selectedDateFilter || new Date().toISOString().split('T')[0];
+  const currentActiveShift = (selectedShiftFilter && selectedShiftFilter !== 'ALL') ? selectedShiftFilter : 'Morning';
+
+  const matchingShiftPatients = patients.filter((p) => {
+    const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
+    const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim();
+    return (
+      p.doctorId === currentDoctor?.id &&
+      pDate === currentActiveDate &&
+      pShift.toLowerCase() === currentActiveShift.toLowerCase()
+    );
+  });
+
+  const nextDisplayToken = matchingShiftPatients.reduce((max, p) => {
+    const num = typeof p.tokenNumber === 'number' ? p.tokenNumber : parseInt(String(p.tokenNumber), 10) || 0;
+    return num > max ? num : max;
+  }, 0) + 1;
   
   const handleAddWalkInSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -405,9 +424,11 @@ const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
               <div className="text-lg font-black mt-1 leading-tight">
                 Add Patient (FREE)
               </div>
+
               <span className="text-[11px] text-emerald-200">
-                Next Token #{doctorPatients.length + 1}
+                Next Token #{nextDisplayToken}
               </span>
+              
             </div>
             <div className="h-12 w-12 rounded-2xl bg-white/20 flex items-center justify-center group-hover:scale-110 transition-transform">
               <UserPlus className="h-6 w-6 text-white" />
