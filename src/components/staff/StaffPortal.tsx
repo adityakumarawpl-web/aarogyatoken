@@ -45,7 +45,11 @@ export const StaffPortal: React.FC = () => {
 );
 const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
 
-  // Add Free Walk-in patient modal state
+// Auto detect current shift based on clinic hour (before 2 PM: Morning, after: Evening)
+  const getCurrentDefaultShift = () => {
+    return new Date().getHours() < 14 ? 'Morning' : 'Evening';
+  };
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [walkInForm, setWalkInForm] = useState({
     name: '',
@@ -55,6 +59,8 @@ const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
     address: '',
     complaint: '',
     isEmergency: false,
+    appointmentDate: new Date().toISOString().split('T')[0],
+    selectedShift: getCurrentDefaultShift(),
   });
 
   // Report Period
@@ -244,12 +250,9 @@ const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
     return num > max ? num : max;
   }, 0) + 1;
   
-  const handleAddWalkInSubmit = (e: React.FormEvent) => {
+const handleAddWalkInSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!walkInForm.name.trim() || !walkInForm.mobile.trim() || !currentDoctor?.id) return;
-
-    const activeDate = selectedDateFilter || new Date().toISOString().split('T')[0];
-    const activeShift = (selectedShiftFilter && selectedShiftFilter !== 'ALL') ? selectedShiftFilter : 'Morning';
 
     addWalkInPatient({
       doctorId: currentDoctor.id,
@@ -260,8 +263,8 @@ const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
       address: walkInForm.address.trim() || 'Local Area',
       complaint: walkInForm.complaint.trim() || 'OPD Checkup',
       isEmergency: walkInForm.isEmergency,
-      selectedShift: activeShift,
-      appointmentDate: activeDate,
+      selectedShift: walkInForm.selectedShift,
+      appointmentDate: walkInForm.appointmentDate,
     } as any);
 
     // === WhatsApp notification trigger ===
@@ -289,6 +292,8 @@ const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
       address: '',
       complaint: '',
       isEmergency: false,
+      appointmentDate: new Date().toISOString().split('T')[0],
+      selectedShift: getCurrentDefaultShift(),
     });
     setShowAddModal(false);
   };
@@ -780,6 +785,35 @@ const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
                 </div>
               </div>
 
+{/* Date & Shift Selection */}
+        <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Token Date
+            </label>
+            <input
+              type="date"
+              value={walkInForm.appointmentDate}
+              onChange={(e) => setWalkInForm({ ...walkInForm, appointmentDate: e.target.value })}
+              className="w-full rounded-lg border border-slate-300 p-2 text-xs font-medium bg-white focus:outline-none focus:border-emerald-500"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Shift
+            </label>
+            <select
+              value={walkInForm.selectedShift}
+              onChange={(e) => setWalkInForm({ ...walkInForm, selectedShift: e.target.value })}
+              className="w-full rounded-lg border border-slate-300 p-2 text-xs font-medium bg-white focus:outline-none focus:border-emerald-500"
+            >
+              <option value="Morning">Morning Shift</option>
+              <option value="Evening">Evening Shift</option>
+            </select>
+          </div>
+        </div>
+              
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Address / Locality
