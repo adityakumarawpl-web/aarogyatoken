@@ -45,9 +45,46 @@ export const StaffPortal: React.FC = () => {
 );
 const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
 
-// Auto detect current shift based on clinic hour (before 2 PM: Morning, after: Evening)
-  const getCurrentDefaultShift = () => {
-    return new Date().getHours() < 14 ? 'Morning' : 'Evening';
+// Time string (e.g. "01:00 PM" ya "13:00") ko minutes mein convert karna
+  const parseTimeToMinutes = (timeStr: string) => {
+    if (!timeStr) return 13 * 60; // Default 1:00 PM (780 mins)
+    const cleanStr = timeStr.trim().toUpperCase();
+    const isPM = cleanStr.includes('PM');
+    const isAM = cleanStr.includes('AM');
+    const rawTime = cleanStr.replace(/[APM\s]/g, '');
+    const [hoursStr, minutesStr] = rawTime.split(':');
+    let hours = parseInt(hoursStr, 10) || 0;
+    const minutes = parseInt(minutesStr, 10) || 0;
+
+    if (isPM && hours < 12) hours += 12;
+    if (isAM && hours === 12) hours = 0;
+
+    return hours * 60 + minutes;
+  };
+
+  // Doctor ki profile timing ke hisaab se check karna ki Morning Shift active hai ya nahi
+  const isMorningShiftActiveForDoctor = (targetDate: string, doctor: any) => {
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // Future date par Morning hamesha allow rahegi
+    if (targetDate > todayStr) return true;
+
+    // Aaj ki date ke liye doctor ki timing check karein
+    if (targetDate === todayStr) {
+      const now = new Date();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+      let morningEndTimeStr = doctor?.morningShiftEnd || doctor?.morningEnd;
+      if (!morningEndTimeStr && doctor?.opdTimings && doctor.opdTimings.includes('-')) {
+        morningEndTimeStr = doctor.opdTimings.split('-')[1]?.trim();
+      }
+      if (!morningEndTimeStr) morningEndTimeStr = '01:00 PM';
+
+      const morningEndMinutes = parseTimeToMinutes(morningEndTimeStr);
+      return currentMinutes <= morningEndMinutes;
+    }
+
+    return false;
   };
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -60,8 +97,18 @@ const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
     complaint: '',
     isEmergency: false,
     appointmentDate: new Date().toISOString().split('T')[0],
-    selectedShift: getCurrentDefaultShift(),
+    selectedShift: 'Morning',
   });
+
+  // Date change hone par auto-adjust karna
+  const handleDateChange = (newDate: string) => {
+    const morningAllowed = isMorningShiftActiveForDoctor(newDate, currentDoctor);
+    setWalkInForm((prev) => ({
+      ...prev,
+      appointmentDate: newDate,
+      selectedShift: (!morningAllowed && prev.selectedShift === 'Morning') ? 'Evening' : prev.selectedShift,
+    }));
+  };
 
   // Report Period
   const [reportPeriod, setReportPeriod] = useState<'day' | 'week' | 'month' | 'year'>('day');
@@ -731,6 +778,39 @@ const handleAddWalkInSubmit = (e: React.FormEvent) => {
             </div>
 
             <form onSubmit={handleAddWalkInSubmit} className="p-6 space-y-4">
+             
+              {/* Date & Shift Selection */}
+        <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Appointment Date
+            </label>
+            <input
+              type="date"
+              min={new Date().toISOString().split('T')[0]}
+              value={walkInForm.appointmentDate}
+              onChange={(e) => handleDateChange(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 p-2 text-xs font-medium bg-white focus:outline-none focus:border-emerald-500"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Shift
+            </label>
+            <select
+              value={walkInForm.selectedShift}
+              onChange={(e) => setWalkInForm({ ...walkInForm, selectedShift: e.target.value })}
+              className="w-full rounded-lg border border-slate-300 p-2 text-xs font-medium bg-white focus:outline-none focus:border-emerald-500"
+            >
+              {/* Doctor ki profile morning end timing ke anusaar check */}
+              {isMorningShiftActiveForDoctor(walkInForm.appointmentDate, currentDoctor) && (
+                <option value="Morning">Morning Shift</option>
+              )}
+              <option value="Evening">Evening Shift</option>
+            </select>
+          </div>
+        </div>
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Patient Full Name *
