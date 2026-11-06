@@ -865,34 +865,6 @@ const handleAddWalkInSubmit = (e: React.FormEvent) => {
                 </div>
               </div>
 
-{/* Date & Shift Selection */}
-        <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Token Date
-            </label>
-            <input
-              type="date"
-              value={walkInForm.appointmentDate}
-              onChange={(e) => setWalkInForm({ ...walkInForm, appointmentDate: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 p-2 text-xs font-medium bg-white focus:outline-none focus:border-emerald-500"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Shift
-            </label>
-            <select
-              value={walkInForm.selectedShift}
-              onChange={(e) => setWalkInForm({ ...walkInForm, selectedShift: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 p-2 text-xs font-medium bg-white focus:outline-none focus:border-emerald-500"
-            >
-              <option value="Morning">Morning Shift</option>
-              <option value="Evening">Evening Shift</option>
-            </select>
-          </div>
-        </div>
               
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
