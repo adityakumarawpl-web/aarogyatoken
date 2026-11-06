@@ -229,6 +229,9 @@ const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
     e.preventDefault();
     if (!walkInForm.name.trim() || !walkInForm.mobile.trim() || !currentDoctor?.id) return;
 
+    const activeDate = selectedDateFilter || new Date().toISOString().split('T')[0];
+    const activeShift = (selectedShiftFilter && selectedShiftFilter !== 'ALL') ? selectedShiftFilter : 'Morning';
+
     addWalkInPatient({
       doctorId: currentDoctor.id,
       name: walkInForm.name.trim(),
@@ -238,7 +241,9 @@ const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
       address: walkInForm.address.trim() || 'Local Area',
       complaint: walkInForm.complaint.trim() || 'OPD Checkup',
       isEmergency: walkInForm.isEmergency,
-    });
+      selectedShift: activeShift,
+      appointmentDate: activeDate,
+    } as any);
 
     // === WhatsApp notification trigger ===
     console.log("Triggering WhatsApp fetch for:", walkInForm.mobile.trim());
