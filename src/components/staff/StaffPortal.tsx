@@ -40,9 +40,9 @@ export const StaffPortal: React.FC = () => {
   // Active Tab
   const [activeTab, setActiveTab] = useState<'QUEUE' | 'COMPLETED' | 'ABSENT' | 'REPORTS'>('QUEUE');
   const [searchFilter, setSearchFilter] = useState('');
-  const [selectedDateFilter, setSelectedDateFilter] = useState<string>(
-    new Date().toISOString().split('T')[0]
-  );
+const realTodayDate = new Date().toISOString().split('T')[0];
+
+  const [selectedDateFilter, setSelectedDateFilter] = useState<string>(realTodayDate);
   const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
 
   // Time string (e.g. "01:00 PM" ya "13:00") ko minutes mein convert karna
@@ -104,7 +104,29 @@ export const StaffPortal: React.FC = () => {
   const [reportPeriod, setReportPeriod] = useState<'day' | 'week' | 'month' | 'year'>('day');
 
   const currentDoctor = doctors.find((d) => d.id === staffDoctorId);
+// Real-time current shift auto detect doctor timings ke hisaab se
+  const getRealCurrentShift = () => {
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
+    let morningEndTimeStr = currentDoctor?.morningShiftEnd || currentDoctor?.morningEnd;
+    if (!morningEndTimeStr && currentDoctor?.opdTimings && currentDoctor.opdTimings.includes('-')) {
+      morningEndTimeStr = currentDoctor.opdTimings.split('-')[1]?.trim();
+    }
+    if (!morningEndTimeStr && currentDoctor?.timings && currentDoctor.timings.includes('&')) {
+      const morningPart = currentDoctor.timings.split('&')[0];
+      if (morningPart.includes('-')) {
+        morningEndTimeStr = morningPart.split('-')[1]?.trim();
+      }
+    }
+    if (!morningEndTimeStr) morningEndTimeStr = '01:00 PM';
+
+    const morningEndMinutes = parseTimeToMinutes(morningEndTimeStr);
+    return currentMinutes <= morningEndMinutes ? 'Morning' : 'Evening';
+  };
+
+  const realCurrentShift = getRealCurrentShift();
+  
   // Date change hone par auto-adjust karna
   const handleDateChange = (newDate: string) => {
     const morningAllowed = isMorningShiftActiveForDoctor(newDate, currentDoctor);
@@ -644,8 +666,8 @@ export const StaffPortal: React.FC = () => {
                   isFirstWaiting={index === 0 && patient.status === 'WAITING'}
                   isDoctorAvailable={currentDoctor.status === 'AVAILABLE'}
                   doctorStatus={currentDoctor.status}
-                  currentActiveDate={currentActiveDate}
-                  currentActiveShift={currentActiveShift}
+                  currentActiveDate={realTodayDate}
+                  currentActiveShift={realCurrentShift}
                 />
               ))
             )}
