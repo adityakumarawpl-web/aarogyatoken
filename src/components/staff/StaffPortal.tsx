@@ -316,7 +316,6 @@ const handleAddWalkInSubmit = (e: React.FormEvent) => {
 
     // === WhatsApp notification trigger ===
     console.log("Triggering WhatsApp fetch for:", walkInForm.mobile.trim());
-    
     fetch('/api/send-whatsapp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -331,6 +330,11 @@ const handleAddWalkInSubmit = (e: React.FormEvent) => {
     .catch(err => console.error('WhatsApp trigger error:', err));
     // =====================================
 
+    // Dynamic shift check reset ke liye
+    const todayStr = new Date().toISOString().split('T')[0];
+    const defaultShift = isMorningShiftActiveForDoctor(todayStr, currentDoctor) ? 'Morning' : 'Evening';
+
+    // 1. Form ko poora blank aur safe reset karein
     setWalkInForm({
       name: '',
       mobile: '',
@@ -339,9 +343,11 @@ const handleAddWalkInSubmit = (e: React.FormEvent) => {
       address: '',
       complaint: '',
       isEmergency: false,
-      appointmentDate: new Date().toISOString().split('T')[0],
-      selectedShift: getCurrentDefaultShift(),
+      appointmentDate: todayStr,
+      selectedShift: defaultShift,
     });
+
+    // 2. Modal ko close karein
     setShowAddModal(false);
   };
   
@@ -770,7 +776,22 @@ const handleAddWalkInSubmit = (e: React.FormEvent) => {
               </div>
               <button
                 type="button"
-                onClick={() => setShowAddModal(false)}
+                onClick={() => {
+                  setShowAddModal(false);
+                  const todayStr = new Date().toISOString().split('T')[0];
+                  const defaultShift = isMorningShiftActiveForDoctor(todayStr, currentDoctor) ? 'Morning' : 'Evening';
+                  setWalkInForm({
+                    name: '',
+                    mobile: '',
+                    age: '',
+                    gender: 'Male',
+                    address: '',
+                    complaint: '',
+                    isEmergency: false,
+                    appointmentDate: todayStr,
+                    selectedShift: defaultShift,
+                  });
+                }}
                 className="text-white hover:opacity-75 text-xl font-bold cursor-pointer"
               >
                 ✕
