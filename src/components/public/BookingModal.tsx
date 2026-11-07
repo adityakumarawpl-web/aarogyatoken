@@ -27,6 +27,45 @@ interface BookingModalProps {
 export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) => {
   const { patients, bookOnlineAppointment, triggerBotCallAlert, razorpaySettings } = useClinic();
 
+  // Time ko minutes mein parse karna
+  const parseTimeToMinutes = (timeStr: string) => {
+    if (!timeStr) return 13 * 60;
+    const cleanStr = timeStr.trim().toUpperCase();
+    const isPM = cleanStr.includes('PM');
+    const isAM = cleanStr.includes('AM');
+    const rawTime = cleanStr.replace(/[APM\s]/g, '');
+    const [hoursStr, minutesStr] = rawTime.split(':');
+    let hours = parseInt(hoursStr, 10) || 0;
+    const minutes = parseInt(minutesStr, 10) || 0;
+
+    if (isPM && hours < 12) hours += 12;
+    if (isAM && hours === 12) hours = 0;
+
+    return hours * 60 + minutes;
+  };
+
+  // Doctor profile timing ke according check karna
+  const isMorningShiftActiveForDoctor = (targetDate: string, doc: any) => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (targetDate > todayStr) return true;
+
+    if (targetDate === todayStr) {
+      const now = new Date();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+      let morningEndTimeStr = doc?.morningShiftEnd || doc?.morningEnd;
+      if (!morningEndTimeStr && doc?.opdTimings && doc.opdTimings.includes('-')) {
+        morningEndTimeStr = doc.opdTimings.split('-')[1]?.trim();
+      }
+      if (!morningEndTimeStr) morningEndTimeStr = '01:00 PM';
+
+      const morningEndMinutes = parseTimeToMinutes(morningEndTimeStr);
+      return currentMinutes <= morningEndMinutes;
+    }
+
+    return false;
+  };
+  
   const [step, setStep] = useState<'DETAILS' | 'PAYMENT' | 'SUCCESS'>('DETAILS');
   const [formData, setFormData] = useState({
     name: '',
@@ -39,11 +78,34 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
     complaint: '',
   });
 
+  const handleDateChange = (newDate: string) => {
+    const morningAllowed = isMorningShiftActiveForDoctor(newDate, doctor);
+    setFormData((prev) => ({
+      ...prev,
+      appointmentDate: newDate,
+      selectedShift: (!morningAllowed && prev.selectedShift === 'Morning') ? 'Evening' : prev.selectedShift,
+    }));
+  };
+  
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [confirmedPatient, setConfirmedPatient] = useState<Patient | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const nextEstimatedToken = getNextTokenNumber(patients, doctor.id);
+  const matchingShiftPatients = patients.filter((p) => {
+    const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
+    const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim();
+    return (
+      p.doctorId === doctor.id &&
+      pDate === formData.appointmentDate &&
+      pShift.toLowerCase() === formData.selectedShift.toLowerCase()
+    );
+  });
+
+  const nextEstimatedToken = matchingShiftPatients.reduce((max, p) => {
+    const num = typeof p.tokenNumber === 'number' ? p.tokenNumber : parseInt(String(p.tokenNumber), 10) || 0;
+    return num > max ? num : max;
+  }, 0) + 1;
+  
   const activeRazorpayKey = doctor.razorpayKeyId || razorpaySettings.keyId;
 
   const handleDetailsSubmit = (e: React.FormEvent) => {
@@ -230,6 +292,38 @@ const handleProcessPayment = () => {
                 </div>
               </div>
 
+{/* Date & Shift Selection */}
+        <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Appointment Date
+            </label>
+            <input
+              type="date"
+              min={new Date().toISOString().split('T')[0]}
+              value={formData.appointmentDate}
+              onChange={(e) => handleDateChange(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 p-2 text-xs font-medium bg-white focus:outline-none focus:border-blue-500"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Preferred Shift
+            </label>
+            <select
+              value={formData.selectedShift}
+              onChange={(e) => setFormData({ ...formData, selectedShift: e.target.value })}
+              className="w-full rounded-lg border border-slate-300 p-2 text-xs font-medium bg-white focus:outline-none focus:border-blue-500"
+            >
+              {isMorningShiftActiveForDoctor(formData.appointmentDate, doctor) && (
+                <option value="Morning">Morning Shift</option>
+              )}
+              <option value="Evening">Evening Shift</option>
+            </select>
+          </div>
+        </div>
+              
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   1. Patient Full Name (मरीज़ का नाम) *
