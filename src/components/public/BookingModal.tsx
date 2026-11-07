@@ -381,50 +381,6 @@ const handleProcessPayment = () => {
                 </div>
               </div>
 
-{/* Appointment Date Picker */}
-<div className="mb-3">
-  <label className="block text-xs font-bold text-slate-700 mb-1">
-    Appointment Date
-  </label>
-  <input
-    type="date"
-    min={new Date().toISOString().split('T')[0]} // Past dates disable rahengi
-    value={formData.appointmentDate}
-    onChange={(e) =>
-      setFormData((prev: any) => ({
-        ...prev,
-        appointmentDate: e.target.value,
-      }))
-    }
-    className="w-full border border-slate-300 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-    required
-  />
-</div>
-
-{/* Shift Selector */}
-<div className="mb-3">
-  <label className="block text-xs font-bold text-slate-700 mb-1">
-    Select Shift
-  </label>
-  <select
-    value={formData.selectedShift}
-    onChange={(e) =>
-      setFormData((prev: any) => ({
-        ...prev,
-        selectedShift: e.target.value,
-      }))
-    }
-    className="w-full border border-slate-300 rounded-lg p-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500"
-    required
-  >
-    <option value="Morning">
-      Morning Shift {doctor?.morningShift ? `(${doctor.morningShift})` : ''}
-    </option>
-    <option value="Evening">
-      Evening Shift {doctor?.eveningShift ? `(${doctor.eveningShift})` : ''}
-    </option>
-  </select>
-</div>
               
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
