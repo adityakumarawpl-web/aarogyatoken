@@ -375,125 +375,205 @@ const handleAddWalkInSubmit = (e: React.FormEvent) => {
             </div>
           </div>
 
-          {/* Quick Doctor Status Controller for Staff */}
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-bold text-slate-700 mr-1">Doctor Status:</span>
-            {(['AVAILABLE', 'LUNCH', 'SURGERY', 'LEAVE'] as DoctorStatus[]).map((st) => (
-              <button
-                key={st}
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  updateDoctorStatus(currentDoctor.id, st);
-                  }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
-                  currentDoctor.status === st
-                    ? st === 'AVAILABLE'
-                      ? 'bg-emerald-600 text-white shadow-sm'
-                      : st === 'LUNCH'
-                      ? 'bg-amber-500 text-white shadow-sm'
-                      : st === 'SURGERY'
-                      ? 'bg-rose-600 text-white shadow-sm'
-                      : 'bg-slate-700 text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
-              >
-                {st === 'AVAILABLE' && <span>🟢 Available</span>}
-                {st === 'LUNCH' && <span>🟡 Lunch Break</span>}
-                {st === 'SURGERY' && <span>🔴 In Surgery</span>}
-                {st === 'LEAVE' && <span>⚪ Leave</span>}
-              </button>
-            ))}
+{/* Doctor Status Dropdown & Logout */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-700">Doctor Status:</span>
+            <select
+              value={currentDoctor.status || 'AVAILABLE'}
+              onChange={(e) => updateDoctorStatus(currentDoctor.id, e.target.value as any)}
+              className={`text-xs font-bold rounded-xl px-3 py-2 border shadow-xs outline-none cursor-pointer transition ${
+                currentDoctor.status === 'AVAILABLE'
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                  : currentDoctor.status === 'LUNCH'
+                  ? 'bg-amber-50 text-amber-800 border-amber-300'
+                  : currentDoctor.status === 'SURGERY'
+                  ? 'bg-rose-50 text-rose-800 border-rose-300'
+                  : 'bg-slate-100 text-slate-800 border-slate-300'
+              }`}
+            >
+              <option value="AVAILABLE">🟢 Available (OPD Open)</option>
+              <option value="LUNCH">🟡 Lunch Break</option>
+              <option value="SURGERY">🔴 In Surgery</option>
+              <option value="LEAVE">⚪ Leave</option>
+            </select>
 
             <button
               type="button"
               onClick={staffLogout}
-              className="ml-2 rounded-xl border border-slate-300 p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition cursor-pointer"
+              className="ml-1 rounded-xl border border-slate-200 bg-white p-2 text-slate-500 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition cursor-pointer"
               title="Staff Logout"
             >
               <LogOut className="h-4 w-4" />
             </button>
           </div>
-        </div>
+
+{/* 3 Main Action Buttons */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 my-5">
+        {/* Button 1: Add Patient (FREE) */}
+        <button
+          type="button"
+          onClick={() => {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const defaultShift = isMorningShiftActiveForDoctor(todayStr, currentDoctor) ? 'Morning' : 'Evening';
+            setWalkInForm({
+              name: '',
+              mobile: '',
+              age: '',
+              gender: 'Male',
+              address: '',
+              complaint: '',
+              isEmergency: false,
+              appointmentDate: todayStr,
+              selectedShift: defaultShift,
+            });
+            setShowAddModal(true);
+          }}
+          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl p-3.5 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition active:scale-95 cursor-pointer"
+        >
+          <span className="text-base font-black leading-none">+</span>
+          <span>Add Patient (FREE)</span>
+        </button>
+
+        {/* Button 2: Live OPD Queue (Sirf doctor AVAILABLE hone par active) */}
+        <button
+          type="button"
+          disabled={currentDoctor.status !== 'AVAILABLE'}
+          onClick={() => setActiveTab('QUEUE')}
+          className={`w-full rounded-2xl p-3.5 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition cursor-pointer ${
+            activeTab === 'QUEUE'
+              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+              : currentDoctor.status === 'AVAILABLE'
+              ? 'bg-white hover:bg-blue-50 text-blue-700 border border-blue-200'
+              : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
+          }`}
+          title={
+            currentDoctor.status !== 'AVAILABLE'
+              ? 'Doctor Available hone par hi Queue access hogi'
+              : 'Live OPD Queue View'
+          }
+        >
+          <span>📋 Live OPD Queue</span>
+          {currentDoctor.status !== 'AVAILABLE' && <span className="text-xs">🔒</span>}
+        </button>
+
+        {/* Button 3: Clinic Summary (Poora hisab-kitab) */}
+        <button
+          type="button"
+          onClick={() => setActiveTab('REPORTS')}
+          className={`w-full rounded-2xl p-3.5 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition cursor-pointer ${
+            activeTab === 'REPORTS'
+              ? 'bg-slate-900 text-white shadow-md shadow-slate-900/20'
+              : 'bg-white hover:bg-slate-50 text-slate-800 border border-slate-200'
+          }`}
+        >
+          <span>📊 Summary & Reports</span>
+        </button>
       </div>
-
-      {/* Main Staff Container */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* Top Summary & Action Bar */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Card 1: Currently In Cabin */}
-          <div className="rounded-2xl bg-blue-600 text-white p-4 shadow-sm flex items-center justify-between">
-            <div>
-              <span className="text-xs font-semibold text-blue-100 uppercase tracking-wider block">
-                Current In Cabin (Andar)
-              </span>
-              <div className="text-3xl font-black mt-1">
-                {currentlyServing > 0 ? `#${currentlyServing}` : 'None'}
-              </div>
-              <span className="text-[11px] text-blue-200">Blue status active</span>
-            </div>
-            <div className="h-10 w-10 rounded-xl bg-blue-500/40 flex items-center justify-center">
-              <Stethoscope className="h-6 w-6" />
-            </div>
-          </div>
-
-          {/* Card 2: Waiting Queue */}
-          <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-xs flex items-center justify-between">
-            <div>
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
-                Waiting Patients
-              </span>
-              <div className="text-3xl font-black text-slate-900 mt-1">
-                {doctorPatients.filter((p) => p.status === 'WAITING').length}
-              </div>
-              <span className="text-[11px] text-slate-500">In waiting room</span>
-            </div>
-            <div className="h-10 w-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-              <Clock className="h-6 w-6" />
-            </div>
-          </div>
-
-          {/* Card 3: Completed Today */}
-          <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-xs flex items-center justify-between">
-            <div>
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
-                Completed (Dekhe Gaye)
-              </span>
-              <div className="text-3xl font-black text-emerald-600 mt-1">
-                {completedPatients.length}
-              </div>
-              <span className="text-[11px] text-emerald-700">Green status marked</span>
-            </div>
-            <div className="h-10 w-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <CheckCircle2 className="h-6 w-6" />
-            </div>
-          </div>
-
-          {/* Card 4: Add Free Walk-in Patient Action Button */}
+          
+{/* 3 Main Action Buttons Strip */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Button 1: Add Patient (FREE) */}
           <button
             type="button"
             onClick={() => setShowAddModal(true)}
-            className="rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-4 shadow-lg shadow-emerald-600/20 hover:from-emerald-700 hover:to-teal-700 transition cursor-pointer flex items-center justify-between text-left group"
+            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl p-4 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition active:scale-95 cursor-pointer"
           >
-            <div>
-              <span className="text-xs font-bold text-emerald-100 uppercase tracking-wider block">
-                + Staff Walk-in Entry
-              </span>
-              <div className="text-lg font-black mt-1 leading-tight">
-                Add Patient (FREE)
-              </div>
+            <span className="text-base font-black leading-none">+</span>
+            <span>Add Patient (FREE)</span>
+            <span className="text-[11px] bg-emerald-700/60 px-2 py-0.5 rounded-lg text-emerald-100 font-mono">
+              Next #{nextDisplayToken}
+            </span>
+          </button>
 
-              <span className="text-[11px] text-emerald-200">
-                Next Token #{nextDisplayToken}
-              </span>
-              
-            </div>
-            <div className="h-12 w-12 rounded-2xl bg-white/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <UserPlus className="h-6 w-6 text-white" />
-            </div>
+          {/* Button 2: Live OPD Queue (Doctor AVAILABLE hone par hi Clickable) */}
+          <button
+            type="button"
+            disabled={currentDoctor?.status !== 'AVAILABLE'}
+            onClick={() => setActiveTab('QUEUE')}
+            className={`w-full rounded-2xl p-4 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition cursor-pointer ${
+              activeTab === 'QUEUE'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20 ring-2 ring-blue-400'
+                : currentDoctor?.status === 'AVAILABLE'
+                ? 'bg-white hover:bg-blue-50 text-blue-700 border border-blue-200'
+                : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
+            }`}
+            title={
+              currentDoctor?.status !== 'AVAILABLE'
+                ? 'Doctor Available hone par hi Queue access hogi'
+                : 'Live OPD Queue View'
+            }
+          >
+            <span>📋 Live OPD Queue</span>
+            {currentDoctor?.status !== 'AVAILABLE' && <span className="text-xs">🔒</span>}
+          </button>
+
+          {/* Button 3: Clinic Summary & Stats */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('REPORTS')}
+            className={`w-full rounded-2xl p-4 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition cursor-pointer ${
+              activeTab === 'REPORTS'
+                ? 'bg-slate-900 text-white shadow-md shadow-slate-900/20 ring-2 ring-slate-700'
+                : 'bg-white hover:bg-slate-50 text-slate-800 border border-slate-200'
+            }`}
+          >
+            <span>📊 Clinic Summary & Stats</span>
           </button>
         </div>
 
+        {/* Jab REPORTS (Summary) tab click ho, tab ye teeno Stats Cards dikhein */}
+        {activeTab === 'REPORTS' && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Card 1: Currently In Cabin */}
+            <div className="rounded-2xl bg-blue-600 text-white p-4 shadow-sm flex items-center justify-between">
+              <div>
+                <span className="text-xs font-semibold text-blue-100 uppercase tracking-wider block">
+                  Current In Cabin (Andar)
+                </span>
+                <div className="text-3xl font-black mt-1">
+                  {currentlyServing > 0 ? `#${currentlyServing}` : 'None'}
+                </div>
+                <span className="text-[11px] text-blue-200">Blue status active</span>
+              </div>
+              <div className="h-10 w-10 rounded-xl bg-blue-500/40 flex items-center justify-center">
+                <Stethoscope className="h-6 w-6" />
+              </div>
+            </div>
+
+            {/* Card 2: Waiting Queue */}
+            <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
+                  Waiting Patients
+                </span>
+                <div className="text-3xl font-black text-slate-900 mt-1">
+                  {doctorPatients.filter((p) => p.status === 'WAITING').length}
+                </div>
+                <span className="text-[11px] text-slate-500">In waiting room</span>
+              </div>
+              <div className="h-10 w-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                <Clock className="h-6 w-6" />
+              </div>
+            </div>
+
+            {/* Card 3: Completed Today */}
+            <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
+                  Completed (Dekhe Gaye)
+                </span>
+                <div className="text-3xl font-black text-emerald-600 mt-1">
+                  {completedPatients.length}
+                </div>
+                <span className="text-[11px] text-emerald-700">Green status marked</span>
+              </div>
+              <div className="h-10 w-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <CheckCircle2 className="h-6 w-6" />
+              </div>
+            </div>
+          </div>
+        )}
+          
         {/* Search & Tabs Toolbar */}
         <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
           {/* Navigation Tabs */}
