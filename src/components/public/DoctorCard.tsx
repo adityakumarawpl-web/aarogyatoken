@@ -1,7 +1,6 @@
 import React from 'react';
 import { Doctor } from '../../types';
 import { useClinic } from '../../context/ClinicContext';
-import { getCurrentlyServingToken } from '../../utils/queueLogic';
 import {
   MapPin,
   Clock,
@@ -21,8 +20,54 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
   onBookOnline,
 }) => {
   const { patients } = useClinic();
-  const currentServingToken = getCurrentlyServingToken(patients, doctor.id);
-console.log("Doctor Data Check:", doctor.name, doctor.clinicImages);
+
+  // Smart Live Token Calculation (Cabin + Active Queue Sync)
+  const getLiveServingDetails = () => {
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // 1. Agar koi mareez Doctor Cabin ke andar hai (IN_CABIN)
+    const inCabinPatient = patients.find(
+      (p) => p.doctorId === doctor.id && p.status === 'IN_CABIN'
+    );
+    if (inCabinPatient) {
+      return {
+        token: `#${inCabinPatient.tokenNumber}`,
+        label: 'Doctor Cabin me abhi chal raha hai',
+      };
+    }
+
+    // 2. Agar cabin me koi nahi hai, toh aaj ki active queue ka pehla turn (Next Patient / Turn Active)
+    const activeWaiting = patients
+      .filter((p) => {
+        const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
+        return p.doctorId === doctor.id && p.status === 'WAITING' && pDate === todayStr;
+      })
+      .sort((a, b) => {
+        // Emergency priority pehle
+        if (a.isEmergency && !b.isEmergency) return -1;
+        if (!a.isEmergency && b.isEmergency) return 1;
+        return (a.tokenNumber || 0) - (b.tokenNumber || 0);
+      });
+
+    if (activeWaiting.length > 0) {
+      const nextInLine = activeWaiting[0];
+      return {
+        token: `#${nextInLine.tokenNumber}`,
+        label: nextInLine.isEmergency
+          ? '🚨 Emergency Case (Turn Active)'
+          : 'Calling / Current Turn Active',
+      };
+    }
+
+    // 3. Agar koi patient line me nahi hai
+    return {
+      token: 'Ready',
+      label: 'Cabin Ready for Patients',
+    };
+  };
+
+  const servingInfo = getLiveServingDetails();
+
   const getStatusBadge = () => {
     switch (doctor.status) {
       case 'AVAILABLE':
@@ -94,11 +139,11 @@ console.log("Doctor Data Check:", doctor.name, doctor.clinicImages);
           </div>
         </div>
 
-{/* Clinic Images Gallery Section */}
+        {/* Clinic Images Gallery Section */}
         {(() => {
           const imgs = doctor.clinicImages;
           if (!imgs) return null;
-          
+
           const imagesArray = Array.isArray(imgs) ? imgs : Object.values(imgs);
           const validImages = imagesArray.filter(url => typeof url === 'string' && url.trim().length > 0);
 
@@ -122,17 +167,17 @@ console.log("Doctor Data Check:", doctor.name, doctor.clinicImages);
             </div>
           );
         })()}
-        
-        {/* ONLY CURRENT TOKEN DISPLAY (Zero Privacy Leak - No Patient Names or Lists) */}
+
+        {/* ONLY CURRENT TOKEN DISPLAY (Zero Privacy Leak - Live Synced) */}
         <div className="mt-5 rounded-2xl bg-gradient-to-br from-blue-900 to-indigo-950 p-4 text-center text-white shadow-md relative overflow-hidden">
           <span className="text-[11px] uppercase font-bold text-blue-300 tracking-wider block">
             Current Running Token (Live Token)
           </span>
           <div className="my-1 text-5xl font-mono font-black text-blue-400 tracking-tight drop-shadow-[0_0_12px_rgba(96,165,250,0.6)]">
-            {currentServingToken > 0 ? `#${currentServingToken}` : 'Ready'}
+            {servingInfo.token}
           </div>
           <span className="text-[11px] text-blue-200">
-            {currentServingToken > 0 ? 'Doctor Cabin me abhi chal raha hai' : 'Cabin Ready for Patients'}
+            {servingInfo.label}
           </span>
         </div>
       </div>
@@ -153,4 +198,3 @@ console.log("Doctor Data Check:", doctor.name, doctor.clinicImages);
     </div>
   );
 };
-
