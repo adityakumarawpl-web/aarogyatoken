@@ -1,19 +1,13 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { DoctorStatus, Patient } from '../../types';
 import { useClinic } from '../../context/ClinicContext';
 import {
   PhoneCall,
-  UserCheck,
   CheckCircle,
-  AlertOctagon,
-  ArrowRight,
-  ArrowLeft,
   RotateCcw,
-  Sparkles,
   Phone,
   Flame,
   Lock,
-  AlertTriangle,
 } from 'lucide-react';
 
 interface QueueCardProps {
@@ -30,6 +24,7 @@ export const QueueCard: React.FC<QueueCardProps> = ({
   doctorStatus = 'AVAILABLE',
 }) => {
   const {
+    callPatient,
     completePatient,
     markNotAvailable,
     markEmergency,
@@ -40,9 +35,8 @@ export const QueueCard: React.FC<QueueCardProps> = ({
   const isCompleted = patient.status === 'COMPLETED';
   const isAbsent = patient.status === 'NOT_AVAILABLE';
 
-  // Rule: Sirf tabhi action liya ja sakta hai jab Doctor Available ho
-  // Aur strict series ke mutabiq sirf First Waiting ya Emergency patient hi active ho
-  const canActOnPatient = isDoctorAvailable && (isFirstWaiting || patient.isEmergency);
+  // Action sirf tab valid hoga jab doctor Available ho aur line me patient ka turn ho (ya emergency ho)
+  const canActOnPatient = isDoctorAvailable && (isFirstWaiting || patient.isEmergency || isInCabin);
 
   const getCardStyle = () => {
     switch (patient.status) {
@@ -76,14 +70,14 @@ export const QueueCard: React.FC<QueueCardProps> = ({
     <div
       className={`relative rounded-2xl p-4 sm:p-5 transition-all duration-300 overflow-hidden ${getCardStyle()}`}
     >
-      {/* Top Banner: Doctor Unavailability ya Queue Turn Notification */}
+      {/* Top Banner Status */}
       {patient.status === 'WAITING' && (
         <div className="mb-3">
           {!isDoctorAvailable ? (
             <div className="flex items-center justify-between text-[11px] font-bold p-2 rounded-xl bg-amber-100/90 border border-amber-300 text-amber-900">
               <span className="flex items-center gap-1.5">
                 <Lock className="h-3.5 w-3.5 text-amber-700" />
-                <span>Doctor Status: <strong>{statusLabel}</strong> — Consultation Paused</span>
+                <span>Doctor Status: <strong>{statusLabel}</strong> — Cabin Entry Paused</span>
               </span>
               <span className="text-[10px] text-amber-800 font-medium">
                 (Doctor ke Available hone par hi buttons chalenge)
@@ -93,10 +87,10 @@ export const QueueCard: React.FC<QueueCardProps> = ({
             <div className="flex items-center justify-between text-[11px] font-bold pb-2 border-b border-emerald-100 text-emerald-700">
               <span className="flex items-center gap-1">
                 <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping"></span>
-                <span>Current Turn: Next Patient to Consult</span>
+                <span>Current Turn: Next Patient to Call</span>
               </span>
               <span className="text-[10px] text-emerald-600 font-medium">
-                (Checkup complete hone par 'Done' karein)
+                ('Andar Bulayein' dabakar cabin me bhejein)
               </span>
             </div>
           ) : (
@@ -106,7 +100,7 @@ export const QueueCard: React.FC<QueueCardProps> = ({
                 <span>Waiting in Queue — Series Token Locked</span>
               </span>
               <span className="text-[10px] text-slate-400">
-                (Pehle pichhle token ka checkup poora hoga)
+                (Pehle aage wale token ka checkup hoga)
               </span>
             </div>
           )}
@@ -117,7 +111,6 @@ export const QueueCard: React.FC<QueueCardProps> = ({
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         {/* Left: Token Number & Patient Details */}
         <div className="flex items-start gap-3.5">
-          {/* Big Token Badge */}
           <div
             className={`flex flex-col items-center justify-center rounded-2xl h-14 w-14 shrink-0 font-mono font-black shadow-sm ${
               isInCabin
@@ -153,7 +146,6 @@ export const QueueCard: React.FC<QueueCardProps> = ({
                 {patient.gender}, {patient.age} yrs
               </span>
 
-              {/* Source Tag */}
               <span
                 className={`text-[11px] px-2 py-0.5 rounded-md font-bold uppercase ${
                   patient.bookingType === 'ONLINE'
@@ -168,7 +160,6 @@ export const QueueCard: React.FC<QueueCardProps> = ({
                 {patient.bookingType === 'ONLINE' ? 'Online Book' : 'Staff Walk-in (Free)'}
               </span>
 
-              {/* Appointment Date Badge */}
               {patient.appointmentDate && (
                 <span
                   className={`text-[11px] px-2 py-0.5 rounded-md font-bold ${
@@ -181,7 +172,6 @@ export const QueueCard: React.FC<QueueCardProps> = ({
                 </span>
               )}
 
-              {/* Shift Badge */}
               {patient.selectedShift && (
                 <span
                   className={`text-[11px] px-2 py-0.5 rounded-md font-bold ${
@@ -204,7 +194,6 @@ export const QueueCard: React.FC<QueueCardProps> = ({
               )}
             </div>
 
-            {/* Mobile & Complaint */}
             <div
               className={`mt-1.5 flex flex-wrap items-center gap-3 text-xs ${
                 isInCabin ? 'text-blue-100' : 'text-slate-600'
@@ -222,7 +211,6 @@ export const QueueCard: React.FC<QueueCardProps> = ({
               <span className="opacity-75">{patient.address}</span>
             </div>
 
-            {/* Bot Call Status for Online Booking */}
             {patient.bookingType === 'ONLINE' && (
               <div className="mt-2 flex items-center gap-2">
                 <div
@@ -246,37 +234,51 @@ export const QueueCard: React.FC<QueueCardProps> = ({
           </div>
         </div>
 
-        {/* Right: Actions */}
+        {/* Right Actions */}
         <div className="w-full sm:w-auto mt-2 sm:mt-0 flex flex-wrap items-center gap-2">
+          {/* WAITING STATE ACTIONS */}
           {patient.status === 'WAITING' && (
             <>
-              {/* BUTTON: DONE (COMPLETED) */}
+              {/* BUTTON 1: ANDAR BULAYEIN (Sirf turn aane par active rahega) */}
               <button
                 type="button"
                 disabled={!canActOnPatient}
                 onClick={() => {
                   if (canActOnPatient) {
-                    completePatient(patient.id);
+                    callPatient(patient.id);
                   }
                 }}
-                className={`flex-1 sm:flex-initial rounded-xl px-4 py-2.5 text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                className={`flex-1 sm:flex-initial rounded-xl px-3.5 py-2.5 text-xs font-bold transition flex items-center justify-center gap-1.5 ${
                   canActOnPatient
-                    ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-md shadow-emerald-500/20 cursor-pointer active:scale-95'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20 hover:bg-blue-700 cursor-pointer active:scale-95'
                     : 'bg-slate-200 text-slate-400 border border-slate-300 cursor-not-allowed opacity-60'
                 }`}
                 title={
-                  !isDoctorAvailable
-                    ? `Doctor currently ${statusLabel}. Consultation paused.`
-                    : !canActOnPatient
-                    ? 'Series locked: Pehle pichhle token ko complete karein.'
-                    : 'Checkup done & marked completed'
+                  !canActOnPatient
+                    ? 'Series locked: Pehle pichhle patient ko call karein.'
+                    : 'Patient ko cabin ke andar bulayein'
                 }
               >
-                {!canActOnPatient ? <Lock className="h-3.5 w-3.5 text-slate-400" /> : <CheckCircle className="h-3.5 w-3.5" />}
+                {!canActOnPatient ? (
+                  <Lock className="h-3.5 w-3.5 text-slate-400" />
+                ) : (
+                  <span className="h-2 w-2 rounded-full bg-white animate-ping"></span>
+                )}
+                <span>➡️ Andar Gaye (In Cabin)</span>
+              </button>
+
+              {/* BUTTON 2: DONE (WAITING state me disabled rahega, andar jaane par hi unlock hoga) */}
+              <button
+                type="button"
+                disabled={true}
+                className="flex-1 sm:flex-initial rounded-xl px-3 py-2.5 text-xs font-bold bg-slate-200 text-slate-400 border border-slate-300 cursor-not-allowed opacity-50 flex items-center gap-1"
+                title="Pehle mareez ko andar bhejein, tab bahar aane ka button active hoga"
+              >
+                <Lock className="h-3.5 w-3.5 text-slate-400" />
                 <span>Done (Bahar Aaye)</span>
               </button>
 
-              {/* BUTTON: UPLABDH NAHI */}
+              {/* BUTTON 3: UPLABDH NAHI */}
               <button
                 type="button"
                 disabled={!canActOnPatient}
@@ -299,7 +301,7 @@ export const QueueCard: React.FC<QueueCardProps> = ({
                 Uplabdh Nahi
               </button>
 
-              {/* BUTTON: EMERGENCY PRIORITY */}
+              {/* BUTTON 4: EMERGENCY PRIORITY */}
               {!patient.isEmergency && (
                 <button
                   type="button"
@@ -314,7 +316,7 @@ export const QueueCard: React.FC<QueueCardProps> = ({
                       ? 'border border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100 cursor-pointer'
                       : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-50'
                   }`}
-                  title="Shift this patient to immediate next priority"
+                  title="Is token ko emergency mark karke line me sabse pehle shift karein"
                 >
                   <Flame className="h-3.5 w-3.5 text-rose-500" />
                   <span>Emergency</span>
@@ -323,23 +325,26 @@ export const QueueCard: React.FC<QueueCardProps> = ({
             </>
           )}
 
+          {/* IN CABIN STATE ACTIONS: Andar gaye disable/gayab, sirf BAHAR AAYE chalu */}
           {isInCabin && (
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <span className="text-xs font-bold uppercase tracking-wider text-blue-100 px-2 py-1 rounded bg-blue-700">
-                Doctor Cabin me Andar Hai (Blue)
+                Doctor Cabin me Andar Hai
               </span>
 
               <button
                 type="button"
+                disabled={!isDoctorAvailable}
                 onClick={() => completePatient(patient.id)}
-                className="rounded-xl bg-white text-emerald-800 font-extrabold px-4 py-2.5 text-xs shadow-md hover:bg-emerald-50 transition cursor-pointer flex items-center gap-1.5"
+                className="rounded-xl bg-white text-emerald-800 font-extrabold px-4 py-2.5 text-xs shadow-md hover:bg-emerald-50 transition cursor-pointer flex items-center gap-1.5 active:scale-95"
               >
                 <CheckCircle className="h-4 w-4 text-emerald-600" />
-                <span>Consultation Complete (Bahar Nikle)</span>
+                <span>Done (Bahar Aaye)</span>
               </button>
             </div>
           )}
 
+          {/* ABSENT STATE */}
           {isAbsent && (
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-amber-800">
@@ -356,10 +361,11 @@ export const QueueCard: React.FC<QueueCardProps> = ({
             </div>
           )}
 
+          {/* COMPLETED STATE */}
           {isCompleted && (
             <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700">
               <CheckCircle className="h-4 w-4 text-emerald-600" />
-              <span>Completed / Checkup Done (Green)</span>
+              <span>Completed / Checkup Done</span>
             </div>
           )}
         </div>
