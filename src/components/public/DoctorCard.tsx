@@ -21,29 +21,53 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
 }) => {
   const { patients } = useClinic();
 
-  // Smart Live Token Calculation (Cabin + Active Queue Sync)
+  // Smart Live Display Calculation: Doctor status + Queue Token
   const getLiveServingDetails = () => {
+    // 1. Agar Doctor AVAILABLE nahi hai toh status text show hoga
+    if (doctor.status === 'LUNCH') {
+      return {
+        displayText: 'Lunch Break',
+        textColor: 'text-amber-500 drop-shadow-[0_0_8px_rgba(245,158,11,0.3)]',
+        label: 'Doctor abhi lunch break par hain',
+      };
+    }
+    if (doctor.status === 'SURGERY') {
+      return {
+        displayText: 'In Surgery',
+        textColor: 'text-rose-600 drop-shadow-[0_0_8px_rgba(225,29,72,0.3)]',
+        label: 'Doctor OT / Surgery me vyast hain',
+      };
+    }
+    if (doctor.status === 'LEAVE') {
+      return {
+        displayText: 'On Leave',
+        textColor: 'text-blue-600 drop-shadow-[0_0_8px_rgba(37,99,235,0.3)]',
+        label: 'Doctor aaj upalabdha nahi hain',
+      };
+    }
+
+    // 2. Doctor AVAILABLE hone par: Token ya Ready (Dono Green)
     const todayStr = new Date().toISOString().split('T')[0];
 
-    // 1. Agar koi mareez Doctor Cabin ke andar hai (IN_CABIN)
+    // Cabin me andar patient
     const inCabinPatient = patients.find(
       (p) => p.doctorId === doctor.id && p.status === 'IN_CABIN'
     );
     if (inCabinPatient) {
       return {
-        token: `#${inCabinPatient.tokenNumber}`,
+        displayText: `#${inCabinPatient.tokenNumber}`,
+        textColor: 'text-emerald-600 drop-shadow-[0_0_10px_rgba(16,185,129,0.4)]',
         label: 'Doctor Cabin me abhi chal raha hai',
       };
     }
 
-    // 2. Agar cabin me koi nahi hai, toh aaj ki active queue ka pehla turn (Next Patient / Turn Active)
+    // Waiting queue me pehla active patient
     const activeWaiting = patients
       .filter((p) => {
         const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
         return p.doctorId === doctor.id && p.status === 'WAITING' && pDate === todayStr;
       })
       .sort((a, b) => {
-        // Emergency priority pehle
         if (a.isEmergency && !b.isEmergency) return -1;
         if (!a.isEmergency && b.isEmergency) return 1;
         return (a.tokenNumber || 0) - (b.tokenNumber || 0);
@@ -52,16 +76,20 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
     if (activeWaiting.length > 0) {
       const nextInLine = activeWaiting[0];
       return {
-        token: `#${nextInLine.tokenNumber}`,
+        displayText: `#${nextInLine.tokenNumber}`,
+        textColor: nextInLine.isEmergency
+          ? 'text-rose-600 drop-shadow-[0_0_10px_rgba(225,29,72,0.4)]'
+          : 'text-emerald-600 drop-shadow-[0_0_10px_rgba(16,185,129,0.4)]',
         label: nextInLine.isEmergency
           ? '🚨 Emergency Case (Turn Active)'
           : 'Calling / Current Turn Active',
       };
     }
 
-    // 3. Agar koi patient line me nahi hai
+    // Agar queue poori khali hai
     return {
-      token: 'Ready',
+      displayText: 'Ready',
+      textColor: 'text-emerald-600 drop-shadow-[0_0_8px_rgba(16,185,129,0.3)]',
       label: 'Cabin Ready for Patients',
     };
   };
@@ -168,15 +196,15 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
           );
         })()}
 
-        {/* ONLY CURRENT TOKEN DISPLAY (Zero Privacy Leak - Live Synced) */}
-        <div className="mt-5 rounded-2xl bg-gradient-to-br from-blue-900 to-indigo-950 p-4 text-center text-white shadow-md relative overflow-hidden">
-          <span className="text-[11px] uppercase font-bold text-blue-300 tracking-wider block">
+        {/* LIVE TOKEN / DOCTOR STATUS DISPLAY BOX (Dark White Theme) */}
+        <div className="mt-5 rounded-2xl bg-slate-100/90 border border-slate-300/80 p-4 text-center shadow-inner relative overflow-hidden">
+          <span className="text-[11px] uppercase font-bold text-slate-500 tracking-wider block">
             Current Running Token (Live Token)
           </span>
-          <div className="my-1 text-5xl font-mono font-black text-blue-400 tracking-tight drop-shadow-[0_0_12px_rgba(96,165,250,0.6)]">
-            {servingInfo.token}
+          <div className={`my-1 text-4xl sm:text-5xl font-mono font-black tracking-tight ${servingInfo.textColor}`}>
+            {servingInfo.displayText}
           </div>
-          <span className="text-[11px] text-blue-200">
+          <span className="text-[11px] font-medium text-slate-600">
             {servingInfo.label}
           </span>
         </div>
