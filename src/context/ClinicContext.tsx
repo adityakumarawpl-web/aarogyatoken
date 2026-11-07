@@ -495,11 +495,24 @@ const addWalkInPatient = useCallback((data: Omit<Patient, 'id' | 'tokenNumber' |
     setTimeout(() => checkBotAlerts(updated), 50);
   }, [patients, checkBotAlerts]);
 
-  const markEmergency = useCallback((patientId: string) => {
-    const updated = markPatientEmergency(patients, patientId);
-    updated.forEach(p => {
-      updateDoc(doc(db, 'patients', p.id), { status: p.status }).catch(() => {});
-    });
+const markEmergency = useCallback((patientId: string) => {
+    // 1. Local state turant update karein taaki screen par patient instant upar shift ho jaye
+    const updated = patients.map((p) =>
+      p.id === patientId ? { ...p, isEmergency: true } : p
+    );
+    setPatients(updated);
+
+    // 2. Database (Firestore) mein isEmergency: true save karein
+    try {
+      if (db) {
+        updateDoc(doc(db, 'patients', patientId), { isEmergency: true }).catch((err) =>
+          console.error("Firestore emergency update error:", err)
+        );
+      }
+    } catch (e) {
+      console.error("Emergency update exception:", e);
+    }
+
     setTimeout(() => checkBotAlerts(updated), 50);
   }, [patients, checkBotAlerts]);
 
