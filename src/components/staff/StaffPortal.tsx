@@ -644,6 +644,8 @@ export const StaffPortal: React.FC = () => {
                   isFirstWaiting={index === 0 && patient.status === 'WAITING'}
                   isDoctorAvailable={currentDoctor.status === 'AVAILABLE'}
                   doctorStatus={currentDoctor.status}
+                  currentActiveDate={currentActiveDate}
+                  currentActiveShift={currentActiveShift}
                 />
               ))
             )}
