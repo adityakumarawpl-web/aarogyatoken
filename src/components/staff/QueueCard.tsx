@@ -25,27 +25,25 @@ interface QueueCardProps {
 
 export const QueueCard: React.FC<QueueCardProps> = ({
   patient,
-  isFirstWaiting,
+  isFirstWaiting = false,
   isDoctorAvailable = true,
   doctorStatus = 'AVAILABLE',
 }) => {
   const {
-    callPatient,
     completePatient,
     markNotAvailable,
     markEmergency,
     recallPatient,
-    triggerBotCallAlert,
   } = useClinic();
 
-  const [dragOffset, setDragOffset] = useState<number>(0);
-  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const isInCabin = patient.status === 'IN_CABIN';
+  const isCompleted = patient.status === 'COMPLETED';
+  const isAbsent = patient.status === 'NOT_AVAILABLE';
 
-  // Status-based styling matching user's exact specification:
-  // IN_CABIN = BLUE
-  // COMPLETED = GREEN
-  // NOT_AVAILABLE = AMBER
-  // EMERGENCY = RED / CRIMSON
+  // Rule: Sirf tabhi action liya ja sakta hai jab Doctor Available ho
+  // Aur strict series ke mutabiq sirf First Waiting ya Emergency patient hi active ho
+  const canActOnPatient = isDoctorAvailable && (isFirstWaiting || patient.isEmergency);
+
   const getCardStyle = () => {
     switch (patient.status) {
       case 'IN_CABIN':
@@ -60,14 +58,10 @@ export const QueueCard: React.FC<QueueCardProps> = ({
           return 'bg-rose-50 text-slate-900 border-2 border-rose-500 ring-2 ring-rose-400/40 shadow-sm';
         }
         return isFirstWaiting
-          ? 'bg-white text-slate-900 border-2 border-blue-300 shadow-md ring-1 ring-blue-200'
-          : 'bg-white text-slate-800 border border-slate-200 shadow-xs hover:border-slate-300';
+          ? 'bg-white text-slate-900 border-2 border-emerald-400 shadow-md ring-2 ring-emerald-100'
+          : 'bg-slate-50/70 text-slate-600 border border-slate-200 opacity-90';
     }
   };
-
-  const isInCabin = patient.status === 'IN_CABIN';
-  const isCompleted = patient.status === 'COMPLETED';
-  const isAbsent = patient.status === 'NOT_AVAILABLE';
 
   const statusLabel =
     doctorStatus === 'LUNCH'
@@ -82,29 +76,38 @@ export const QueueCard: React.FC<QueueCardProps> = ({
     <div
       className={`relative rounded-2xl p-4 sm:p-5 transition-all duration-300 overflow-hidden ${getCardStyle()}`}
     >
-      {/* Visual Slide Guides / Labels */}
+      {/* Top Banner: Doctor Unavailability ya Queue Turn Notification */}
       {patient.status === 'WAITING' && (
         <div className="mb-3">
           {!isDoctorAvailable ? (
             <div className="flex items-center justify-between text-[11px] font-bold p-2 rounded-xl bg-amber-100/90 border border-amber-300 text-amber-900">
               <span className="flex items-center gap-1.5">
                 <Lock className="h-3.5 w-3.5 text-amber-700" />
-                <span>Doctor Status: <strong>{statusLabel}</strong> — Cabin Calling Paused</span>
+                <span>Doctor Status: <strong>{statusLabel}</strong> — Consultation Paused</span>
               </span>
               <span className="text-[10px] text-amber-800 font-medium">
-                (Doctor ke Available hone par hi andar bula sakeinge)
+                (Doctor ke Available hone par hi buttons chalenge)
+              </span>
+            </div>
+          ) : isFirstWaiting || patient.isEmergency ? (
+            <div className="flex items-center justify-between text-[11px] font-bold pb-2 border-b border-emerald-100 text-emerald-700">
+              <span className="flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping"></span>
+                <span>Current Turn: Next Patient to Consult</span>
+              </span>
+              <span className="text-[10px] text-emerald-600 font-medium">
+                (Checkup complete hone par 'Done' karein)
               </span>
             </div>
           ) : (
-            <div className="flex items-center justify-between text-[11px] font-bold pb-2 border-b border-slate-100">
-              <div className="flex items-center gap-1 text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
-                <span>Slide ➡️ Left-to-Right:</span>
-                <span>Blue (Andar Cabin me)</span>
-              </div>
-              <div className="flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-                <span>Slide ⬅️ Right-to-Left:</span>
-                <span>Green (Completed)</span>
-              </div>
+            <div className="flex items-center justify-between text-[11px] font-medium pb-1.5 border-b border-slate-100 text-slate-500">
+              <span className="flex items-center gap-1">
+                <Lock className="h-3 w-3 text-slate-400" />
+                <span>Waiting in Queue — Series Token Locked</span>
+              </span>
+              <span className="text-[10px] text-slate-400">
+                (Pehle pichhle token ka checkup poora hoga)
+              </span>
             </div>
           )}
         </div>
@@ -125,7 +128,9 @@ export const QueueCard: React.FC<QueueCardProps> = ({
                 ? 'bg-amber-200 text-amber-900'
                 : patient.isEmergency
                 ? 'bg-rose-600 text-white'
-                : 'bg-slate-900 text-white'
+                : isFirstWaiting
+                ? 'bg-emerald-600 text-white shadow-emerald-200 shadow-md'
+                : 'bg-slate-700 text-white'
             }`}
           >
             <span className="text-[10px] uppercase font-bold tracking-tight opacity-75">Token</span>
@@ -148,13 +153,13 @@ export const QueueCard: React.FC<QueueCardProps> = ({
                 {patient.gender}, {patient.age} yrs
               </span>
 
-              {/* Source Tag: Free Staff vs Online Book */}
+              {/* Source Tag */}
               <span
                 className={`text-[11px] px-2 py-0.5 rounded-md font-bold uppercase ${
                   patient.bookingType === 'ONLINE'
                     ? isInCabin
-                    ? 'bg-purple-300 text-purple-950'
-                    : 'bg-purple-100 text-purple-800 border border-purple-200'
+                      ? 'bg-purple-300 text-purple-950'
+                      : 'bg-purple-100 text-purple-800 border border-purple-200'
                     : isInCabin
                     ? 'bg-blue-700 text-blue-100'
                     : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
@@ -163,7 +168,7 @@ export const QueueCard: React.FC<QueueCardProps> = ({
                 {patient.bookingType === 'ONLINE' ? 'Online Book' : 'Staff Walk-in (Free)'}
               </span>
 
-{/* Appointment Date Badge */}
+              {/* Appointment Date Badge */}
               {patient.appointmentDate && (
                 <span
                   className={`text-[11px] px-2 py-0.5 rounded-md font-bold ${
@@ -190,7 +195,7 @@ export const QueueCard: React.FC<QueueCardProps> = ({
                   🕒 {patient.selectedShift} Shift
                 </span>
               )}
-              
+
               {patient.isEmergency && (
                 <span className="inline-flex items-center gap-1 rounded-md bg-rose-600 text-white px-2 py-0.5 text-[10px] font-black uppercase tracking-wider animate-pulse">
                   <Flame className="h-3 w-3" />
@@ -217,7 +222,7 @@ export const QueueCard: React.FC<QueueCardProps> = ({
               <span className="opacity-75">{patient.address}</span>
             </div>
 
-            {/* Purely Automatic Call Status for Online Booking */}
+            {/* Bot Call Status for Online Booking */}
             {patient.bookingType === 'ONLINE' && (
               <div className="mt-2 flex items-center gap-2">
                 <div
@@ -233,7 +238,7 @@ export const QueueCard: React.FC<QueueCardProps> = ({
                   <span>
                     {patient.botCallAlertSent
                       ? '✓ Automated Bot Call Alert Sent'
-                      : 'Auto Call System Active (3-4 Mareez Pehle Auto Call Hoga)'}
+                      : 'Auto Call System Active'}
                   </span>
                 </div>
               </div>
@@ -241,86 +246,78 @@ export const QueueCard: React.FC<QueueCardProps> = ({
           </div>
         </div>
 
-        {/* Right: Interactive Slide Actions & Quick Option Buttons */}
+        {/* Right: Actions */}
         <div className="w-full sm:w-auto mt-2 sm:mt-0 flex flex-wrap items-center gap-2">
           {patient.status === 'WAITING' && (
             <>
-              {/* SLIDE LEFT-TO-RIGHT EQUIVALENT BUTTON (BLUE - IN CABIN) */}
+              {/* BUTTON: DONE (COMPLETED) */}
               <button
                 type="button"
-                disabled={!isDoctorAvailable}
+                disabled={!canActOnPatient}
                 onClick={() => {
-                  if (isDoctorAvailable) {
-                    callPatient(patient.id);
-                  }
-                }}
-                className={`flex-1 sm:flex-initial rounded-xl px-3.5 py-2.5 text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-                  isDoctorAvailable
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20 hover:bg-blue-700 cursor-pointer active:scale-95'
-                    : 'bg-slate-200 text-slate-400 border border-slate-300 cursor-not-allowed opacity-60'
-                }`}
-                title={
-                  isDoctorAvailable
-                    ? 'Slide Left-to-Right: Patient inside Doctor Cabin (Blue)'
-                    : `Doctor currently ${statusLabel}. Set status to Available to call patient.`
-                }
-              >
-                {isDoctorAvailable ? (
-                  <>
-                    <span>➡️ Andar Bulayein (In Cabin)</span>
-                    <span className="h-2 w-2 rounded-full bg-white animate-ping"></span>
-                  </>
-                ) : (
-                  <>
-                    <Lock className="h-3.5 w-3.5 text-slate-400" />
-                    <span>Andar Bulayein (Locked)</span>
-                  </>
-                )}
-              </button>
-
-              {/* SLIDE RIGHT-TO-LEFT EQUIVALENT BUTTON (GREEN - COMPLETED) */}
-              <button
-                type="button"
-                disabled={!isDoctorAvailable}
-                onClick={() => {
-                  if (isDoctorAvailable) {
+                  if (canActOnPatient) {
                     completePatient(patient.id);
                   }
                 }}
-                className={`flex-1 sm:flex-initial rounded-xl px-3 py-2.5 text-xs font-bold transition flex items-center justify-center gap-1 ${
-                  isDoctorAvailable
-                    ? 'bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer'
+                className={`flex-1 sm:flex-initial rounded-xl px-4 py-2.5 text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                  canActOnPatient
+                    ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-md shadow-emerald-500/20 cursor-pointer active:scale-95'
                     : 'bg-slate-200 text-slate-400 border border-slate-300 cursor-not-allowed opacity-60'
                 }`}
                 title={
-                  isDoctorAvailable
-                    ? 'Slide Right-to-Left: Mark consultation done & out (Green)'
-                    : `Doctor currently ${statusLabel}`
+                  !isDoctorAvailable
+                    ? `Doctor currently ${statusLabel}. Consultation paused.`
+                    : !canActOnPatient
+                    ? 'Series locked: Pehle pichhle token ko complete karein.'
+                    : 'Checkup done & marked completed'
                 }
               >
-                <CheckCircle className="h-3.5 w-3.5" />
+                {!canActOnPatient ? <Lock className="h-3.5 w-3.5 text-slate-400" /> : <CheckCircle className="h-3.5 w-3.5" />}
                 <span>Done (Bahar Aaye)</span>
               </button>
 
-              {/* 3.a Option: Not Available */}
+              {/* BUTTON: UPLABDH NAHI */}
               <button
                 type="button"
-                onClick={() => markNotAvailable(patient.id)}
-                className="rounded-xl border border-amber-300 bg-amber-50 px-2.5 py-2.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition cursor-pointer"
-                title="Patient is not available / absent right now"
+                disabled={!canActOnPatient}
+                onClick={() => {
+                  if (canActOnPatient) {
+                    markNotAvailable(patient.id);
+                  }
+                }}
+                className={`rounded-xl px-3 py-2.5 text-xs font-semibold transition ${
+                  canActOnPatient
+                    ? 'border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 cursor-pointer'
+                    : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-50'
+                }`}
+                title={
+                  !canActOnPatient
+                    ? 'Turn aane par hi absent mark kar sakte hain'
+                    : 'Patient absent right now'
+                }
               >
                 Uplabdh Nahi
               </button>
 
-              {/* 3.a Option: Emergency Priority */}
+              {/* BUTTON: EMERGENCY PRIORITY */}
               {!patient.isEmergency && (
                 <button
                   type="button"
-                  onClick={() => markEmergency(patient.id)}
-                  className="rounded-xl border border-rose-300 bg-rose-50 px-2.5 py-2.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition cursor-pointer"
-                  title="Move to top priority as Emergency"
+                  disabled={!isDoctorAvailable}
+                  onClick={() => {
+                    if (isDoctorAvailable) {
+                      markEmergency(patient.id);
+                    }
+                  }}
+                  className={`rounded-xl px-3 py-2.5 text-xs font-bold transition flex items-center gap-1 ${
+                    isDoctorAvailable
+                      ? 'border border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100 cursor-pointer'
+                      : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-50'
+                  }`}
+                  title="Shift this patient to immediate next priority"
                 >
-                  🚨 Emergency
+                  <Flame className="h-3.5 w-3.5 text-rose-500" />
+                  <span>Emergency</span>
                 </button>
               )}
             </>
@@ -332,7 +329,6 @@ export const QueueCard: React.FC<QueueCardProps> = ({
                 Doctor Cabin me Andar Hai (Blue)
               </span>
 
-              {/* Complete consultation button */}
               <button
                 type="button"
                 onClick={() => completePatient(patient.id)}
