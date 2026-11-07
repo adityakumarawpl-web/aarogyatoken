@@ -41,11 +41,11 @@ export const StaffPortal: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'QUEUE' | 'COMPLETED' | 'ABSENT' | 'REPORTS'>('QUEUE');
   const [searchFilter, setSearchFilter] = useState('');
   const [selectedDateFilter, setSelectedDateFilter] = useState<string>(
-  new Date().toISOString().split('T')[0]
-);
-const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
+    new Date().toISOString().split('T')[0]
+  );
+  const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
 
-// Time string (e.g. "01:00 PM" ya "13:00") ko minutes mein convert karna
+  // Time string (e.g. "01:00 PM" ya "13:00") ko minutes mein convert karna
   const parseTimeToMinutes = (timeStr: string) => {
     if (!timeStr) return 13 * 60; // Default 1:00 PM (780 mins)
     const cleanStr = timeStr.trim().toUpperCase();
@@ -100,6 +100,11 @@ const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
     selectedShift: 'Morning',
   });
 
+  // Report Period
+  const [reportPeriod, setReportPeriod] = useState<'day' | 'week' | 'month' | 'year'>('day');
+
+  const currentDoctor = doctors.find((d) => d.id === staffDoctorId);
+
   // Date change hone par auto-adjust karna
   const handleDateChange = (newDate: string) => {
     const morningAllowed = isMorningShiftActiveForDoctor(newDate, currentDoctor);
@@ -109,11 +114,6 @@ const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
       selectedShift: (!morningAllowed && prev.selectedShift === 'Morning') ? 'Evening' : prev.selectedShift,
     }));
   };
-
-  // Report Period
-  const [reportPeriod, setReportPeriod] = useState<'day' | 'week' | 'month' | 'year'>('day');
-
-  const currentDoctor = doctors.find((d) => d.id === staffDoctorId);
 
   // If not logged in, show staff login screen
   if (!currentDoctor) {
@@ -219,31 +219,19 @@ const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
     );
   }
 
-// 1. Doctor Patients list with Date, Shift & Search filters
+  // 1. Doctor Patients list with Date, Shift & Search filters
   const doctorPatients = patients.filter((p) => {
-    // 0. Doctor ID check
-    if (p.doctorId !== currentDoctor?.id) {
-      return false;
-    }
+    if (p.doctorId !== currentDoctor?.id) return false;
 
-    // 1. Date Filter
     const patientDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
-    if (selectedDateFilter && patientDate && patientDate !== selectedDateFilter) {
-      return false;
-    }
+    if (selectedDateFilter && patientDate && patientDate !== selectedDateFilter) return false;
 
-    // 2. Shift Filter
     if (selectedShiftFilter && selectedShiftFilter !== 'ALL') {
       const patientShift = (p.selectedShift || p.shift || '').trim();
-      if (patientShift && patientShift !== selectedShiftFilter) {
-        return false;
-      }
+      if (patientShift && patientShift !== selectedShiftFilter) return false;
     }
 
-    // 3. Search Filter
-    if (!searchFilter.trim()) {
-      return true;
-    }
+    if (!searchFilter.trim()) return true;
 
     const term = searchFilter.toLowerCase();
     const tokenStr = p.tokenNumber ? p.tokenNumber.toString() : '';
@@ -259,11 +247,8 @@ const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
     );
   });
 
-  // Alias taaki agar niche kahin filteredPatients ya doctorPatients dono me se kuch bhi ho toh crash na ho
-  const filteredPatients = doctorPatients;
+  const waitingPatients = doctorPatients.filter((p) => p.status === 'WAITING' || p.status === 'IN_CABIN');
 
-  const waitingPatients = filteredPatients.filter((p) => p.status === 'WAITING' || p.status === 'IN_CABIN');
-  // Sort waiting patients: Emergency first, then IN_CABIN, then token number
   const sortedWaitingPatients = [...waitingPatients].sort((a, b) => {
     if (a.status === 'IN_CABIN') return -1;
     if (b.status === 'IN_CABIN') return 1;
@@ -272,13 +257,12 @@ const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
     return (a.tokenNumber || 0) - (b.tokenNumber || 0);
   });
 
-  const completedPatients = filteredPatients.filter((p) => p.status === 'COMPLETED');
-  const absentPatients = filteredPatients.filter((p) => p.status === 'NOT_AVAILABLE');
+  const completedPatients = doctorPatients.filter((p) => p.status === 'COMPLETED');
+  const absentPatients = doctorPatients.filter((p) => p.status === 'NOT_AVAILABLE');
 
   const currentlyServing = getCurrentlyServingToken(patients, currentDoctor?.id);
   const summary = generateDoctorSummary(patients, currentDoctor?.id, reportPeriod);
 
-  // Active Date aur Shift ke hisab se next token preview calculate karna
   const currentActiveDate = selectedDateFilter || new Date().toISOString().split('T')[0];
   const currentActiveShift = (selectedShiftFilter && selectedShiftFilter !== 'ALL') ? selectedShiftFilter : 'Morning';
 
@@ -296,8 +280,8 @@ const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
     const num = typeof p.tokenNumber === 'number' ? p.tokenNumber : parseInt(String(p.tokenNumber), 10) || 0;
     return num > max ? num : max;
   }, 0) + 1;
-  
-const handleAddWalkInSubmit = (e: React.FormEvent) => {
+
+  const handleAddWalkInSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!walkInForm.name.trim() || !walkInForm.mobile.trim() || !currentDoctor?.id) return;
 
@@ -314,8 +298,6 @@ const handleAddWalkInSubmit = (e: React.FormEvent) => {
       appointmentDate: walkInForm.appointmentDate,
     } as any);
 
-    // === WhatsApp notification trigger ===
-    console.log("Triggering WhatsApp fetch for:", walkInForm.mobile.trim());
     fetch('/api/send-whatsapp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -325,16 +307,12 @@ const handleAddWalkInSubmit = (e: React.FormEvent) => {
         doctorName: currentDoctor.name,
       }),
     })
-    .then(res => res.json())
-    .then(data => console.log('WhatsApp API Response:', data))
-    .catch(err => console.error('WhatsApp trigger error:', err));
-    // =====================================
+      .then((res) => res.json())
+      .catch((err) => console.error('WhatsApp trigger error:', err));
 
-    // Dynamic shift check reset ke liye
     const todayStr = new Date().toISOString().split('T')[0];
     const defaultShift = isMorningShiftActiveForDoctor(todayStr, currentDoctor) ? 'Morning' : 'Evening';
 
-    // 1. Form ko poora blank aur safe reset karein
     setWalkInForm({
       name: '',
       mobile: '',
@@ -347,10 +325,9 @@ const handleAddWalkInSubmit = (e: React.FormEvent) => {
       selectedShift: defaultShift,
     });
 
-    // 2. Modal ko close karein
     setShowAddModal(false);
   };
-  
+
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-slate-100 pb-20">
       {/* Clinic Header Bar */}
@@ -375,7 +352,7 @@ const handleAddWalkInSubmit = (e: React.FormEvent) => {
             </div>
           </div>
 
-{/* Doctor Status Dropdown & Logout */}
+          {/* Doctor Status Dropdown & Logout */}
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-slate-700">Doctor Status:</span>
             <select
@@ -406,76 +383,32 @@ const handleAddWalkInSubmit = (e: React.FormEvent) => {
               <LogOut className="h-4 w-4" />
             </button>
           </div>
-
-{/* 3 Main Action Buttons */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 my-5">
-        {/* Button 1: Add Patient (FREE) */}
-        <button
-          type="button"
-          onClick={() => {
-            const todayStr = new Date().toISOString().split('T')[0];
-            const defaultShift = isMorningShiftActiveForDoctor(todayStr, currentDoctor) ? 'Morning' : 'Evening';
-            setWalkInForm({
-              name: '',
-              mobile: '',
-              age: '',
-              gender: 'Male',
-              address: '',
-              complaint: '',
-              isEmergency: false,
-              appointmentDate: todayStr,
-              selectedShift: defaultShift,
-            });
-            setShowAddModal(true);
-          }}
-          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl p-3.5 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition active:scale-95 cursor-pointer"
-        >
-          <span className="text-base font-black leading-none">+</span>
-          <span>Add Patient (FREE)</span>
-        </button>
-
-        {/* Button 2: Live OPD Queue (Sirf doctor AVAILABLE hone par active) */}
-        <button
-          type="button"
-          disabled={currentDoctor.status !== 'AVAILABLE'}
-          onClick={() => setActiveTab('QUEUE')}
-          className={`w-full rounded-2xl p-3.5 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition cursor-pointer ${
-            activeTab === 'QUEUE'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-              : currentDoctor.status === 'AVAILABLE'
-              ? 'bg-white hover:bg-blue-50 text-blue-700 border border-blue-200'
-              : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
-          }`}
-          title={
-            currentDoctor.status !== 'AVAILABLE'
-              ? 'Doctor Available hone par hi Queue access hogi'
-              : 'Live OPD Queue View'
-          }
-        >
-          <span>📋 Live OPD Queue</span>
-          {currentDoctor.status !== 'AVAILABLE' && <span className="text-xs">🔒</span>}
-        </button>
-
-        {/* Button 3: Clinic Summary (Poora hisab-kitab) */}
-        <button
-          type="button"
-          onClick={() => setActiveTab('REPORTS')}
-          className={`w-full rounded-2xl p-3.5 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition cursor-pointer ${
-            activeTab === 'REPORTS'
-              ? 'bg-slate-900 text-white shadow-md shadow-slate-900/20'
-              : 'bg-white hover:bg-slate-50 text-slate-800 border border-slate-200'
-          }`}
-        >
-          <span>📊 Summary & Reports</span>
-        </button>
+        </div>
       </div>
-          
-{/* 3 Main Action Buttons Strip */}
+
+      {/* Main Staff Container */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {/* 3 Main Action Buttons Strip */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {/* Button 1: Add Patient (FREE) */}
           <button
             type="button"
-            onClick={() => setShowAddModal(true)}
+            onClick={() => {
+              const todayStr = new Date().toISOString().split('T')[0];
+              const defaultShift = isMorningShiftActiveForDoctor(todayStr, currentDoctor) ? 'Morning' : 'Evening';
+              setWalkInForm({
+                name: '',
+                mobile: '',
+                age: '',
+                gender: 'Male',
+                address: '',
+                complaint: '',
+                isEmergency: false,
+                appointmentDate: todayStr,
+                selectedShift: defaultShift,
+              });
+              setShowAddModal(true);
+            }}
             className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl p-4 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition active:scale-95 cursor-pointer"
           >
             <span className="text-base font-black leading-none">+</span>
@@ -573,7 +506,7 @@ const handleAddWalkInSubmit = (e: React.FormEvent) => {
             </div>
           </div>
         )}
-          
+
         {/* Search & Tabs Toolbar */}
         <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
           {/* Navigation Tabs */}
@@ -627,9 +560,8 @@ const handleAddWalkInSubmit = (e: React.FormEvent) => {
             </button>
           </div>
 
-{/* Date & Shift Filter with Search bar */}
+          {/* Date & Shift Filter with Search bar */}
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            {/* Date Filter */}
             <input
               type="date"
               value={selectedDateFilter}
@@ -637,7 +569,6 @@ const handleAddWalkInSubmit = (e: React.FormEvent) => {
               className="rounded-xl border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white shadow-xs focus:border-blue-500 focus:outline-none"
             />
 
-            {/* Shift Filter */}
             <select
               value={selectedShiftFilter}
               onChange={(e) => setSelectedShiftFilter(e.target.value)}
@@ -648,7 +579,6 @@ const handleAddWalkInSubmit = (e: React.FormEvent) => {
               <option value="Evening">Evening Shift</option>
             </select>
 
-            {/* Search Bar */}
             <div className="relative w-full sm:w-64">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
               <input
@@ -661,8 +591,6 @@ const handleAddWalkInSubmit = (e: React.FormEvent) => {
             </div>
           </div>
         </div>
-
-        {/* TAB CONTENT */}
 
         {/* Doctor Status Pause Alert Banner when not available */}
         {currentDoctor.status !== 'AVAILABLE' && (
@@ -762,7 +690,7 @@ const handleAddWalkInSubmit = (e: React.FormEvent) => {
           </div>
         )}
 
-        {/* TAB 4: SUMMARY & REPORTS (DIN, WEEK, MONTH, YEAR) */}
+        {/* TAB 4: SUMMARY & REPORTS */}
         {activeTab === 'REPORTS' && (
           <div className="rounded-3xl bg-white border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
@@ -776,7 +704,6 @@ const handleAddWalkInSubmit = (e: React.FormEvent) => {
                 </p>
               </div>
 
-              {/* Period Switcher (Day, Week, Month, Year as requested) */}
               <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
                 {(['day', 'week', 'month', 'year'] as const).map((p) => (
                   <button
@@ -795,7 +722,6 @@ const handleAddWalkInSubmit = (e: React.FormEvent) => {
               </div>
             </div>
 
-            {/* Metrics Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               <div className="rounded-2xl bg-slate-50 p-4 border border-slate-200 text-center">
                 <span className="text-[10px] font-bold uppercase text-slate-500">Kul Registered</span>
@@ -828,7 +754,6 @@ const handleAddWalkInSubmit = (e: React.FormEvent) => {
               </div>
             </div>
 
-            {/* Print / Export Report action */}
             <div className="pt-2 flex justify-end">
               <button
                 type="button"
@@ -843,7 +768,7 @@ const handleAddWalkInSubmit = (e: React.FormEvent) => {
         )}
       </div>
 
-      {/* ADD WALK-IN PATIENT MODAL (100% FREE AS SPECIFIED) */}
+      {/* ADD WALK-IN PATIENT MODAL */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-in fade-in">
           <div className="w-full max-w-md rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
@@ -879,39 +804,37 @@ const handleAddWalkInSubmit = (e: React.FormEvent) => {
             </div>
 
             <form onSubmit={handleAddWalkInSubmit} className="p-6 space-y-4">
-             
-              {/* Date & Shift Selection */}
-        <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Appointment Date
-            </label>
-            <input
-              type="date"
-              min={new Date().toISOString().split('T')[0]}
-              value={walkInForm.appointmentDate}
-              onChange={(e) => handleDateChange(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 p-2 text-xs font-medium bg-white focus:outline-none focus:border-emerald-500"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Shift
-            </label>
-            <select
-              value={walkInForm.selectedShift}
-              onChange={(e) => setWalkInForm({ ...walkInForm, selectedShift: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 p-2 text-xs font-medium bg-white focus:outline-none focus:border-emerald-500"
-            >
-              {/* Doctor ki profile morning end timing ke anusaar check */}
-              {isMorningShiftActiveForDoctor(walkInForm.appointmentDate, currentDoctor) && (
-                <option value="Morning">Morning Shift</option>
-              )}
-              <option value="Evening">Evening Shift</option>
-            </select>
-          </div>
-        </div>
+              <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Appointment Date
+                  </label>
+                  <input
+                    type="date"
+                    min={new Date().toISOString().split('T')[0]}
+                    value={walkInForm.appointmentDate}
+                    onChange={(e) => handleDateChange(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 p-2 text-xs font-medium bg-white focus:outline-none focus:border-emerald-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Shift
+                  </label>
+                  <select
+                    value={walkInForm.selectedShift}
+                    onChange={(e) => setWalkInForm({ ...walkInForm, selectedShift: e.target.value })}
+                    className="w-full rounded-lg border border-slate-300 p-2 text-xs font-medium bg-white focus:outline-none focus:border-emerald-500"
+                  >
+                    {isMorningShiftActiveForDoctor(walkInForm.appointmentDate, currentDoctor) && (
+                      <option value="Morning">Morning Shift</option>
+                    )}
+                    <option value="Evening">Evening Shift</option>
+                  </select>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Patient Full Name *
@@ -966,7 +889,6 @@ const handleAddWalkInSubmit = (e: React.FormEvent) => {
                 </div>
               </div>
 
-              
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Address / Locality
@@ -993,7 +915,6 @@ const handleAddWalkInSubmit = (e: React.FormEvent) => {
                 />
               </div>
 
-              {/* Emergency toggle */}
               <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Flame className="h-4 w-4 text-rose-600" />
@@ -1030,5 +951,4 @@ const handleAddWalkInSubmit = (e: React.FormEvent) => {
       )}
     </div>
   );
-  };
-
+};
