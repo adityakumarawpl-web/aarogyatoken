@@ -21,19 +21,21 @@ export const PublicOPDView: React.FC = () => {
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>('ALL');
   const [activeDoctorForBooking, setActiveDoctorForBooking] = useState<Doctor | null>(null);
 
-  // Filter doctors
-  const filteredDoctors = doctors.filter((doc) => {
-    const query = searchQuery.toLowerCase();
-    const matchesQuery =
+const filteredDoctors = doctors.filter((doc) => {
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) return true;
+
+    // 1. Direct visible details
+    const matchesVisible =
       doc.name.toLowerCase().includes(query) ||
       doc.specialty.toLowerCase().includes(query) ||
       doc.clinicName.toLowerCase().includes(query) ||
       doc.city.toLowerCase().includes(query);
 
-    const matchesSpecialty =
-      selectedSpecialty === 'ALL' || doc.specialty.toLowerCase().includes(selectedSpecialty.toLowerCase());
+    // 2. Invisible background tags (Public card par show nahi honge, sirf match honge)
+    const matchesTags = doc.tags?.some((t) => t.toLowerCase().includes(query));
 
-    return matchesQuery && matchesSpecialty;
+    return matchesVisible || matchesTags;
   });
 
   return (
