@@ -19,6 +19,8 @@ import {
   Calendar,
   Sparkles,
   Users,
+  Building2,
+  ChevronLeft,
 } from 'lucide-react';
 
 export const StaffPortal: React.FC = () => {
@@ -30,24 +32,29 @@ export const StaffPortal: React.FC = () => {
     staffLogout,
     updateDoctorStatus,
     addWalkInPatient,
+    setSelectedDoctorId,
   } = useClinic();
 
   // Login credentials state
+  const [loginType, setLoginType] = useState<'CLINIC' | 'HOSPITAL'>('CLINIC');
   const [loginUsername, setLoginUsername] = useState('staff_rajesh');
   const [loginPassword, setLoginPassword] = useState('clinic123');
   const [loginError, setLoginError] = useState('');
 
+  // Hospital Desk Cabin Directory Switcher
+  const [selectedHospitalCabinId, setSelectedHospitalCabinId] = useState<string | null>(null);
+
   // Active Tab
   const [activeTab, setActiveTab] = useState<'QUEUE' | 'COMPLETED' | 'ABSENT' | 'REPORTS' | 'FUTURE'>('QUEUE');
   const [searchFilter, setSearchFilter] = useState('');
-const realTodayDate = new Date().toISOString().split('T')[0];
+  const realTodayDate = new Date().toISOString().split('T')[0];
 
   const [selectedDateFilter, setSelectedDateFilter] = useState<string>(realTodayDate);
   const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
 
-  // Time string (e.g. "01:00 PM" ya "13:00") ko minutes mein convert karna
+  // Time string ko minutes mein convert karna
   const parseTimeToMinutes = (timeStr: string) => {
-    if (!timeStr) return 13 * 60; // Default 1:00 PM (780 mins)
+    if (!timeStr) return 13 * 60;
     const cleanStr = timeStr.trim().toUpperCase();
     const isPM = cleanStr.includes('PM');
     const isAM = cleanStr.includes('AM');
@@ -62,14 +69,10 @@ const realTodayDate = new Date().toISOString().split('T')[0];
     return hours * 60 + minutes;
   };
 
-  // Doctor ki profile timing ke hisaab se check karna ki Morning Shift active hai ya nahi
   const isMorningShiftActiveForDoctor = (targetDate: string, doctor: any) => {
     const todayStr = new Date().toISOString().split('T')[0];
-
-    // Future date par Morning hamesha allow rahegi
     if (targetDate > todayStr) return true;
 
-    // Aaj ki date ke liye doctor ki timing check karein
     if (targetDate === todayStr) {
       const now = new Date();
       const currentMinutes = now.getHours() * 60 + now.getMinutes();
@@ -100,11 +103,12 @@ const realTodayDate = new Date().toISOString().split('T')[0];
     selectedShift: 'Morning',
   });
 
-  // Report Period
   const [reportPeriod, setReportPeriod] = useState<'day' | 'week' | 'month' | 'year'>('day');
 
-  const currentDoctor = doctors.find((d) => d.id === staffDoctorId);
-// Real-time current shift auto detect doctor timings ke hisaab se
+  // Effective current doctor
+  const activeDoctorId = (loginType === 'HOSPITAL' && selectedHospitalCabinId) ? selectedHospitalCabinId : staffDoctorId;
+  const currentDoctor = doctors.find((d) => d.id === activeDoctorId);
+
   const getRealCurrentShift = () => {
     const now = new Date();
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
@@ -126,8 +130,7 @@ const realTodayDate = new Date().toISOString().split('T')[0];
   };
 
   const realCurrentShift = getRealCurrentShift();
-  
-  // Date change hone par auto-adjust karna
+
   const handleDateChange = (newDate: string) => {
     const morningAllowed = isMorningShiftActiveForDoctor(newDate, currentDoctor);
     setWalkInForm((prev) => ({
@@ -137,20 +140,74 @@ const realTodayDate = new Date().toISOString().split('T')[0];
     }));
   };
 
-  // If not logged in, show staff login screen
-  if (!currentDoctor) {
+  // ==========================================
+  // VIEW 1: STAFF LOGIN SCREEN (CLINIC vs HOSPITAL)
+  // ==========================================
+  if (!staffDoctorId) {
     return (
       <div className="min-h-[calc(100vh-4rem)] bg-slate-100 flex items-center justify-center p-4">
         <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-xl border border-slate-200">
           <div className="text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-500/30">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-500/30 mb-4">
               <Lock className="h-7 w-7" />
             </div>
-            <h2 className="mt-4 text-2xl font-black text-slate-900 tracking-tight">
-              Doctor Clinic Staff Login
+
+            {/* 1. Radio Button: Clinic vs Hospital Selector */}
+            <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1.5 rounded-2xl mb-5 border border-slate-200">
+              <label
+                className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold cursor-pointer transition ${
+                  loginType === 'CLINIC'
+                    ? 'bg-white text-blue-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="portalLoginType"
+                  checked={loginType === 'CLINIC'}
+                  onChange={() => {
+                    setLoginType('CLINIC');
+                    setLoginUsername('staff_rajesh');
+                    setLoginPassword('clinic123');
+                    setLoginError('');
+                  }}
+                  className="hidden"
+                />
+                <Stethoscope className="h-3.5 w-3.5" />
+                <span>Private Clinic</span>
+              </label>
+
+              <label
+                className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold cursor-pointer transition ${
+                  loginType === 'HOSPITAL'
+                    ? 'bg-white text-blue-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="portalLoginType"
+                  checked={loginType === 'HOSPITAL'}
+                  onChange={() => {
+                    setLoginType('HOSPITAL');
+                    setLoginUsername('');
+                    setLoginPassword('');
+                    setLoginError('');
+                  }}
+                  className="hidden"
+                />
+                <Building2 className="h-3.5 w-3.5" />
+                <span>Hospital Desk</span>
+              </label>
+            </div>
+
+            <h2 className="text-xl font-black text-slate-900 tracking-tight">
+              {loginType === 'CLINIC' ? 'Doctor Clinic Staff Login' : 'Hospital Central Reception Login'}
             </h2>
             <p className="mt-1 text-xs text-slate-500">
-              Enter the Staff ID & Password provided by platform admin
+              {loginType === 'CLINIC'
+                ? 'Single clinic doctor ke desk me login karein'
+                : 'Hospital Reception ID daalein aur sabhi OPD Cabins manage karein'}
             </p>
           </div>
 
@@ -168,27 +225,28 @@ const realTodayDate = new Date().toISOString().split('T')[0];
                 setLoginError(res.message);
               } else {
                 setLoginError('');
+                setSelectedHospitalCabinId(null);
               }
             }}
             className="mt-6 space-y-4"
           >
             <div>
               <label className="block text-xs font-bold uppercase text-slate-700 mb-1">
-                Staff ID / Username
+                {loginType === 'CLINIC' ? 'Staff ID / Username *' : 'Hospital Reception ID *'}
               </label>
               <input
                 type="text"
                 required
                 value={loginUsername}
                 onChange={(e) => setLoginUsername(e.target.value)}
-                placeholder="e.g. staff_rajesh"
+                placeholder={loginType === 'CLINIC' ? 'e.g. staff_rajesh' : 'e.g. amrita_desk'}
                 className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-blue-600 focus:outline-none"
               />
             </div>
 
             <div>
               <label className="block text-xs font-bold uppercase text-slate-700 mb-1">
-                Password
+                Password *
               </label>
               <input
                 type="password"
@@ -204,7 +262,7 @@ const realTodayDate = new Date().toISOString().split('T')[0];
               type="submit"
               className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/25 hover:bg-blue-700 transition cursor-pointer"
             >
-              Sign In to Clinic Desk
+              {loginType === 'CLINIC' ? 'Sign In to Clinic Desk' : 'Sign In to Hospital Reception'}
             </button>
           </form>
 
@@ -213,27 +271,30 @@ const realTodayDate = new Date().toISOString().split('T')[0];
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2">
               Quick 1-Click Demo Login:
             </span>
-            <div className="space-y-1.5">
-              {doctors.map((doc) => (
-                <button
-                  key={doc.id}
-                  type="button"
-                  onClick={() => {
-                    setLoginUsername(doc.staffUsername);
-                    setLoginPassword(doc.staffPassword);
-                    staffLogin(doc.staffUsername, doc.staffPassword);
-                  }}
-                  className="w-full text-left px-3 py-2 rounded-xl bg-slate-50 hover:bg-blue-50 hover:border-blue-200 border border-slate-200 text-xs flex items-center justify-between transition cursor-pointer"
-                >
-                  <div>
-                    <span className="font-bold text-slate-800">{doc.name}</span>
-                    <span className="text-slate-500 block text-[10px]">{doc.clinicName}</span>
-                  </div>
-                  <span className="font-mono text-[10px] bg-slate-200 px-2 py-0.5 rounded text-slate-700">
-                    {doc.staffUsername}
-                  </span>
-                </button>
-              ))}
+            <div className="space-y-1.5 max-h-48 overflow-y-auto">
+              {doctors
+                .filter((d) => (loginType === 'CLINIC' ? (d.cabinNumber === 'Chamber' || !d.cabinNumber) : d.cabinNumber !== 'Chamber'))
+                .map((doc) => (
+                  <button
+                    key={doc.id}
+                    type="button"
+                    onClick={() => {
+                      setLoginUsername(doc.staffUsername);
+                      setLoginPassword(doc.staffPassword);
+                      staffLogin(doc.staffUsername, doc.staffPassword);
+                      setSelectedHospitalCabinId(null);
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-xl bg-slate-50 hover:bg-blue-50 hover:border-blue-200 border border-slate-200 text-xs flex items-center justify-between transition cursor-pointer"
+                  >
+                    <div>
+                      <span className="font-bold text-slate-800">{doc.name}</span>
+                      <span className="text-slate-500 block text-[10px]">{doc.clinicName} ({doc.cabinNumber})</span>
+                    </div>
+                    <span className="font-mono text-[10px] bg-slate-200 px-2 py-0.5 rounded text-slate-700">
+                      {doc.staffUsername}
+                    </span>
+                  </button>
+                ))}
             </div>
           </div>
         </div>
@@ -241,7 +302,114 @@ const realTodayDate = new Date().toISOString().split('T')[0];
     );
   }
 
-  // 1. Doctor Patients list with Date, Shift & Search filters
+  // ==========================================
+  // VIEW 2: HOSPITAL MULTI-DOCTOR SELECTION DIRECTORY
+  // (Jab hospital login ho aur koi specific cabin select na kiya ho)
+  // ==========================================
+  const loggedInDoctor = doctors.find((d) => d.id === staffDoctorId);
+  const hospitalDoctorsList = doctors.filter(
+    (d) => d.clinicName === loggedInDoctor?.clinicName || (d.staffUsername && d.staffUsername === loggedInDoctor?.staffUsername)
+  );
+  const isHospitalMultiDoctor = hospitalDoctorsList.length > 1;
+
+  if (isHospitalMultiDoctor && !selectedHospitalCabinId) {
+    return (
+      <div className="min-h-[calc(100vh-4rem)] bg-slate-100 p-4 sm:p-8 pb-20">
+        <div className="max-w-6xl mx-auto space-y-6">
+          {/* Hospital Header Strip */}
+          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="bg-blue-100 text-blue-800 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider">
+                  Hospital Central Reception Desk
+                </span>
+                <span className="text-xs text-slate-500">ID: {loggedInDoctor?.staffUsername}</span>
+              </div>
+              <h1 className="text-2xl font-black text-slate-900 mt-1">
+                {loggedInDoctor?.clinicName}
+              </h1>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Kripya jis OPD Cabin ka live queue chalana hai, use select karein:
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={staffLogout}
+              className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 transition cursor-pointer flex items-center gap-1.5"
+            >
+              <LogOut className="h-4 w-4" />
+              <span>Desk Logout</span>
+            </button>
+          </div>
+
+          {/* Doctors & Cabins Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {hospitalDoctorsList.map((doc) => {
+              const docWaitingPatients = patients.filter(
+                (p) => p.doctorId === doc.id && (p.status === 'WAITING' || p.status === 'IN_CABIN')
+              );
+              const docCompletedPatients = patients.filter(
+                (p) => p.doctorId === doc.id && p.status === 'COMPLETED'
+              );
+
+              return (
+                <div
+                  key={doc.id}
+                  className="bg-white rounded-3xl p-5 border-2 border-slate-200 shadow-sm hover:border-blue-500 hover:shadow-md transition flex flex-col justify-between space-y-4"
+                >
+                  <div className="flex items-start gap-3.5">
+                    <img
+                      src={doc.profilePic || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=300'}
+                      alt={doc.name}
+                      className="h-16 w-16 rounded-2xl object-cover border border-slate-200 shrink-0"
+                    />
+                    <div className="space-y-0.5">
+                      <span className="inline-block bg-blue-50 text-blue-700 font-black text-[10px] uppercase px-2.5 py-0.5 rounded-md border border-blue-200">
+                        {doc.cabinNumber}
+                      </span>
+                      <h3 className="text-sm font-bold text-slate-900">{doc.name}</h3>
+                      <p className="text-[11px] text-slate-500 font-medium">{doc.degree}</p>
+                      <p className="text-[10px] text-blue-600 font-bold">{doc.specialty}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-center">
+                    <div>
+                      <span className="text-[9px] font-bold uppercase text-slate-400 block">Waiting</span>
+                      <span className="text-sm font-black text-blue-700">{docWaitingPatients.length} Patients</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] font-bold uppercase text-slate-400 block">Done Today</span>
+                      <span className="text-sm font-black text-emerald-700">{docCompletedPatients.length} Seen</span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedHospitalCabinId(doc.id);
+                      setSelectedDoctorId(doc.id);
+                    }}
+                    className="w-full rounded-xl bg-blue-600 text-white py-2.5 text-xs font-bold hover:bg-blue-700 transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <span>Open {doc.cabinNumber} Desk</span>
+                    <span>→</span>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ==========================================
+  // VIEW 3: LIVE OPD DESK (Single Doctor / Selected Cabin)
+  // ==========================================
+  if (!currentDoctor) return null;
+
   const doctorPatients = patients.filter((p) => {
     if (p.doctorId !== currentDoctor?.id) return false;
 
@@ -356,6 +524,18 @@ const realTodayDate = new Date().toISOString().split('T')[0];
       <div className="bg-white border-b border-slate-200 px-4 sm:px-8 py-4">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
+            {isHospitalMultiDoctor && (
+              <button
+                type="button"
+                onClick={() => setSelectedHospitalCabinId(null)}
+                className="rounded-xl bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 px-3 py-2 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                title="Wapas Sabhi Cabins Ki List Par Jayein"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                <span>All Cabins</span>
+              </button>
+            )}
+
             <img
               src={currentDoctor.profilePic || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=300'}
               alt={currentDoctor.name}
@@ -374,9 +554,26 @@ const realTodayDate = new Date().toISOString().split('T')[0];
             </div>
           </div>
 
-          {/* Doctor Status Dropdown & Logout */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-700">Doctor Status:</span>
+          {/* Doctor Status Dropdown, Switcher & Logout */}
+          <div className="flex flex-wrap items-center gap-2">
+            {isHospitalMultiDoctor && (
+              <select
+                value={currentDoctor.id}
+                onChange={(e) => {
+                  setSelectedHospitalCabinId(e.target.value);
+                  setSelectedDoctorId(e.target.value);
+                }}
+                className="text-xs font-bold rounded-xl px-3 py-2 border border-blue-200 bg-blue-50 text-blue-900 outline-none cursor-pointer"
+              >
+                {hospitalDoctorsList.map((doc) => (
+                  <option key={doc.id} value={doc.id}>
+                    Switch to {doc.cabinNumber}: {doc.name}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            <span className="text-xs font-bold text-slate-700">Status:</span>
             <select
               value={currentDoctor.status || 'AVAILABLE'}
               onChange={(e) => updateDoctorStatus(currentDoctor.id, e.target.value as any)}
@@ -412,7 +609,6 @@ const realTodayDate = new Date().toISOString().split('T')[0];
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {/* 3 Main Action Buttons Strip */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {/* Button 1: Add Patient (FREE) */}
           <button
             type="button"
             onClick={() => {
@@ -440,7 +636,6 @@ const realTodayDate = new Date().toISOString().split('T')[0];
             </span>
           </button>
 
-          {/* Button 2: Live OPD Queue (Doctor AVAILABLE hone par hi Clickable) */}
           <button
             type="button"
             disabled={currentDoctor?.status !== 'AVAILABLE'}
@@ -462,7 +657,6 @@ const realTodayDate = new Date().toISOString().split('T')[0];
             {currentDoctor?.status !== 'AVAILABLE' && <span className="text-xs">🔒</span>}
           </button>
 
-          {/* Button 3: Clinic Summary & Stats */}
           <button
             type="button"
             onClick={() => setActiveTab('REPORTS')}
@@ -476,10 +670,9 @@ const realTodayDate = new Date().toISOString().split('T')[0];
           </button>
         </div>
 
-{/* Search & Tabs Toolbar (Sirf Queue/Completed/Absent/Future dekhne ke liye, Summary me nahi) */}
+        {/* Search & Tabs Toolbar */}
         {activeTab !== 'REPORTS' && (
           <div className="rounded-2xl bg-white border border-slate-200 p-3 sm:p-4 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
-            {/* Navigation 4 Tabs */}
             <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl w-full sm:w-auto overflow-x-auto">
               <button
                 type="button"
@@ -531,7 +724,6 @@ const realTodayDate = new Date().toISOString().split('T')[0];
               </button>
             </div>
 
-            {/* Search Bar & Future Filters */}
             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
               {activeTab === 'FUTURE' && (
                 <>
@@ -566,8 +758,8 @@ const realTodayDate = new Date().toISOString().split('T')[0];
             </div>
           </div>
         )}
-        
-        {/* Doctor Status Pause Alert Banner when not available */}
+
+        {/* Doctor Status Pause Alert Banner */}
         {currentDoctor.status !== 'AVAILABLE' && (
           <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 text-amber-900 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in">
             <div className="flex items-center gap-3">
@@ -593,7 +785,7 @@ const realTodayDate = new Date().toISOString().split('T')[0];
           </div>
         )}
 
-{/* TAB 1: ACTIVE QUEUE */}
+        {/* TAB 1: ACTIVE QUEUE */}
         {activeTab === 'QUEUE' && (
           <div className="space-y-3">
             {(() => {
@@ -669,7 +861,8 @@ const realTodayDate = new Date().toISOString().split('T')[0];
             )}
           </div>
         )}
-{/* TAB 4: FUTURE / ADVANCE TOKENS VIEW */}
+
+        {/* TAB 4: FUTURE / ADVANCE TOKENS VIEW */}
         {activeTab === 'FUTURE' && (
           <div className="space-y-4">
             <div className="rounded-2xl bg-blue-50 border border-blue-200 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-blue-900">
@@ -678,7 +871,7 @@ const realTodayDate = new Date().toISOString().split('T')[0];
                 <div>
                   <span className="font-extrabold uppercase tracking-wide">Advance & Future Date Inspector</span>
                   <p className="text-[11px] text-blue-700 mt-0.5">
-                    Aane wale dino ya dusri shift ke tokens check karne ke liye upar Date aur Shift filter ka prayog karein. Calling buttons unke nirdharit samay par hi activate honge.
+                    Aane wale dino ya dusri shift ke tokens check karne ke liye upar Date aur Shift filter ka prayog karein.
                   </p>
                 </div>
               </div>
@@ -706,6 +899,7 @@ const realTodayDate = new Date().toISOString().split('T')[0];
             )}
           </div>
         )}
+
         {/* TAB 5: SUMMARY & REPORTS */}
         {activeTab === 'REPORTS' && (
           <div className="rounded-3xl bg-white border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
