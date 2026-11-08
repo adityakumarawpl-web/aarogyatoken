@@ -25,6 +25,7 @@ export interface Doctor {
   staffPassword: string;
   profilePic?: string;
   clinicImages?: string[];
+  tags?: string[]; // <-- Naya field: Invisible SEO & Search Tags
   morningShift?: string;   // Jaise: '10:00 AM - 02:00 PM'
   eveningShift?: string;   // Jaise: '05:00 PM - 08:00 PM'
   avgTimePerPatientMinutes: number;
