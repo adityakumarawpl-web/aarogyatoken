@@ -476,159 +476,96 @@ const realTodayDate = new Date().toISOString().split('T')[0];
           </button>
         </div>
 
-        {/* Jab REPORTS (Summary) tab click ho, tab ye teeno Stats Cards dikhein */}
-        {activeTab === 'REPORTS' && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Card 1: Currently In Cabin */}
-            <div className="rounded-2xl bg-blue-600 text-white p-4 shadow-sm flex items-center justify-between">
-              <div>
-                <span className="text-xs font-semibold text-blue-100 uppercase tracking-wider block">
-                  Current In Cabin (Andar)
-                </span>
-                <div className="text-3xl font-black mt-1">
-                  {currentlyServing > 0 ? `#${currentlyServing}` : 'None'}
-                </div>
-                <span className="text-[11px] text-blue-200">Blue status active</span>
-              </div>
-              <div className="h-10 w-10 rounded-xl bg-blue-500/40 flex items-center justify-center">
-                <Stethoscope className="h-6 w-6" />
-              </div>
+{/* Search & Tabs Toolbar (Sirf Queue/Completed/Absent/Future dekhne ke liye, Summary me nahi) */}
+        {activeTab !== 'REPORTS' && (
+          <div className="rounded-2xl bg-white border border-slate-200 p-3 sm:p-4 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
+            {/* Navigation 4 Tabs */}
+            <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl w-full sm:w-auto overflow-x-auto">
+              <button
+                type="button"
+                onClick={() => setActiveTab('QUEUE')}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${
+                  activeTab === 'QUEUE'
+                    ? 'bg-white text-blue-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Active Queue ({waitingPatients.length})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('COMPLETED')}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${
+                  activeTab === 'COMPLETED'
+                    ? 'bg-white text-emerald-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Completed ({completedPatients.length})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('ABSENT')}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${
+                  activeTab === 'ABSENT'
+                    ? 'bg-white text-amber-800 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Not Available / Absent ({absentPatients.length})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('FUTURE')}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                  activeTab === 'FUTURE'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Calendar className="h-3.5 w-3.5" />
+                <span>Future Tokens</span>
+              </button>
             </div>
 
-            {/* Card 2: Waiting Queue */}
-            <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-xs flex items-center justify-between">
-              <div>
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
-                  Waiting Patients
-                </span>
-                <div className="text-3xl font-black text-slate-900 mt-1">
-                  {doctorPatients.filter((p) => p.status === 'WAITING').length}
-                </div>
-                <span className="text-[11px] text-slate-500">In waiting room</span>
-              </div>
-              <div className="h-10 w-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                <Clock className="h-6 w-6" />
-              </div>
-            </div>
+            {/* Search Bar & Future Filters */}
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              {activeTab === 'FUTURE' && (
+                <>
+                  <input
+                    type="date"
+                    value={selectedDateFilter}
+                    onChange={(e) => setSelectedDateFilter(e.target.value)}
+                    className="rounded-xl border border-blue-300 px-3 py-1.5 text-xs font-medium text-slate-800 bg-blue-50/50 shadow-xs focus:border-blue-500 focus:outline-none"
+                  />
+                  <select
+                    value={selectedShiftFilter}
+                    onChange={(e) => setSelectedShiftFilter(e.target.value)}
+                    className="rounded-xl border border-blue-300 px-3 py-1.5 text-xs font-medium text-slate-800 bg-blue-50/50 shadow-xs focus:border-blue-500 focus:outline-none"
+                  >
+                    <option value="ALL">All Shifts</option>
+                    <option value="Morning">Morning Shift</option>
+                    <option value="Evening">Evening Shift</option>
+                  </select>
+                </>
+              )}
 
-            {/* Card 3: Completed Today */}
-            <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-xs flex items-center justify-between">
-              <div>
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
-                  Completed (Dekhe Gaye)
-                </span>
-                <div className="text-3xl font-black text-emerald-600 mt-1">
-                  {completedPatients.length}
-                </div>
-                <span className="text-[11px] text-emerald-700">Green status marked</span>
-              </div>
-              <div className="h-10 w-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                <CheckCircle2 className="h-6 w-6" />
+              <div className="relative w-full sm:w-60">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchFilter}
+                  onChange={(e) => setSearchFilter(e.target.value)}
+                  placeholder="Search token #, name..."
+                  className="w-full rounded-xl border border-slate-300 pl-9 pr-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none"
+                />
               </div>
             </div>
           </div>
         )}
-
-{/* Search & Tabs Toolbar */}
-        <div className="rounded-2xl bg-white border border-slate-200 p-3 sm:p-4 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
-          {/* Navigation 4 Tabs */}
-          <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl w-full sm:w-auto overflow-x-auto">
-            {/* Tab 1: Active Queue */}
-            <button
-              type="button"
-              onClick={() => setActiveTab('QUEUE')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${
-                activeTab === 'QUEUE'
-                  ? 'bg-white text-blue-700 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Active Queue ({waitingPatients.filter(p => {
-                const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
-                const pShift = (p.selectedShift || (p as any).shift || 'Morning').trim();
-                return pDate === realTodayDate && pShift.toLowerCase() === realCurrentShift.toLowerCase();
-              }).length})
-            </button>
-
-            {/* Tab 2: Completed */}
-            <button
-              type="button"
-              onClick={() => setActiveTab('COMPLETED')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${
-                activeTab === 'COMPLETED'
-                  ? 'bg-white text-emerald-700 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Completed ({completedPatients.length})
-            </button>
-
-            {/* Tab 3: Not Available */}
-            <button
-              type="button"
-              onClick={() => setActiveTab('ABSENT')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${
-                activeTab === 'ABSENT'
-                  ? 'bg-white text-amber-800 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Not Available / Absent ({absentPatients.length})
-            </button>
-
-            {/* Tab 4: Future Tokens (Advance / Other Date & Shift Bookings) */}
-            <button
-              type="button"
-              onClick={() => setActiveTab('FUTURE')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 flex items-center gap-1.5 ${
-                activeTab === 'FUTURE'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Calendar className="h-3.5 w-3.5" />
-              <span>Future Tokens</span>
-            </button>
-          </div>
-
-          {/* Search Bar & Future Filters */}
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            {/* Date aur Shift Dropdown sirf Future Tokens tab mein dikhenge */}
-            {activeTab === 'FUTURE' && (
-              <>
-                <input
-                  type="date"
-                  value={selectedDateFilter}
-                  onChange={(e) => setSelectedDateFilter(e.target.value)}
-                  className="rounded-xl border border-blue-300 px-3 py-1.5 text-xs font-medium text-slate-800 bg-blue-50/50 shadow-xs focus:border-blue-500 focus:outline-none"
-                  title="Date select karke check karein"
-                />
-
-                <select
-                  value={selectedShiftFilter}
-                  onChange={(e) => setSelectedShiftFilter(e.target.value)}
-                  className="rounded-xl border border-blue-300 px-3 py-1.5 text-xs font-medium text-slate-800 bg-blue-50/50 shadow-xs focus:border-blue-500 focus:outline-none"
-                >
-                  <option value="ALL">All Shifts</option>
-                  <option value="Morning">Morning Shift</option>
-                  <option value="Evening">Evening Shift</option>
-                </select>
-              </>
-            )}
-
-            {/* Search Bar */}
-            <div className="relative w-full sm:w-60">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-              <input
-                type="text"
-                value={searchFilter}
-                onChange={(e) => setSearchFilter(e.target.value)}
-                placeholder="Search token #, name..."
-                className="w-full rounded-xl border border-slate-300 pl-9 pr-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none"
-              />
-            </div>
-          </div>
-        </div>
         
         {/* Doctor Status Pause Alert Banner when not available */}
         {currentDoctor.status !== 'AVAILABLE' && (
