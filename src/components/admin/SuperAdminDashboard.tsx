@@ -98,26 +98,24 @@ export const SuperAdminDashboard: React.FC = () => {
   // Type: Clinic ya Hospital
   const [establishmentType, setEstablishmentType] = useState<'CLINIC' | 'HOSPITAL'>('CLINIC');
 
-  // Hospital ke liye multiple doctors ki list
+// Hospital ke liye multiple doctors ki list (Har doctor ki apni DP)
   const [hospitalDoctors, setHospitalDoctors] = useState<Array<{
     name: string;
     degree: string;
     specialty: string;
     cabinNumber: string;
+    profilePic: string;
     morningShift: string;
     eveningShift: string;
-    staffUsername: string;
-    staffPassword: string;
   }>>([
     {
       name: '',
       degree: '',
       specialty: '',
       cabinNumber: 'Cabin 1',
+      profilePic: '',
       morningShift: '10:00 AM - 02:00 PM',
       eveningShift: '05:00 PM - 08:00 PM',
-      staffUsername: '',
-      staffPassword: '',
     },
   ]);
 
@@ -334,10 +332,15 @@ export const SuperAdminDashboard: React.FC = () => {
         eveningShift: newDoctorForm.eveningShift || '05:00 PM - 08:00 PM',
       });
       setSaveSuccessMsg(`Clinic "${newDoctorForm.clinicName}" created successfully!`);
-    } else {
+    } 
+} else {
       const validDoctors = hospitalDoctors.filter((doc) => doc.name.trim());
       if (validDoctors.length === 0) {
         alert('Kripya kam se kam ek Doctor ka naam add karein!');
+        return;
+      }
+      if (!newDoctorForm.staffUsername.trim()) {
+        alert('Kripya Hospital Reception Desk ka Staff Username bharein!');
         return;
       }
 
@@ -350,9 +353,11 @@ export const SuperAdminDashboard: React.FC = () => {
           cabinNumber: doc.cabinNumber.trim() || `Cabin ${idx + 1}`,
           morningShift: doc.morningShift || newDoctorForm.morningShift || '10:00 AM - 02:00 PM',
           eveningShift: doc.eveningShift || newDoctorForm.eveningShift || '05:00 PM - 08:00 PM',
-          staffUsername: doc.staffUsername.trim() || `staff_${doc.name.toLowerCase().replace(/\s+/g, '')}`,
-          staffPassword: doc.staffPassword.trim() || 'clinic123',
-          profilePic: picToSave,
+          // Hospital ke sabhi doctors ke liye COMMON Reception Login ID
+          staffUsername: newDoctorForm.staffUsername.trim(),
+          staffPassword: newDoctorForm.staffPassword.trim() || 'hospital123',
+          // Har doctor ki apni personal photo (agar blank ho toh default)
+          profilePic: doc.profilePic?.trim() || picToSave,
           clinicImages: newDoctorForm.clinicImages || ['', ''],
         });
       });
@@ -1127,8 +1132,8 @@ export const SuperAdminDashboard: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleCreateDoctor} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
-              {/* 1. Establishment Type Selector (Clinic vs Hospital) */}
+<form onSubmit={handleCreateDoctor} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+              {/* 1. Establishment Type Selector */}
               <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
                 <span className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
                   Select Establishment Type *
@@ -1172,7 +1177,7 @@ export const SuperAdminDashboard: React.FC = () => {
                     />
                     <div>
                       <span className="text-sm block leading-none">Hospital</span>
-                      <span className="text-[10px] text-slate-500 font-normal">Multi-doctor & OPD cabins</span>
+                      <span className="text-[10px] text-slate-500 font-normal">Multi-doctor & 1 Common Reception ID</span>
                     </div>
                   </label>
                 </div>
@@ -1188,7 +1193,15 @@ export const SuperAdminDashboard: React.FC = () => {
                     type="text"
                     required
                     value={newDoctorForm.clinicName}
-                    onChange={(e) => setNewDoctorForm({ ...newDoctorForm, clinicName: e.target.value })}
+                    onChange={(e) => {
+                      const clinicName = e.target.value;
+                      const slug = clinicName.toLowerCase().replace(/[^a-z]/g, '').slice(0, 8);
+                      setNewDoctorForm({
+                        ...newDoctorForm,
+                        clinicName,
+                        staffUsername: newDoctorForm.staffUsername || `desk_${slug}`,
+                      });
+                    }}
                     placeholder={establishmentType === 'CLINIC' ? 'e.g. Sanjeevani Heart Clinic' : 'e.g. Amrita Hospital'}
                     className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-blue-600 focus:outline-none"
                   />
@@ -1219,9 +1232,44 @@ export const SuperAdminDashboard: React.FC = () => {
                     />
                   </div>
                 </div>
+
+                {/* Common Staff / Receptionist Login Credentials (Ek Hi ID/Pass) */}
+                <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3.5 space-y-2">
+                  <span className="text-xs font-bold text-amber-900 uppercase tracking-wider block">
+                    {establishmentType === 'CLINIC' ? 'Staff Login Credentials' : 'Hospital Reception Common Login (एक ही लॉगिन आईडी/पासवर्ड)'}
+                  </span>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 mb-1">
+                        Receptionist / Staff ID *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={newDoctorForm.staffUsername}
+                        onChange={(e) => setNewDoctorForm({ ...newDoctorForm, staffUsername: e.target.value })}
+                        placeholder="e.g. amrita_desk"
+                        className="w-full rounded-xl border border-amber-300 bg-white px-3 py-1.5 font-mono text-xs font-bold text-slate-800 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 mb-1">
+                        Password *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={newDoctorForm.staffPassword}
+                        onChange={(e) => setNewDoctorForm({ ...newDoctorForm, staffPassword: e.target.value })}
+                        placeholder="e.g. amrita123"
+                        className="w-full rounded-xl border border-amber-300 bg-white px-3 py-1.5 font-mono text-xs font-bold text-slate-800 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              {/* 3A. SINGLE CLINIC DOCTOR SECTION (Cabin field HIDE) */}
+              {/* 3A. SINGLE CLINIC DOCTOR SECTION */}
               {establishmentType === 'CLINIC' && (
                 <div className="space-y-3 p-4 rounded-2xl bg-slate-50 border border-slate-200">
                   <span className="block text-xs font-bold uppercase tracking-wider text-slate-600">
@@ -1235,17 +1283,7 @@ export const SuperAdminDashboard: React.FC = () => {
                         type="text"
                         required
                         value={newDoctorForm.name}
-                        onChange={(e) => {
-                          const name = e.target.value;
-                          const cleanSlug = name.toLowerCase().replace(/[^a-z]/g, '').slice(0, 8);
-                          setNewDoctorForm({
-                            ...newDoctorForm,
-                            name,
-                            staffUsername: `staff_${cleanSlug}`,
-                            staffPassword: `doc${Math.floor(100 + Math.random() * 900)}`,
-                            razorpayKeyId: `rzp_test_${cleanSlug}_${Math.floor(1000 + Math.random() * 9000)}`,
-                          });
-                        }}
+                        onChange={(e) => setNewDoctorForm({ ...newDoctorForm, name: e.target.value })}
                         placeholder="e.g. Dr. Rajesh Sharma"
                         className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs bg-white focus:border-blue-600 focus:outline-none"
                       />
@@ -1276,6 +1314,17 @@ export const SuperAdminDashboard: React.FC = () => {
                     />
                   </div>
 
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Doctor DP / Profile Picture URL</label>
+                    <input
+                      type="text"
+                      value={newDoctorForm.profilePic}
+                      onChange={(e) => setNewDoctorForm({ ...newDoctorForm, profilePic: e.target.value })}
+                      placeholder="https://..."
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs bg-white focus:outline-none"
+                    />
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">Morning Shift</label>
@@ -1284,7 +1333,7 @@ export const SuperAdminDashboard: React.FC = () => {
                         value={newDoctorForm.morningShift}
                         onChange={(e) => setNewDoctorForm({ ...newDoctorForm, morningShift: e.target.value })}
                         placeholder="10:00 AM - 02:00 PM"
-                        className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs bg-white focus:border-blue-600 focus:outline-none"
+                        className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs bg-white focus:outline-none"
                       />
                     </div>
                     <div>
@@ -1294,47 +1343,14 @@ export const SuperAdminDashboard: React.FC = () => {
                         value={newDoctorForm.eveningShift}
                         onChange={(e) => setNewDoctorForm({ ...newDoctorForm, eveningShift: e.target.value })}
                         placeholder="05:00 PM - 08:00 PM"
-                        className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs bg-white focus:border-blue-600 focus:outline-none"
+                        className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs bg-white focus:outline-none"
                       />
-                    </div>
-                  </div>
-
-                  {/* Staff Credentials for Clinic */}
-                  <div className="rounded-2xl bg-amber-50 border border-amber-200 p-4 space-y-3">
-                    <span className="text-xs font-bold text-amber-900 uppercase tracking-wider block">
-                      Staff Login Credentials (स्टाफ़ को देने के लिए आईडी और पासवर्ड)
-                    </span>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                          Staff Username / ID *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={newDoctorForm.staffUsername}
-                          onChange={(e) => setNewDoctorForm({ ...newDoctorForm, staffUsername: e.target.value })}
-                          className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 font-mono text-xs font-bold text-slate-800"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                          Staff Password *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={newDoctorForm.staffPassword}
-                          onChange={(e) => setNewDoctorForm({ ...newDoctorForm, staffPassword: e.target.value })}
-                          className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 font-mono text-xs font-bold text-slate-800"
-                        />
-                      </div>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* 3B. MULTI-DOCTOR HOSPITAL SECTION */}
+              {/* 3B. MULTI-DOCTOR HOSPITAL SECTION (Har Doctor ki Apni DP) */}
               {establishmentType === 'HOSPITAL' && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
@@ -1343,7 +1359,7 @@ export const SuperAdminDashboard: React.FC = () => {
                         Hospital Doctors & Cabins ({hospitalDoctors.length})
                       </span>
                       <span className="text-[10px] text-slate-500">
-                        Har doctor ke liye cabin number aur timings set karein
+                        Har doctor ke liye cabin aur unki apni profile photo (DP) set karein
                       </span>
                     </div>
                     <button
@@ -1356,10 +1372,9 @@ export const SuperAdminDashboard: React.FC = () => {
                             degree: '',
                             specialty: '',
                             cabinNumber: `Cabin ${prev.length + 1}`,
+                            profilePic: '',
                             morningShift: '10:00 AM - 02:00 PM',
                             eveningShift: '05:00 PM - 08:00 PM',
-                            staffUsername: '',
-                            staffPassword: '',
                           },
                         ])
                       }
@@ -1372,7 +1387,7 @@ export const SuperAdminDashboard: React.FC = () => {
                   {hospitalDoctors.map((doc, idx) => (
                     <div
                       key={idx}
-                      className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5 relative"
+                      className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5 relative shadow-xs"
                     >
                       <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
                         <span className="text-xs font-black text-blue-900 bg-blue-100 px-2.5 py-0.5 rounded-md">
@@ -1403,9 +1418,6 @@ export const SuperAdminDashboard: React.FC = () => {
                             onChange={(e) => {
                               const updated = [...hospitalDoctors];
                               updated[idx].name = e.target.value;
-                              const cleanSlug = e.target.value.toLowerCase().replace(/[^a-z]/g, '').slice(0, 8);
-                              if (!updated[idx].staffUsername) updated[idx].staffUsername = `staff_${cleanSlug}`;
-                              if (!updated[idx].staffPassword) updated[idx].staffPassword = `doc${Math.floor(100 + Math.random() * 900)}`;
                               setHospitalDoctors(updated);
                             }}
                             placeholder="e.g. Dr. Vinamra Jain"
@@ -1468,52 +1480,34 @@ export const SuperAdminDashboard: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Staff Login Credentials for Doctor */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 bg-white p-2 rounded-xl border border-slate-200">
-                        <div>
-                          <label className="block text-[9px] font-bold text-slate-600 mb-0.5">
-                            Staff Username
-                          </label>
-                          <input
-                            type="text"
-                            value={doc.staffUsername}
-                            onChange={(e) => {
-                              const updated = [...hospitalDoctors];
-                              updated[idx].staffUsername = e.target.value;
-                              setHospitalDoctors(updated);
-                            }}
-                            placeholder={`e.g. staff_cabin${idx + 1}`}
-                            className="w-full rounded-lg border border-slate-300 px-2.5 py-1 text-xs focus:outline-none"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[9px] font-bold text-slate-600 mb-0.5">
-                            Staff Password
-                          </label>
-                          <input
-                            type="text"
-                            value={doc.staffPassword}
-                            onChange={(e) => {
-                              const updated = [...hospitalDoctors];
-                              updated[idx].staffPassword = e.target.value;
-                              setHospitalDoctors(updated);
-                            }}
-                            placeholder="e.g. clinic123"
-                            className="w-full rounded-lg border border-slate-300 px-2.5 py-1 text-xs focus:outline-none"
-                          />
-                        </div>
+                      {/* Doctor Ki Individual Profile DP */}
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-700 mb-1">
+                          Doctor Profile Photo (DP URL)
+                        </label>
+                        <input
+                          type="text"
+                          value={doc.profilePic}
+                          onChange={(e) => {
+                            const updated = [...hospitalDoctors];
+                            updated[idx].profilePic = e.target.value;
+                            setHospitalDoctors(updated);
+                          }}
+                          placeholder="Doctor ki photo ka direct image URL paste karein"
+                          className="w-full rounded-xl border border-slate-300 px-3 py-1.5 text-xs bg-white focus:outline-none"
+                        />
                       </div>
                     </div>
                   ))}
                 </div>
               )}
 
-              {/* RAZORPAY PAYMENT SETTING SECTION FOR DOCTOR */}
+              {/* RAZORPAY PAYMENT SETTING SECTION */}
               <div className="rounded-2xl bg-blue-50 border border-blue-200 p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-blue-900 uppercase tracking-wider flex items-center gap-1.5">
                     <CreditCard className="h-4 w-4 text-blue-600" />
-                    <span>Razorpay Payment Setting for this Doctor (रेज़रपे पेमेंट सेटिंग)</span>
+                    <span>Razorpay Payment Setting (रेज़रपे पेमेंट सेटिंग)</span>
                   </span>
                   <label className="flex items-center gap-1.5 text-xs text-blue-800 font-bold cursor-pointer">
                     <input
@@ -1531,7 +1525,7 @@ export const SuperAdminDashboard: React.FC = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                      Doctor Razorpay Key ID
+                      Razorpay Key ID
                     </label>
                     <input
                       type="text"
@@ -1563,30 +1557,15 @@ export const SuperAdminDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* DOCTOR & CLINIC PHOTOS UPLOAD SECTION */}
+              {/* HOSPITAL / CLINIC PHOTOS */}
               <div className="space-y-4 pt-2 border-t border-slate-200">
-                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Doctor & Clinic Photos</h4>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">Profile Picture URL</label>
-                  <input
-                    type="text"
-                    placeholder="Paste direct image URL"
-                    value={newDoctorForm.profilePic || ''}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setNewDoctorForm((prev) => ({
-                        ...prev,
-                        profilePic: val,
-                      }));
-                    }}
-                    className="w-full border rounded-lg p-2"
-                  />
-                </div>
+                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                  {establishmentType === 'CLINIC' ? 'Clinic Photos' : 'Hospital Building Photos'}
+                </h4>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Clinic Image 1 URL</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Campus Image 1 URL</label>
                     <input
                       type="text"
                       value={newDoctorForm.clinicImages?.[0] || ''}
@@ -1595,12 +1574,12 @@ export const SuperAdminDashboard: React.FC = () => {
                         imgs[0] = e.target.value;
                         setNewDoctorForm({ ...newDoctorForm, clinicImages: imgs });
                       }}
-                      placeholder="Clinic image link 1"
+                      placeholder="Building image link 1"
                       className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs focus:border-blue-600 focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Clinic Image 2 URL</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Campus Image 2 URL</label>
                     <input
                       type="text"
                       value={newDoctorForm.clinicImages?.[1] || ''}
@@ -1609,7 +1588,7 @@ export const SuperAdminDashboard: React.FC = () => {
                         imgs[1] = e.target.value;
                         setNewDoctorForm({ ...newDoctorForm, clinicImages: imgs });
                       }}
-                      placeholder="Clinic image link 2"
+                      placeholder="Building image link 2"
                       className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs focus:border-blue-600 focus:outline-none"
                     />
                   </div>
