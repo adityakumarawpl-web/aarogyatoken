@@ -98,7 +98,7 @@ export const SuperAdminDashboard: React.FC = () => {
   // Type: Clinic ya Hospital
   const [establishmentType, setEstablishmentType] = useState<'CLINIC' | 'HOSPITAL'>('CLINIC');
 
-// Hospital ke liye multiple doctors ki list (Har doctor ki apni DP)
+  // Hospital ke liye multiple doctors ki list (Har doctor ki apni Profile Pic DP)
   const [hospitalDoctors, setHospitalDoctors] = useState<Array<{
     name: string;
     degree: string;
@@ -307,21 +307,20 @@ export const SuperAdminDashboard: React.FC = () => {
       alert('Kripya Clinic / Hospital ka Naam bharein!');
       return;
     }
+    if (!newDoctorForm.staffUsername.trim()) {
+      alert('Kripya Reception / Staff ID bharein!');
+      return;
+    }
 
-    const picToSave =
-      newDoctorForm.profilePic && newDoctorForm.profilePic.trim() !== ''
-        ? newDoctorForm.profilePic.trim()
-        : 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=300';
+    const defaultPic = 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=300';
 
     if (establishmentType === 'CLINIC') {
       if (!newDoctorForm.name.trim()) {
         alert('Kripya Doctor ka Naam bharein!');
         return;
       }
-      if (!newDoctorForm.staffUsername.trim()) {
-        alert('Kripya Staff Username bharein!');
-        return;
-      }
+
+      const picToSave = newDoctorForm.profilePic?.trim() ? newDoctorForm.profilePic.trim() : defaultPic;
 
       addNewDoctor({
         ...newDoctorForm,
@@ -332,15 +331,10 @@ export const SuperAdminDashboard: React.FC = () => {
         eveningShift: newDoctorForm.eveningShift || '05:00 PM - 08:00 PM',
       });
       setSaveSuccessMsg(`Clinic "${newDoctorForm.clinicName}" created successfully!`);
-    } 
-} else {
+    } else {
       const validDoctors = hospitalDoctors.filter((doc) => doc.name.trim());
       if (validDoctors.length === 0) {
         alert('Kripya kam se kam ek Doctor ka naam add karein!');
-        return;
-      }
-      if (!newDoctorForm.staffUsername.trim()) {
-        alert('Kripya Hospital Reception Desk ka Staff Username bharein!');
         return;
       }
 
@@ -353,11 +347,11 @@ export const SuperAdminDashboard: React.FC = () => {
           cabinNumber: doc.cabinNumber.trim() || `Cabin ${idx + 1}`,
           morningShift: doc.morningShift || newDoctorForm.morningShift || '10:00 AM - 02:00 PM',
           eveningShift: doc.eveningShift || newDoctorForm.eveningShift || '05:00 PM - 08:00 PM',
-          // Hospital ke sabhi doctors ke liye COMMON Reception Login ID
+          // Hospital ke sabhi doctors ke liye ek common reception login credential
           staffUsername: newDoctorForm.staffUsername.trim(),
           staffPassword: newDoctorForm.staffPassword.trim() || 'hospital123',
-          // Har doctor ki apni personal photo (agar blank ho toh default)
-          profilePic: doc.profilePic?.trim() || picToSave,
+          // Har doctor ki apni personal DP
+          profilePic: doc.profilePic?.trim() ? doc.profilePic.trim() : defaultPic,
           clinicImages: newDoctorForm.clinicImages || ['', ''],
         });
       });
@@ -373,10 +367,9 @@ export const SuperAdminDashboard: React.FC = () => {
         degree: '',
         specialty: '',
         cabinNumber: 'Cabin 1',
+        profilePic: '',
         morningShift: '10:00 AM - 02:00 PM',
         eveningShift: '05:00 PM - 08:00 PM',
-        staffUsername: '',
-        staffPassword: '',
       },
     ]);
 
@@ -619,7 +612,7 @@ export const SuperAdminDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* REAL-TIME ONLINE TRANSACTIONS FEED (₹20 FEES LEDGER) */}
+            {/* REAL-TIME ONLINE TRANSACTIONS FEED */}
             <div className="rounded-3xl bg-white border border-slate-200 shadow-sm p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
@@ -1132,7 +1125,7 @@ export const SuperAdminDashboard: React.FC = () => {
               </button>
             </div>
 
-<form onSubmit={handleCreateDoctor} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+            <form onSubmit={handleCreateDoctor} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
               {/* 1. Establishment Type Selector */}
               <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
                 <span className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
@@ -1269,7 +1262,7 @@ export const SuperAdminDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* 3A. SINGLE CLINIC DOCTOR SECTION */}
+              {/* 3A. SINGLE CLINIC DOCTOR SECTION (Cabin field HIDE) */}
               {establishmentType === 'CLINIC' && (
                 <div className="space-y-3 p-4 rounded-2xl bg-slate-50 border border-slate-200">
                   <span className="block text-xs font-bold uppercase tracking-wider text-slate-600">
@@ -1320,7 +1313,7 @@ export const SuperAdminDashboard: React.FC = () => {
                       type="text"
                       value={newDoctorForm.profilePic}
                       onChange={(e) => setNewDoctorForm({ ...newDoctorForm, profilePic: e.target.value })}
-                      placeholder="https://..."
+                      placeholder="https://images.unsplash.com/photo-..."
                       className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs bg-white focus:outline-none"
                     />
                   </div>
@@ -1350,7 +1343,7 @@ export const SuperAdminDashboard: React.FC = () => {
                 </div>
               )}
 
-              {/* 3B. MULTI-DOCTOR HOSPITAL SECTION (Har Doctor ki Apni DP) */}
+              {/* 3B. MULTI-DOCTOR HOSPITAL SECTION (Har Doctor Ki Apni DP) */}
               {establishmentType === 'HOSPITAL' && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
