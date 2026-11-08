@@ -1586,7 +1586,6 @@ if (establishmentType === 'CLINIC') {
   </div>
 </div>
 </div>      
-            </form>
             
         {/* Modal Action Buttons */}
         <div className="pt-2 flex items-center gap-3">
@@ -1607,10 +1606,10 @@ if (establishmentType === 'CLINIC') {
           </button>
           
         </div>
+          </form>
        </div>
         </div>
       )}
-
     </div>
   );
 };
