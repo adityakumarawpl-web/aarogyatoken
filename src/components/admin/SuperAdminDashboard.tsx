@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useClinic } from '../../context/ClinicContext';
 import { calculatePlatformAnalytics } from '../../utils/queueLogic';
 import { voiceBot } from '../../utils/voiceBot';
+import { getAutoTagSuggestions } from '../../utils/tagEngine';
+import { Tag, X } from 'lucide-react';
 import {
   Shield,
   TrendingUp,
@@ -82,6 +84,7 @@ export const SuperAdminDashboard: React.FC = () => {
     phone: '',
     profilePic: '',
     clinicImages: ['', ''],
+    tags: [] as string[], // <-- Yahan add karein
     timings: '10:00 AM - 02:00 PM & 05:00 PM - 08:00 PM',
     morningShift: '10:00 AM - 02:00 PM',
     eveningShift: '05:00 PM - 08:00 PM',
@@ -325,6 +328,7 @@ export const SuperAdminDashboard: React.FC = () => {
       addNewDoctor({
         ...newDoctorForm,
         cabinNumber: 'Chamber',
+        tags: newDoctorForm.tags || [],
         profilePic: picToSave,
         clinicImages: newDoctorForm.clinicImages || ['', ''],
         morningShift: newDoctorForm.morningShift || '10:00 AM - 02:00 PM',
@@ -1495,6 +1499,115 @@ export const SuperAdminDashboard: React.FC = () => {
                 </div>
               )}
 
+{/* SMART AUTO-TAGS BLOCK (ADMIN ONLY - PUBLIC KO NAHI DIKHEGA) */}
+              <div className="rounded-2xl bg-indigo-50/70 border border-indigo-200 p-3.5 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-indigo-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="h-4 w-4 text-indigo-600" />
+                    <span>Search Keywords & Tags (सर्च टैग्स)</span>
+                  </span>
+                  <span className="text-[10px] text-indigo-700 font-semibold bg-indigo-100 px-2 py-0.5 rounded-full">
+                    Hidden from Public UI
+                  </span>
+                </div>
+
+                {/* Selected Active Tags (Chips) */}
+                <div className="flex flex-wrap gap-1.5 min-h-[28px]">
+                  {newDoctorForm.tags.length === 0 ? (
+                    <span className="text-[11px] text-slate-400 italic">
+                      Abhi koi tag add nahi hai. Niche suggest kiye gaye tags par click karein.
+                    </span>
+                  ) : (
+                    newDoctorForm.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="inline-flex items-center gap-1 bg-indigo-600 text-white text-[11px] font-bold px-2.5 py-0.5 rounded-lg shadow-xs"
+                      >
+                        <span>{tag}</span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setNewDoctorForm({
+                              ...newDoctorForm,
+                              tags: newDoctorForm.tags.filter((t) => t !== tag),
+                            })
+                          }
+                          className="hover:text-indigo-200 cursor-pointer"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))
+                  )}
+                </div>
+
+                {/* Auto Suggestions Bar (Click to Add) */}
+                {newDoctorForm.specialty && (
+                  <div className="pt-1.5 border-t border-indigo-200/60">
+                    <span className="block text-[10px] font-bold text-indigo-700 uppercase tracking-wider mb-1">
+                      ✨ Auto-Suggested (Click karke add karein):
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {getAutoTagSuggestions(newDoctorForm.specialty, newDoctorForm.city, newDoctorForm.name)
+                        .filter((tag) => !newDoctorForm.tags.includes(tag))
+                        .map((suggestedTag) => (
+                          <button
+                            key={suggestedTag}
+                            type="button"
+                            onClick={() =>
+                              setNewDoctorForm({
+                                ...newDoctorForm,
+                                tags: [...newDoctorForm.tags, suggestedTag],
+                              })
+                            }
+                            className="text-[10px] bg-white border border-indigo-300 text-indigo-800 font-semibold px-2 py-0.5 rounded-md hover:bg-indigo-100 transition cursor-pointer"
+                          >
+                            + {suggestedTag}
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Custom Tag Input */}
+                <div className="flex gap-2 pt-1">
+                  <input
+                    type="text"
+                    value={customTagInput}
+                    onChange={(e) => setCustomTagInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (customTagInput.trim() && !newDoctorForm.tags.includes(customTagInput.trim())) {
+                          setNewDoctorForm({
+                            ...newDoctorForm,
+                            tags: [...newDoctorForm.tags, customTagInput.trim()],
+                          });
+                          setCustomTagInput('');
+                        }
+                      }
+                    }}
+                    placeholder="Apna koi keyword likhein aur Enter dabayein..."
+                    className="flex-1 rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-indigo-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (customTagInput.trim() && !newDoctorForm.tags.includes(customTagInput.trim())) {
+                        setNewDoctorForm({
+                          ...newDoctorForm,
+                          tags: [...newDoctorForm.tags, customTagInput.trim()],
+                        });
+                        setCustomTagInput('');
+                      }
+                    }}
+                    className="rounded-xl bg-indigo-600 text-white px-3 py-1.5 text-xs font-bold hover:bg-indigo-700 transition cursor-pointer"
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+              
               {/* RAZORPAY PAYMENT SETTING SECTION */}
               <div className="rounded-2xl bg-blue-50 border border-blue-200 p-4 space-y-3">
                 <div className="flex items-center justify-between">
