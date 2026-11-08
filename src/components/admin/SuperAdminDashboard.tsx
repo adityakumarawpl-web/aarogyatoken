@@ -95,7 +95,31 @@ export const SuperAdminDashboard: React.FC = () => {
     razorpayKeySecret: 'sec_new_doc_live',
     razorpayAccountType: 'PLATFORM_SPLIT' as 'DIRECT' | 'PLATFORM_SPLIT',
   });
+// Type: Clinic ya Hospital
+  const [establishmentType, setEstablishmentType] = useState<'CLINIC' | 'HOSPITAL'>('CLINIC');
 
+  // Hospital ke liye multiple doctors ki list
+  const [hospitalDoctors, setHospitalDoctors] = useState<Array<{
+    name: string;
+    degree: string;
+    specialty: string;
+    cabinNumber: string;
+    morningShift: string;
+    eveningShift: string;
+    staffUsername: string;
+    staffPassword: string;
+  }>>([
+    {
+      name: '',
+      degree: '',
+      specialty: '',
+      cabinNumber: 'Cabin 1',
+      morningShift: '10:00 AM - 02:00 PM',
+      eveningShift: '05:00 PM - 08:00 PM',
+      staffUsername: '',
+      staffPassword: '',
+    },
+  ]);
 
   // ==========================================
   // LAYER 1: ADMIN USERNAME & PASSWORD LOGIN
@@ -300,17 +324,52 @@ const handleCreateDoctor = (e: React.FormEvent) => {
       ? newDoctorForm.profilePic.trim()
       : 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=300';
 
-    addNewDoctor({
-      ...newDoctorForm,
-      profilePic: picToSave,
-      clinicImages: newDoctorForm.clinicImages || ['', ''],
-      morningShift: newDoctorForm.morningShift || '10:00 AM - 02:00 PM',
-      eveningShift: newDoctorForm.eveningShift || '05:00 PM - 08:00 PM',
-    });
+if (establishmentType === 'CLINIC') {
+      addNewDoctor({
+        ...newDoctorForm,
+        cabinNumber: 'Chamber',
+        profilePic: picToSave,
+        clinicImages: newDoctorForm.clinicImages || ['', ''],
+        morningShift: newDoctorForm.morningShift || '10:00 AM - 02:00 PM',
+        eveningShift: newDoctorForm.eveningShift || '05:00 PM - 08:00 PM',
+      });
+      setSaveSuccessMsg(`Clinic "${newDoctorForm.clinicName}" created successfully!`);
+    } else {
+      hospitalDoctors.forEach((doc, idx) => {
+        if (doc.name.trim()) {
+          addNewDoctor({
+            ...newDoctorForm,
+            name: doc.name.trim(),
+            degree: doc.degree.trim(),
+            specialty: doc.specialty.trim(),
+            cabinNumber: doc.cabinNumber.trim() || `Cabin ${idx + 1}`,
+            morningShift: doc.morningShift || newDoctorForm.morningShift || '10:00 AM - 02:00 PM',
+            eveningShift: doc.eveningShift || newDoctorForm.eveningShift || '05:00 PM - 08:00 PM',
+            staffUsername: doc.staffUsername.trim() || `staff_${doc.name.toLowerCase().replace(/\s+/g, '')}`,
+            staffPassword: doc.staffPassword.trim() || 'clinic123',
+            profilePic: picToSave,
+            clinicImages: newDoctorForm.clinicImages || ['', ''],
+          });
+        }
+      });
+      setSaveSuccessMsg(`Hospital "${newDoctorForm.clinicName}" with ${hospitalDoctors.length} doctors onboarded!`);
+    }
 
     setShowAddDoctorModal(false);
-    setSaveSuccessMsg(`New Doctor Clinic "${newDoctorForm.name}" created successfully with Razorpay payment setting!`);
     setTimeout(() => setSaveSuccessMsg(''), 4000);
+
+  setHospitalDoctors([
+      {
+        name: '',
+        degree: '',
+        specialty: '',
+        cabinNumber: 'Cabin 1',
+        morningShift: '10:00 AM - 02:00 PM',
+        eveningShift: '05:00 PM - 08:00 PM',
+        staffUsername: '',
+        staffPassword: '',
+      },
+    ]);
 
     setNewDoctorForm({
       name: '',
@@ -1053,7 +1112,7 @@ const handleCreateDoctor = (e: React.FormEvent) => {
         )}
       </div>
 
-      {/* CREATE NEW DOCTOR / CLINIC MODAL (WITH RAZORPAY SETTING) */}
+ {/* CREATE NEW DOCTOR / CLINIC MODAL (WITH RAZORPAY SETTING) */}
       {showAddDoctorModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs overflow-y-auto animate-in fade-in">
           <div className="w-full max-w-xl rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-6">
@@ -1074,186 +1133,339 @@ const handleCreateDoctor = (e: React.FormEvent) => {
             </div>
 
             <form onSubmit={handleCreateDoctor} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Doctor Full Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={newDoctorForm.name}
-                    onChange={(e) => {
-                      const name = e.target.value;
-                      const cleanSlug = name.toLowerCase().replace(/[^a-z]/g, '').slice(0, 8);
-                      setNewDoctorForm({
-                        ...newDoctorForm,
-                        name,
-                        staffUsername: `staff_${cleanSlug}`,
-                        staffPassword: `doc${Math.floor(100 + Math.random() * 900)}`,
-                        razorpayKeyId: `rzp_test_${cleanSlug}_${Math.floor(1000 + Math.random() * 9000)}`,
-                      });
-                    }}
-                    placeholder="e.g. Dr. Alok Nath"
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs focus:border-blue-600 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Degree / Qualification *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={newDoctorForm.degree}
-                    onChange={(e) => setNewDoctorForm({ ...newDoctorForm, degree: e.target.value })}
-                    placeholder="e.g. MBBS, MD (Medicine)"
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs focus:border-blue-600 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Specialty / Dept *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={newDoctorForm.specialty}
-                    onChange={(e) => setNewDoctorForm({ ...newDoctorForm, specialty: e.target.value })}
-                    placeholder="e.g. Cardiologist & Heart Specialist"
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs focus:border-blue-600 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Cabin Number *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={newDoctorForm.cabinNumber}
-                    onChange={(e) => setNewDoctorForm({ ...newDoctorForm, cabinNumber: e.target.value })}
-                    placeholder="e.g. Cabin No. 3"
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs focus:border-blue-600 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Clinic / Hospital Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newDoctorForm.clinicName}
-                  onChange={(e) => setNewDoctorForm({ ...newDoctorForm, clinicName: e.target.value })}
-                  placeholder="e.g. Sanjeevani Heart & Medical Center"
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs focus:border-blue-600 focus:outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Clinic Address & City *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={newDoctorForm.address}
-                    onChange={(e) => setNewDoctorForm({ ...newDoctorForm, address: e.target.value })}
-                    placeholder="e.g. Station Road, Civil Lines"
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs focus:border-blue-600 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Phone / Contact
-                  </label>
-                  <input
-                    type="tel"
-                    value={newDoctorForm.phone}
-                    onChange={(e) => setNewDoctorForm({ ...newDoctorForm, phone: e.target.value })}
-                    placeholder="+91 98765 43210"
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs focus:border-blue-600 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-{/* Shift Timings */}
-          <div className="grid grid-cols-2 gap-3 mb-3">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Morning Shift
-              </label>
-              <input
-                type="text"
-                placeholder="10:00 AM - 02:00 PM"
-                value={newDoctorForm.morningShift}
-                onChange={(e) =>
-                  setNewDoctorForm((prev) => ({
-                    ...prev,
-                    morningShift: e.target.value,
-                  }))
-                }
-                className="w-full border rounded-lg p-2 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Evening Shift
-              </label>
-              <input
-                type="text"
-                placeholder="05:00 PM - 08:00 PM"
-                value={newDoctorForm.eveningShift}
-                onChange={(e) =>
-                  setNewDoctorForm((prev) => ({
-                    ...prev,
-                    eveningShift: e.target.value,
-                  }))
-                }
-                className="w-full border rounded-lg p-2 text-xs"
-              />
-            </div>
-          </div>
-              
-              {/* STAFF LOGIN CREDENTIALS SECTION */}
-              <div className="rounded-2xl bg-amber-50 border border-amber-200 p-4 space-y-3">
-                <span className="text-xs font-bold text-amber-900 uppercase tracking-wider block">
-                  Staff Login Credentials (स्टाफ़ को देने के लिए आईडी और पासवर्ड)
+              {/* 1. Establishment Type Selector (Clinic vs Hospital) */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                <span className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
+                  Select Establishment Type *
                 </span>
                 <div className="grid grid-cols-2 gap-3">
+                  <label
+                    className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition ${
+                      establishmentType === 'CLINIC'
+                        ? 'bg-blue-50 border-blue-600 text-blue-900 font-bold'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="establishmentType"
+                      value="CLINIC"
+                      checked={establishmentType === 'CLINIC'}
+                      onChange={() => setEstablishmentType('CLINIC')}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+                    />
+                    <div>
+                      <span className="text-sm block leading-none">Private Clinic</span>
+                      <span className="text-[10px] text-slate-500 font-normal">Single doctor practice</span>
+                    </div>
+                  </label>
+
+                  <label
+                    className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition ${
+                      establishmentType === 'HOSPITAL'
+                        ? 'bg-blue-50 border-blue-600 text-blue-900 font-bold'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="establishmentType"
+                      value="HOSPITAL"
+                      checked={establishmentType === 'HOSPITAL'}
+                      onChange={() => setEstablishmentType('HOSPITAL')}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+                    />
+                    <div>
+                      <span className="text-sm block leading-none">Hospital</span>
+                      <span className="text-[10px] text-slate-500 font-normal">Multi-doctor & OPD cabins</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* 2. Common Establishment Info */}
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    {establishmentType === 'CLINIC' ? 'Clinic Name *' : 'Hospital Name *'}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newDoctorForm.clinicName}
+                    onChange={(e) => setNewDoctorForm({ ...newDoctorForm, clinicName: e.target.value })}
+                    placeholder={establishmentType === 'CLINIC' ? 'e.g. Sanjeevani Heart Clinic' : 'e.g. Amrita Hospital'}
+                    className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-blue-600 focus:outline-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                      Staff Username / ID *
-                    </label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Address & City *</label>
                     <input
                       type="text"
                       required
-                      value={newDoctorForm.staffUsername}
-                      onChange={(e) => setNewDoctorForm({ ...newDoctorForm, staffUsername: e.target.value })}
-                      className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 font-mono text-xs font-bold text-slate-800"
+                      value={newDoctorForm.address}
+                      onChange={(e) => setNewDoctorForm({ ...newDoctorForm, address: e.target.value })}
+                      placeholder="e.g. Rewa Road, Near Bus Stand, Shahdol"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-blue-600 focus:outline-none"
                     />
                   </div>
+
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                      Staff Password *
-                    </label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Phone / Helpline *</label>
                     <input
-                      type="text"
+                      type="tel"
                       required
-                      value={newDoctorForm.staffPassword}
-                      onChange={(e) => setNewDoctorForm({ ...newDoctorForm, staffPassword: e.target.value })}
-                      className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 font-mono text-xs font-bold text-slate-800"
+                      value={newDoctorForm.phone}
+                      onChange={(e) => setNewDoctorForm({ ...newDoctorForm, phone: e.target.value })}
+                      placeholder="+91 98765 43210"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-blue-600 focus:outline-none"
                     />
                   </div>
                 </div>
               </div>
+
+              {/* 3A. SINGLE CLINIC DOCTOR SECTION (Cabin field HIDE) */}
+              {establishmentType === 'CLINIC' && (
+                <div className="space-y-3 p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                  <span className="block text-xs font-bold uppercase tracking-wider text-slate-600">
+                    Doctor Profile Details
+                  </span>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Doctor Full Name *</label>
+                      <input
+                        type="text"
+                        required
+                        value={newDoctorForm.name}
+                        onChange={(e) => {
+                          const name = e.target.value;
+                          const cleanSlug = name.toLowerCase().replace(/[^a-z]/g, '').slice(0, 8);
+                          setNewDoctorForm({
+                            ...newDoctorForm,
+                            name,
+                            staffUsername: `staff_${cleanSlug}`,
+                            staffPassword: `doc${Math.floor(100 + Math.random() * 900)}`,
+                            razorpayKeyId: `rzp_test_${cleanSlug}_${Math.floor(1000 + Math.random() * 9000)}`,
+                          });
+                        }}
+                        placeholder="e.g. Dr. Rajesh Sharma"
+                        className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs bg-white focus:border-blue-600 focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Degree / Qualification *</label>
+                      <input
+                        type="text"
+                        required
+                        value={newDoctorForm.degree}
+                        onChange={(e) => setNewDoctorForm({ ...newDoctorForm, degree: e.target.value })}
+                        placeholder="e.g. MBBS, MD (Medicine)"
+                        className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs bg-white focus:border-blue-600 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Specialty / Department *</label>
+                    <input
+                      type="text"
+                      required
+                      value={newDoctorForm.specialty}
+                      onChange={(e) => setNewDoctorForm({ ...newDoctorForm, specialty: e.target.value })}
+                      placeholder="e.g. Cardiologist & Heart Specialist"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs bg-white focus:border-blue-600 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Morning Shift</label>
+                      <input
+                        type="text"
+                        value={newDoctorForm.morningShift}
+                        onChange={(e) => setNewDoctorForm({ ...newDoctorForm, morningShift: e.target.value })}
+                        placeholder="10:00 AM - 02:00 PM"
+                        className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs bg-white focus:border-blue-600 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Evening Shift</label>
+                      <input
+                        type="text"
+                        value={newDoctorForm.eveningShift}
+                        onChange={(e) => setNewDoctorForm({ ...newDoctorForm, eveningShift: e.target.value })}
+                        placeholder="05:00 PM - 08:00 PM"
+                        className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs bg-white focus:border-blue-600 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Staff Credentials for Clinic */}
+                  <div className="rounded-2xl bg-amber-50 border border-amber-200 p-4 space-y-3">
+                    <span className="text-xs font-bold text-amber-900 uppercase tracking-wider block">
+                      Staff Login Credentials (स्टाफ़ को देने के लिए आईडी और पासवर्ड)
+                    </span>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          Staff Username / ID *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={newDoctorForm.staffUsername}
+                          onChange={(e) => setNewDoctorForm({ ...newDoctorForm, staffUsername: e.target.value })}
+                          className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 font-mono text-xs font-bold text-slate-800"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          Staff Password *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={newDoctorForm.staffPassword}
+                          onChange={(e) => setNewDoctorForm({ ...newDoctorForm, staffPassword: e.target.value })}
+                          className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 font-mono text-xs font-bold text-slate-800"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 3B. MULTI-DOCTOR HOSPITAL SECTION */}
+              {establishmentType === 'HOSPITAL' && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-700 block">
+                        Hospital Doctors & Cabins ({hospitalDoctors.length})
+                      </span>
+                      <span className="text-[10px] text-slate-500">
+                        Har doctor ke liye cabin number aur timings set karein
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setHospitalDoctors((prev) => [
+                          ...prev,
+                          {
+                            name: '',
+                            degree: '',
+                            specialty: '',
+                            cabinNumber: `Cabin ${prev.length + 1}`,
+                            morningShift: '10:00 AM - 02:00 PM',
+                            eveningShift: '05:00 PM - 08:00 PM',
+                            staffUsername: '',
+                            staffPassword: '',
+                          },
+                        ])
+                      }
+                      className="rounded-xl bg-blue-600 text-white px-3 py-1.5 text-xs font-bold shadow-xs hover:bg-blue-700 transition cursor-pointer"
+                    >
+                      + Add Another Doctor
+                    </button>
+                  </div>
+
+                  {hospitalDoctors.map((doc, idx) => (
+                    <div
+                      key={idx}
+                      className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5 relative"
+                    >
+                      <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
+                        <span className="text-xs font-black text-blue-900 bg-blue-100 px-2.5 py-0.5 rounded-md">
+                          Doctor #{idx + 1}
+                        </span>
+                        {hospitalDoctors.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setHospitalDoctors(hospitalDoctors.filter((_, i) => i !== idx))
+                            }
+                            className="text-xs text-rose-600 hover:text-rose-800 font-bold cursor-pointer"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                        <div className="sm:col-span-2">
+                          <label className="block text-[10px] font-bold text-slate-700 mb-1">
+                            Doctor Full Name *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={doc.name}
+                            onChange={(e) => {
+                              const updated = [...hospitalDoctors];
+                              updated[idx].name = e.target.value;
+                              const cleanSlug = e.target.value.toLowerCase().replace(/[^a-z]/g, '').slice(0, 8);
+                              if (!updated[idx].staffUsername) updated[idx].staffUsername = `staff_${cleanSlug}`;
+                              if (!updated[idx].staffPassword) updated[idx].staffPassword = `doc${Math.floor(100 + Math.random() * 900)}`;
+                              setHospitalDoctors(updated);
+                            }}
+                            placeholder="e.g. Dr. Vinamra Jain"
+                            className="w-full rounded-xl border border-slate-300 px-3 py-1.5 text-xs bg-white focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-700 mb-1">
+                            Cabin Number *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={doc.cabinNumber}
+                            onChange={(e) => {
+                              const updated = [...hospitalDoctors];
+                              updated[idx].cabinNumber = e.target.value;
+                              setHospitalDoctors(updated);
+                            }}
+                            placeholder="e.g. Cabin 1"
+                            className="w-full rounded-xl border border-slate-300 px-3 py-1.5 text-xs bg-white focus:outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-700 mb-1">
+                            Degree / Qualification *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={doc.degree}
+                            onChange={(e) => {
+                              const updated = [...hospitalDoctors];
+                              updated[idx].degree = e.target.value;
+                              setHospitalDoctors(updated);
+                            }}
+                            placeholder="e.g. MBBS, MS (General Surgery)"
+                            className="w-full rounded-xl border border-slate-300 px-3 py-1.5 text-xs bg-white focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-700 mb-1">
+                            Specialty / Department *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={doc.specialty}
+                            onChange={(e) => {
+                              const updated = [...hospitalDoctors];
+                              updated[idx].specialty = e.target.value;
+                              setHospitalDoctors(updated);
 
               {/* RAZORPAY PAYMENT SETTING SECTION FOR DOCTOR (AS REQUESTED) */}
               <div className="rounded-2xl bg-blue-50 border border-blue-200 p-4 space-y-3">
