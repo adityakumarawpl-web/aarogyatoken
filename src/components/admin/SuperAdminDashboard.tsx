@@ -81,7 +81,7 @@ export const SuperAdminDashboard: React.FC = () => {
     city: '',
     phone: '',
     profilePic: '',
-    clinicImages: ['', ''], // Do clinic images ke liye
+    clinicImages: ['', ''],
     timings: '10:00 AM - 02:00 PM & 05:00 PM - 08:00 PM',
     morningShift: '10:00 AM - 02:00 PM',
     eveningShift: '05:00 PM - 08:00 PM',
@@ -89,13 +89,13 @@ export const SuperAdminDashboard: React.FC = () => {
     staffUsername: '',
     staffPassword: '',
     avgTimePerPatientMinutes: 10,
-    // Razorpay per-doctor setting
     razorpayEnabled: true,
     razorpayKeyId: 'rzp_test_new_doc',
     razorpayKeySecret: 'sec_new_doc_live',
     razorpayAccountType: 'PLATFORM_SPLIT' as 'DIRECT' | 'PLATFORM_SPLIT',
   });
-// Type: Clinic ya Hospital
+
+  // Type: Clinic ya Hospital
   const [establishmentType, setEstablishmentType] = useState<'CLINIC' | 'HOSPITAL'>('CLINIC');
 
   // Hospital ke liye multiple doctors ki list
@@ -194,11 +194,10 @@ export const SuperAdminDashboard: React.FC = () => {
               type="submit"
               className="w-full rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-amber-500/20 hover:from-amber-400 hover:to-amber-500 transition cursor-pointer"
             >
-              Verify Layer 1 Credentials &rarr;
+              Verify Layer 1 Credentials →
             </button>
           </form>
 
-          {/* Quick Demo Credentials */}
           <div className="mt-6 border-t border-slate-800/80 pt-4 text-center">
             <span className="text-[11px] text-slate-500 block">Default Master Credentials:</span>
             <span className="font-mono text-xs text-amber-300 bg-slate-900 px-2.5 py-1 rounded-md border border-slate-800 mt-1 inline-block">
@@ -283,7 +282,6 @@ export const SuperAdminDashboard: React.FC = () => {
             </button>
           </form>
 
-          {/* Quick Demo PIN Chip */}
           <div className="mt-6 border-t border-slate-800/80 pt-4 text-center">
             <span className="text-[11px] text-slate-500 block">Default 2FA Security PIN:</span>
             <span className="font-mono text-xs text-emerald-400 bg-slate-900 px-2.5 py-1 rounded-md border border-slate-800 mt-1 inline-block">
@@ -304,27 +302,29 @@ export const SuperAdminDashboard: React.FC = () => {
     .filter((p) => p.bookingType === 'ONLINE')
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-const handleCreateDoctor = (e: React.FormEvent) => {
+  const handleCreateDoctor = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!newDoctorForm.name.trim()) {
-      alert('Kripya Doctor ka Naam bharein!');
-      return;
-    }
+
     if (!newDoctorForm.clinicName.trim()) {
       alert('Kripya Clinic / Hospital ka Naam bharein!');
       return;
     }
-    if (!newDoctorForm.staffUsername.trim()) {
-      alert('Kripya Staff Username bharein!');
-      return;
-    }
 
-    const picToSave = newDoctorForm.profilePic && newDoctorForm.profilePic.trim() !== ''
-      ? newDoctorForm.profilePic.trim()
-      : 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=300';
+    const picToSave =
+      newDoctorForm.profilePic && newDoctorForm.profilePic.trim() !== ''
+        ? newDoctorForm.profilePic.trim()
+        : 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=300';
 
-if (establishmentType === 'CLINIC') {
+    if (establishmentType === 'CLINIC') {
+      if (!newDoctorForm.name.trim()) {
+        alert('Kripya Doctor ka Naam bharein!');
+        return;
+      }
+      if (!newDoctorForm.staffUsername.trim()) {
+        alert('Kripya Staff Username bharein!');
+        return;
+      }
+
       addNewDoctor({
         ...newDoctorForm,
         cabinNumber: 'Chamber',
@@ -335,30 +335,34 @@ if (establishmentType === 'CLINIC') {
       });
       setSaveSuccessMsg(`Clinic "${newDoctorForm.clinicName}" created successfully!`);
     } else {
-      hospitalDoctors.forEach((doc, idx) => {
-        if (doc.name.trim()) {
-          addNewDoctor({
-            ...newDoctorForm,
-            name: doc.name.trim(),
-            degree: doc.degree.trim(),
-            specialty: doc.specialty.trim(),
-            cabinNumber: doc.cabinNumber.trim() || `Cabin ${idx + 1}`,
-            morningShift: doc.morningShift || newDoctorForm.morningShift || '10:00 AM - 02:00 PM',
-            eveningShift: doc.eveningShift || newDoctorForm.eveningShift || '05:00 PM - 08:00 PM',
-            staffUsername: doc.staffUsername.trim() || `staff_${doc.name.toLowerCase().replace(/\s+/g, '')}`,
-            staffPassword: doc.staffPassword.trim() || 'clinic123',
-            profilePic: picToSave,
-            clinicImages: newDoctorForm.clinicImages || ['', ''],
-          });
-        }
+      const validDoctors = hospitalDoctors.filter((doc) => doc.name.trim());
+      if (validDoctors.length === 0) {
+        alert('Kripya kam se kam ek Doctor ka naam add karein!');
+        return;
+      }
+
+      validDoctors.forEach((doc, idx) => {
+        addNewDoctor({
+          ...newDoctorForm,
+          name: doc.name.trim(),
+          degree: doc.degree.trim(),
+          specialty: doc.specialty.trim(),
+          cabinNumber: doc.cabinNumber.trim() || `Cabin ${idx + 1}`,
+          morningShift: doc.morningShift || newDoctorForm.morningShift || '10:00 AM - 02:00 PM',
+          eveningShift: doc.eveningShift || newDoctorForm.eveningShift || '05:00 PM - 08:00 PM',
+          staffUsername: doc.staffUsername.trim() || `staff_${doc.name.toLowerCase().replace(/\s+/g, '')}`,
+          staffPassword: doc.staffPassword.trim() || 'clinic123',
+          profilePic: picToSave,
+          clinicImages: newDoctorForm.clinicImages || ['', ''],
+        });
       });
-      setSaveSuccessMsg(`Hospital "${newDoctorForm.clinicName}" with ${hospitalDoctors.length} doctors onboarded!`);
+      setSaveSuccessMsg(`Hospital "${newDoctorForm.clinicName}" with ${validDoctors.length} doctors onboarded!`);
     }
 
     setShowAddDoctorModal(false);
     setTimeout(() => setSaveSuccessMsg(''), 4000);
 
-  setHospitalDoctors([
+    setHospitalDoctors([
       {
         name: '',
         degree: '',
@@ -385,7 +389,7 @@ if (establishmentType === 'CLINIC') {
       timings: '10:00 AM - 02:00 PM & 05:00 PM - 08:00 PM',
       morningShift: '10:00 AM - 02:00 PM',
       eveningShift: '05:00 PM - 08:00 PM',
-      consultationFee: '',
+      consultationFee: 500,
       staffUsername: '',
       staffPassword: '',
       avgTimePerPatientMinutes: 10,
@@ -395,7 +399,7 @@ if (establishmentType === 'CLINIC') {
       razorpayAccountType: 'PLATFORM_SPLIT',
     });
   };
-  
+
   const handleSaveRazorpaySettings = (e: React.FormEvent) => {
     e.preventDefault();
     updateRazorpaySettings(localRazorpaySettings);
@@ -541,11 +545,10 @@ if (establishmentType === 'CLINIC') {
         {adminTab === 'OVERVIEW' && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* 1. Today's Revenue */}
               <div className="rounded-3xl bg-white border border-slate-200 p-6 shadow-xs relative overflow-hidden">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    Aaj Ki Kamai (Today&apos;s Revenue)
+                    Aaj Ki Kamai (Today's Revenue)
                   </span>
                   <span className="rounded-full bg-emerald-100 p-2 text-emerald-700">
                     <DollarSign className="h-5 w-5" />
@@ -559,7 +562,6 @@ if (establishmentType === 'CLINIC') {
                 </p>
               </div>
 
-              {/* 2. Total Lifetime Revenue */}
               <div className="rounded-3xl bg-slate-900 text-white p-6 shadow-sm relative overflow-hidden">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
@@ -577,7 +579,6 @@ if (establishmentType === 'CLINIC') {
                 </p>
               </div>
 
-              {/* 3. Total Patient Footfall */}
               <div className="rounded-3xl bg-white border border-slate-200 p-6 shadow-xs relative overflow-hidden">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
@@ -595,7 +596,6 @@ if (establishmentType === 'CLINIC') {
                 </p>
               </div>
 
-              {/* 4. Active Doctors */}
               <div className="rounded-3xl bg-white border border-slate-200 p-6 shadow-xs relative overflow-hidden">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
@@ -901,7 +901,7 @@ if (establishmentType === 'CLINIC') {
                   placeholder="rzp_test_..."
                   className="w-full rounded-xl border border-slate-300 font-mono px-3 py-2 text-xs font-bold text-slate-800 focus:border-blue-500 focus:outline-none"
                 />
-                <span className="text-[10px] text-slate-500">Available from your Razorpay Dashboard &rarr; Settings &rarr; API Keys</span>
+                <span className="text-[10px] text-slate-500">Available from your Razorpay Dashboard → Settings → API Keys</span>
               </div>
 
               <div>
@@ -955,7 +955,7 @@ if (establishmentType === 'CLINIC') {
                   <span>Automatic Call Bot Settings (कॉल ऑटोमेशन सेटिंग)</span>
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Configure automated telephony call alerts dispatched when an online patient&apos;s turn is near
+                  Configure automated telephony call alerts dispatched when an online patient's turn is near
                 </p>
               </div>
 
@@ -973,7 +973,6 @@ if (establishmentType === 'CLINIC') {
             </div>
 
             <form onSubmit={handleSaveVoiceSettings} className="space-y-6 max-w-2xl">
-              {/* Trigger Threshold: 3-4 Patients Ahead */}
               <div className="rounded-2xl bg-amber-50/70 border border-amber-200 p-4 space-y-2">
                 <label className="block text-xs font-bold uppercase text-amber-900">
                   Turn Alert Timing: Kitne Mareez Pehle Call Jaye? *
@@ -999,7 +998,6 @@ if (establishmentType === 'CLINIC') {
                 </p>
               </div>
 
-              {/* Telephony Provider */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold uppercase text-slate-700 mb-1">
@@ -1038,7 +1036,6 @@ if (establishmentType === 'CLINIC') {
                 </div>
               </div>
 
-              {/* IVR Voice Announcement Message Script Template */}
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-700 mb-1">
                   Automated Voice Call Script (IVR Text-to-Speech Template)
@@ -1060,7 +1057,6 @@ if (establishmentType === 'CLINIC') {
                 </div>
               </div>
 
-              {/* Auto Retry on Unanswered */}
               <div className="rounded-2xl border border-slate-200 p-4 flex items-center justify-between">
                 <div>
                   <span className="text-xs font-bold text-slate-800 block">
@@ -1080,7 +1076,6 @@ if (establishmentType === 'CLINIC') {
                 />
               </div>
 
-              {/* Action Buttons */}
               <div className="pt-2 flex items-center gap-3">
                 <button
                   type="submit"
@@ -1112,27 +1107,7 @@ if (establishmentType === 'CLINIC') {
         )}
       </div>
 
- {/* CREATE NEW DOCTOR / CLINIC MODAL (WITH RAZORPAY SETTING) */}
-      {showAddDoctorModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs overflow-y-auto animate-in fade-in">
-          <div className="w-full max-w-xl rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-6">
-            <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
-              <div>
-                <span className="rounded bg-amber-400 text-slate-950 px-2 py-0.5 text-[10px] font-bold uppercase">
-                  Platform Setup
-                </span>
-                <h3 className="text-base font-bold mt-1">Add New Doctor & Payment Configuration</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAddDoctorModal(false)}
-                className="text-white hover:opacity-75 text-xl font-bold cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-{/* CREATE NEW DOCTOR / CLINIC MODAL (WITH RAZORPAY SETTING) */}
+      {/* CREATE NEW DOCTOR / CLINIC / HOSPITAL MODAL */}
       {showAddDoctorModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs overflow-y-auto animate-in fade-in">
           <div className="w-full max-w-xl rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-6">
