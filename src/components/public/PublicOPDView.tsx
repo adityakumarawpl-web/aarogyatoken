@@ -15,14 +15,21 @@ import {
 } from 'lucide-react';
 
 export const PublicOPDView: React.FC = () => {
-  const { doctors } = useClinic();
+  const { doctors, patients } = useClinic();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>('ALL');
   const [activeDoctorForBooking, setActiveDoctorForBooking] = useState<Doctor | null>(null);
 
-const filteredDoctors = doctors.filter((doc) => {
+  const filteredDoctors = doctors.filter((doc) => {
     const query = searchQuery.toLowerCase().trim();
+
+    // Specialty Chip Filter
+    if (selectedSpecialty !== 'ALL') {
+      const specMatch = doc.specialty?.toLowerCase().includes(selectedSpecialty.toLowerCase());
+      if (!specMatch) return false;
+    }
+
     if (!query) return true;
 
     // 1. Direct visible details
@@ -83,7 +90,7 @@ const filteredDoctors = doctors.filter((doc) => {
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-4 text-xs font-semibold text-slate-400 hover:text-slate-600"
+                  className="absolute right-4 text-xs font-semibold text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
                   Clear
                 </button>
@@ -125,7 +132,7 @@ const filteredDoctors = doctors.filter((doc) => {
         </div>
 
         {filteredDoctors.length === 0 ? (
-          <div className="rounded-3xl bg-white p-12 text-center border border-slate-200">
+          <div className="rounded-3xl bg-white p-12 text-center border border-slate-200 shadow-sm">
             <Activity className="mx-auto h-12 w-12 text-slate-400" />
             <h3 className="text-base font-bold text-slate-800 mt-3">Koi doctor nahi mila</h3>
             <p className="text-xs text-slate-500 mt-1">Kripya doosra naam ya specialty search karein</p>
@@ -136,6 +143,7 @@ const filteredDoctors = doctors.filter((doc) => {
               <DoctorCard
                 key={doc.id}
                 doctor={doc}
+                patients={patients}
                 onBookOnline={(d) => setActiveDoctorForBooking(d)}
               />
             ))}
@@ -153,7 +161,7 @@ const filteredDoctors = doctors.filter((doc) => {
                 1. Real-Time Token Number
               </h4>
               <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                Check exactly which token is inside the doctor&apos;s cabin before leaving home.
+                Check exactly which token is inside the doctor's cabin before leaving home.
               </p>
             </div>
           </div>
