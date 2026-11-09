@@ -6,6 +6,8 @@ export type BookingType = 'WALK_IN' | 'ONLINE';
 
 export type PaymentStatus = 'FREE' | 'PAID' | 'PENDING';
 
+export type EstablishmentType = 'CLINIC' | 'HOSPITAL';
+
 export interface Doctor {
   id: string;
   name: string;
@@ -25,11 +27,16 @@ export interface Doctor {
   staffPassword: string;
   profilePic?: string;
   clinicImages?: string[];
-  tags?: string[]; // <-- Naya field: Invisible SEO & Search Tags
-  morningShift?: string;   // Jaise: '10:00 AM - 02:00 PM'
-  eveningShift?: string;   // Jaise: '05:00 PM - 08:00 PM'
+  tags?: string[]; // Invisible SEO & Search Tags
+  morningShift?: string;   // e.g. '10:00 AM - 02:00 PM'
+  eveningShift?: string;   // e.g. '05:00 PM - 08:00 PM'
   avgTimePerPatientMinutes: number;
   createdAt: string;
+
+  // Hospital & Hierarchy Linkage
+  establishmentType?: EstablishmentType; // 'CLINIC' ya 'HOSPITAL'
+  hospitalId?: string; // Parent Hospital ID / Username (e.g. 'aditya_hospital_shahdol')
+
   // Razorpay Payment Configuration for this doctor/clinic
   razorpayEnabled?: boolean;
   razorpayKeyId?: string;
@@ -40,6 +47,7 @@ export interface Doctor {
 export interface Patient {
   id: string;
   doctorId: string;
+  hospitalId?: string; // Parent Hospital Linkage (e.g. 'aditya_hospital_shahdol')
   tokenNumber: number;
   name: string;
   mobile: string;
@@ -61,6 +69,18 @@ export interface Patient {
   botCallAlertSent: boolean;
   botCallAlertSentAt?: string;
   estimatedWaitMinutes?: number;
+}
+
+export interface Hospital {
+  id: string; // e.g. 'aditya_hospital_shahdol'
+  name: string;
+  city: string;
+  address: string;
+  phone: string;
+  staffUsername: string;
+  staffPassword: string;
+  doctorIds: string[];
+  createdAt: string;
 }
 
 export interface SummaryReport {
