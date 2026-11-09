@@ -76,7 +76,7 @@ export const SuperAdminDashboard: React.FC = () => {
   // Custom Tag Input State
   const [customTagInput, setCustomTagInput] = useState('');
 
-  // New Doctor Form with Razorpay settings
+  // New Doctor Form State
   const [newDoctorForm, setNewDoctorForm] = useState({
     name: '',
     degree: '',
@@ -96,10 +96,6 @@ export const SuperAdminDashboard: React.FC = () => {
     staffUsername: '',
     staffPassword: '',
     avgTimePerPatientMinutes: 10,
-    razorpayEnabled: true,
-    razorpayKeyId: 'rzp_test_new_doc',
-    razorpayKeySecret: 'sec_new_doc_live',
-    razorpayAccountType: 'PLATFORM_SPLIT' as 'DIRECT' | 'PLATFORM_SPLIT',
   });
 
   // Type: Clinic ya Hospital
@@ -340,6 +336,14 @@ export const SuperAdminDashboard: React.FC = () => {
     }
 
     const defaultPic = 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=300';
+    
+    // Automatic Razorpay configuration values from platform settings
+    const autoRazorpayData = {
+      razorpayEnabled: true,
+      razorpayKeyId: razorpaySettings.keyId || 'rzp_test_new_doc',
+      razorpayKeySecret: razorpaySettings.keySecret || 'sec_new_doc_live',
+      razorpayAccountType: 'PLATFORM_SPLIT' as 'DIRECT' | 'PLATFORM_SPLIT',
+    };
 
     if (establishmentType === 'CLINIC') {
       if (!newDoctorForm.name.trim()) {
@@ -351,6 +355,7 @@ export const SuperAdminDashboard: React.FC = () => {
 
       addNewDoctor({
         ...newDoctorForm,
+        ...autoRazorpayData,
         cabinNumber: 'Chamber',
         tags: newDoctorForm.tags || [],
         profilePic: picToSave,
@@ -369,6 +374,7 @@ export const SuperAdminDashboard: React.FC = () => {
       validDoctors.forEach((doc, idx) => {
         addNewDoctor({
           ...newDoctorForm,
+          ...autoRazorpayData,
           name: doc.name.trim(),
           degree: doc.degree.trim(),
           specialty: doc.specialty.trim(),
@@ -419,10 +425,6 @@ export const SuperAdminDashboard: React.FC = () => {
       staffUsername: '',
       staffPassword: '',
       avgTimePerPatientMinutes: 10,
-      razorpayEnabled: true,
-      razorpayKeyId: 'rzp_test_new_doc',
-      razorpayKeySecret: 'sec_new_doc_live',
-      razorpayAccountType: 'PLATFORM_SPLIT',
     });
   };
 
@@ -1142,7 +1144,7 @@ export const SuperAdminDashboard: React.FC = () => {
                 <span className="rounded bg-amber-400 text-slate-950 px-2 py-0.5 text-[10px] font-bold uppercase">
                   Platform Setup
                 </span>
-                <h3 className="text-base font-bold mt-1">Add New Doctor & Payment Configuration</h3>
+                <h3 className="text-base font-bold mt-1">Add New Doctor / Hospital</h3>
               </div>
               <button
                 type="button"
@@ -1255,7 +1257,7 @@ export const SuperAdminDashboard: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Common Staff / Receptionist Login Credentials (WITH UNIQUE VALIDATION) */}
+                {/* Common Staff / Receptionist Login Credentials */}
                 <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3.5 space-y-2">
                   <span className="text-xs font-bold text-amber-900 uppercase tracking-wider block">
                     {establishmentType === 'CLINIC' ? 'Staff Login Credentials' : 'Hospital Reception Common Login (एक ही लॉगिन आईडी/पासवर्ड)'}
@@ -1674,61 +1676,6 @@ export const SuperAdminDashboard: React.FC = () => {
                   >
                     Add
                   </button>
-                </div>
-              </div>
-
-              {/* RAZORPAY PAYMENT SETTING SECTION */}
-              <div className="rounded-2xl bg-blue-50 border border-blue-200 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-blue-900 uppercase tracking-wider flex items-center gap-1.5">
-                    <CreditCard className="h-4 w-4 text-blue-600" />
-                    <span>Razorpay Payment Setting (रेज़रपे पेमेंट सेटिंग)</span>
-                  </span>
-                  <label className="flex items-center gap-1.5 text-xs text-blue-800 font-bold cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={newDoctorForm.razorpayEnabled}
-                      onChange={(e) =>
-                        setNewDoctorForm({ ...newDoctorForm, razorpayEnabled: e.target.checked })
-                      }
-                      className="rounded text-blue-600"
-                    />
-                    <span>Active</span>
-                  </label>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                      Razorpay Key ID
-                    </label>
-                    <input
-                      type="text"
-                      value={newDoctorForm.razorpayKeyId}
-                      onChange={(e) =>
-                        setNewDoctorForm({ ...newDoctorForm, razorpayKeyId: e.target.value })
-                      }
-                      className="w-full rounded-xl border border-blue-300 bg-white px-3 py-2 font-mono text-xs text-slate-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                      Settlement Routing
-                    </label>
-                    <select
-                      value={newDoctorForm.razorpayAccountType}
-                      onChange={(e) =>
-                        setNewDoctorForm({
-                          ...newDoctorForm,
-                          razorpayAccountType: e.target.value as 'DIRECT' | 'PLATFORM_SPLIT',
-                        })
-                      }
-                      className="w-full rounded-xl border border-blue-300 bg-white px-3 py-2 text-xs font-medium text-slate-800"
-                    >
-                      <option value="PLATFORM_SPLIT">Platform Split (₹20 SaaS Fee to Admin)</option>
-                      <option value="DIRECT">Direct Platform Account</option>
-                    </select>
-                  </div>
                 </div>
               </div>
 
