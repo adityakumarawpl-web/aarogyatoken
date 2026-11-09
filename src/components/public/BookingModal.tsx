@@ -65,7 +65,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
 
     return false;
   };
-  
+
   const [step, setStep] = useState<'DETAILS' | 'PAYMENT' | 'SUCCESS'>('DETAILS');
   const [formData, setFormData] = useState({
     name: '',
@@ -86,7 +86,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
       selectedShift: (!morningAllowed && prev.selectedShift === 'Morning') ? 'Evening' : prev.selectedShift,
     }));
   };
-  
+
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [confirmedPatient, setConfirmedPatient] = useState<Patient | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
@@ -105,7 +105,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
     const num = typeof p.tokenNumber === 'number' ? p.tokenNumber : parseInt(String(p.tokenNumber), 10) || 0;
     return num > max ? num : max;
   }, 0) + 1;
-  
+
   const activeRazorpayKey = doctor.razorpayKeyId || razorpaySettings.keyId;
 
   const handleDetailsSubmit = (e: React.FormEvent) => {
@@ -126,7 +126,38 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
     setStep('PAYMENT');
   };
 
-const handleProcessPayment = () => {
+  const sendWhatsAppNotification = async (patientData: {
+    phone: string;
+    name: string;
+    tokenNumber: number;
+    doctorName: string;
+  }) => {
+    try {
+      const response = await fetch('/api/send-whatsapp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          phone: '91' + patientData.phone, // 10-digit number ke aage country code '91'
+          patientName: patientData.name,
+          tokenNumber: patientData.tokenNumber,
+          doctorName: patientData.doctorName,
+        }),
+      });
+
+      const result = await response.json();
+      if (response.ok) {
+        console.log('WhatsApp message sent successfully:', result);
+      } else {
+        console.error('Failed to send WhatsApp:', result);
+      }
+    } catch (err) {
+      console.error('Error triggering WhatsApp:', err);
+    }
+  };
+
+  const handleProcessPayment = () => {
     const razorpayKey = activeRazorpayKey;
 
     if (!razorpayKey) {
@@ -142,6 +173,9 @@ const handleProcessPayment = () => {
     setIsProcessingPayment(true);
     setErrorMsg('');
 
+    // Parent Hospital ID resolve karna
+    const resolvedHospitalId = doctor.hospitalId || doctor.staffUsername || doctor.id;
+
     const options = {
       key: razorpayKey,
       amount: 20 * 100, // ₹20 in paise
@@ -150,9 +184,10 @@ const handleProcessPayment = () => {
       description: `OPD Consultation Fee - Dr. ${doctor.name}`,
       handler: function (response: any) {
         setIsProcessingPayment(false);
-        
+
         const result = bookOnlineAppointment({
           doctorId: doctor.id,
+          hospitalId: resolvedHospitalId,
           name: formData.name.trim(),
           mobile: formData.mobile.trim(),
           age: parseInt(formData.age, 10) || 28,
@@ -163,10 +198,18 @@ const handleProcessPayment = () => {
           complaint: formData.complaint.trim() || 'General OPD Consultation',
           isEmergency: false,
           paymentId: response.razorpay_payment_id,
-        });
+        } as any);
 
         setConfirmedPatient(result.patient);
         setStep('SUCCESS');
+
+        // Automatic WhatsApp confirmation dispatch
+        sendWhatsAppNotification({
+          phone: formData.mobile.trim(),
+          name: formData.name.trim(),
+          tokenNumber: result.patient.tokenNumber,
+          doctorName: doctor.name,
+        });
 
         try {
           confetti({
@@ -202,32 +245,6 @@ const handleProcessPayment = () => {
     }
   };
 
-  const sendWhatsAppNotification = async (patientData) => {
-  try {
-    const response = await fetch('/api/send-whatsapp', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        phone: '91' + patientData.phone, // 10-digit number ke aage country code '91' lagana zaroori hai
-        patientName: patientData.name,
-        tokenNumber: patientData.tokenNumber,
-        doctorName: patientData.doctorName,
-      }),
-    });
-
-    const result = await response.json();
-    if (response.ok) {
-      console.log('WhatsApp message sent successfully:', result);
-    } else {
-      console.error('Failed to send WhatsApp:', result);
-    }
-  } catch (err) {
-    console.error('Error triggering WhatsApp:', err);
-  }
-};
-  
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs overflow-y-auto animate-in fade-in">
       <div className="relative w-full max-w-lg rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-6">
@@ -292,38 +309,38 @@ const handleProcessPayment = () => {
                 </div>
               </div>
 
-{/* Date & Shift Selection */}
-        <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Appointment Date
-            </label>
-            <input
-              type="date"
-              min={new Date().toISOString().split('T')[0]}
-              value={formData.appointmentDate}
-              onChange={(e) => handleDateChange(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 p-2 text-xs font-medium bg-white focus:outline-none focus:border-blue-500"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Preferred Shift
-            </label>
-            <select
-              value={formData.selectedShift}
-              onChange={(e) => setFormData({ ...formData, selectedShift: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 p-2 text-xs font-medium bg-white focus:outline-none focus:border-blue-500"
-            >
-              {isMorningShiftActiveForDoctor(formData.appointmentDate, doctor) && (
-                <option value="Morning">Morning Shift</option>
-              )}
-              <option value="Evening">Evening Shift</option>
-            </select>
-          </div>
-        </div>
-              
+              {/* Date & Shift Selection */}
+              <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Appointment Date
+                  </label>
+                  <input
+                    type="date"
+                    min={new Date().toISOString().split('T')[0]}
+                    value={formData.appointmentDate}
+                    onChange={(e) => handleDateChange(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 p-2 text-xs font-medium bg-white focus:outline-none focus:border-blue-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Preferred Shift
+                  </label>
+                  <select
+                    value={formData.selectedShift}
+                    onChange={(e) => setFormData({ ...formData, selectedShift: e.target.value })}
+                    className="w-full rounded-lg border border-slate-300 p-2 text-xs font-medium bg-white focus:outline-none focus:border-blue-500"
+                  >
+                    {isMorningShiftActiveForDoctor(formData.appointmentDate, doctor) && (
+                      <option value="Morning">Morning Shift</option>
+                    )}
+                    <option value="Evening">Evening Shift</option>
+                  </select>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   1. Patient Full Name (मरीज़ का नाम) *
@@ -381,7 +398,6 @@ const handleProcessPayment = () => {
                 </div>
               </div>
 
-              
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   3. Address / Colony / City (मरीज़ का पता) *
