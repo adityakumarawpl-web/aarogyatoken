@@ -1749,7 +1749,6 @@ export const SuperAdminDashboard: React.FC = () => {
                   {establishmentType === 'CLINIC' ? 'Create & Launch Clinic' : 'Create & Launch Hospital'}
                 </button>
               </div>
-            </form>
           </div>
         </div>
       )}
