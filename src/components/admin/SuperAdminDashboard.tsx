@@ -71,7 +71,8 @@ export const SuperAdminDashboard: React.FC = () => {
   // Settings local edit states
   const [localVoiceSettings, setLocalVoiceSettings] = useState(voiceBotSettings);
   const [localRazorpaySettings, setLocalRazorpaySettings] = useState(razorpaySettings);
-
+// Custom Tag Input State
+  const [customTagInput, setCustomTagInput] = useState('');
   // New Doctor Form with Razorpay settings
   const [newDoctorForm, setNewDoctorForm] = useState({
     name: '',
