@@ -549,7 +549,16 @@ const updateDoctorStatus = useCallback((doctorId: string, status: DoctorStatus, 
   }, []);
 
   const addNewDoctor = useCallback((data: Omit<Doctor, 'id' | 'status' | 'onlineTokenFee' | 'createdAt'>): Doctor => {
-    const customId = `doc-${Date.now()}`;
+    // 1. Username se clean document ID banayein
+    const baseUsername = (data.staffUsername || data.name || 'doctor')
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9_]/g, '_');
+
+    // Hospital multi-doctor ke liye cabin suffix, private clinic ke liye direct username
+    const customId = data.cabinNumber && data.cabinNumber !== 'Chamber'
+      ? `${baseUsername}_${data.cabinNumber.toLowerCase().replace(/[^a-z0-9]/g, '')}`
+      : baseUsername;
     
     // Clean data taaki profilePic save ho aur undefined values Firestore ko crash na karein
     const cleanedData = {
