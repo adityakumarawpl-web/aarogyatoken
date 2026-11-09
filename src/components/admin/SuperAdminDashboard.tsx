@@ -126,6 +126,15 @@ export const SuperAdminDashboard: React.FC = () => {
     },
   ]);
 
+  // Unique Username Check Helper
+  const isUsernameTaken = (username: string): boolean => {
+    if (!username.trim()) return false;
+    const clean = username.trim().toLowerCase();
+    return doctors.some((doc) => doc.staffUsername?.trim().toLowerCase() === clean);
+  };
+
+  const isCurrentUsernameTaken = isUsernameTaken(newDoctorForm.staffUsername);
+
   // ==========================================
   // LAYER 1: ADMIN USERNAME & PASSWORD LOGIN
   // ==========================================
@@ -316,6 +325,17 @@ export const SuperAdminDashboard: React.FC = () => {
     }
     if (!newDoctorForm.staffUsername.trim()) {
       alert('Kripya Reception / Staff ID bharein!');
+      return;
+    }
+
+    // UNIQUE USERNAME VALIDATION GUARD
+    const cleanStaffUser = newDoctorForm.staffUsername.trim().toLowerCase();
+    const duplicateExists = doctors.some(
+      (doc) => doc.staffUsername?.trim().toLowerCase() === cleanStaffUser
+    );
+
+    if (duplicateExists) {
+      alert(`Staff ID "${newDoctorForm.staffUsername}" pehle se kisi dusre clinic/hospital ke dwara li ja chuki hai!\n\nKripya koi alag unique username chunein.`);
       return;
     }
 
@@ -1196,12 +1216,13 @@ export const SuperAdminDashboard: React.FC = () => {
                     value={newDoctorForm.clinicName}
                     onChange={(e) => {
                       const clinicName = e.target.value;
-                      const slug = clinicName.toLowerCase().replace(/[^a-z]/g, '').slice(0, 8);
-                      setNewDoctorForm({
-                        ...newDoctorForm,
+                      const slug = clinicName.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 8);
+                      const randomSuffix = Math.floor(100 + Math.random() * 900);
+                      setNewDoctorForm((prev) => ({
+                        ...prev,
                         clinicName,
-                        staffUsername: newDoctorForm.staffUsername || `desk_${slug}`,
-                      });
+                        staffUsername: prev.staffUsername ? prev.staffUsername : (slug ? `desk_${slug}_${randomSuffix}` : ''),
+                      }));
                     }}
                     placeholder={establishmentType === 'CLINIC' ? 'e.g. Sanjeevani Heart Clinic' : 'e.g. Amrita Hospital'}
                     className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-blue-600 focus:outline-none"
@@ -1234,25 +1255,51 @@ export const SuperAdminDashboard: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Common Staff / Receptionist Login Credentials */}
+                {/* Common Staff / Receptionist Login Credentials (WITH UNIQUE VALIDATION) */}
                 <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3.5 space-y-2">
                   <span className="text-xs font-bold text-amber-900 uppercase tracking-wider block">
                     {establishmentType === 'CLINIC' ? 'Staff Login Credentials' : 'Hospital Reception Common Login (एक ही लॉगिन आईडी/पासवर्ड)'}
                   </span>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-700 mb-1">
-                        Receptionist / Staff ID *
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[10px] font-bold text-slate-700">
+                          Receptionist / Staff ID *
+                        </label>
+                        {newDoctorForm.staffUsername.trim() && (
+                          <span
+                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                              isCurrentUsernameTaken
+                                ? 'bg-rose-100 text-rose-700 border border-rose-300'
+                                : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                            }`}
+                          >
+                            {isCurrentUsernameTaken ? '❌ Already Taken' : '✓ Available'}
+                          </span>
+                        )}
+                      </div>
                       <input
                         type="text"
                         required
                         value={newDoctorForm.staffUsername}
-                        onChange={(e) => setNewDoctorForm({ ...newDoctorForm, staffUsername: e.target.value })}
-                        placeholder="e.g. amrita_desk"
-                        className="w-full rounded-xl border border-amber-300 bg-white px-3 py-1.5 font-mono text-xs font-bold text-slate-800 focus:outline-none"
+                        onChange={(e) => {
+                          const cleanVal = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '');
+                          setNewDoctorForm({ ...newDoctorForm, staffUsername: cleanVal });
+                        }}
+                        placeholder="e.g. amrita_desk_101"
+                        className={`w-full rounded-xl border px-3 py-1.5 font-mono text-xs font-bold focus:outline-none ${
+                          isCurrentUsernameTaken
+                            ? 'border-rose-400 bg-rose-50 text-rose-900 focus:border-rose-600'
+                            : 'border-amber-300 bg-white text-slate-800'
+                        }`}
                       />
+                      {isCurrentUsernameTaken && (
+                        <p className="text-[10px] text-rose-600 font-semibold mt-1">
+                          Yeh Staff ID pehle se li ja chuki hai. Kripya naya number ya naam jodein.
+                        </p>
+                      )}
                     </div>
+
                     <div>
                       <label className="block text-[10px] font-bold text-slate-700 mb-1">
                         Password *
@@ -1728,13 +1775,18 @@ export const SuperAdminDashboard: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowAddDoctorModal(false)}
-                  className="flex-1 rounded-xl border border-slate-300 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100"
+                  className="flex-1 rounded-xl border border-slate-300 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 rounded-xl bg-blue-600 py-2.5 text-xs font-bold text-white shadow-md hover:bg-blue-500 cursor-pointer"
+                  disabled={isCurrentUsernameTaken}
+                  className={`flex-1 rounded-xl py-2.5 text-xs font-bold text-white shadow-md transition cursor-pointer ${
+                    isCurrentUsernameTaken
+                      ? 'bg-slate-400 cursor-not-allowed opacity-60'
+                      : 'bg-blue-600 hover:bg-blue-500'
+                  }`}
                 >
                   {establishmentType === 'CLINIC' ? 'Create & Launch Clinic' : 'Create & Launch Hospital'}
                 </button>
