@@ -3,7 +3,6 @@ import { useClinic } from '../../context/ClinicContext';
 import { calculatePlatformAnalytics } from '../../utils/queueLogic';
 import { voiceBot } from '../../utils/voiceBot';
 import { getAutoTagSuggestions } from '../../utils/tagEngine';
-import { Tag, X } from 'lucide-react';
 import {
   Shield,
   TrendingUp,
@@ -30,6 +29,8 @@ import {
   Save,
   Radio,
   AlertCircle,
+  Tag,
+  X,
 } from 'lucide-react';
 
 export const SuperAdminDashboard: React.FC = () => {
@@ -71,8 +72,10 @@ export const SuperAdminDashboard: React.FC = () => {
   // Settings local edit states
   const [localVoiceSettings, setLocalVoiceSettings] = useState(voiceBotSettings);
   const [localRazorpaySettings, setLocalRazorpaySettings] = useState(razorpaySettings);
-// Custom Tag Input State
+
+  // Custom Tag Input State
   const [customTagInput, setCustomTagInput] = useState('');
+
   // New Doctor Form with Razorpay settings
   const [newDoctorForm, setNewDoctorForm] = useState({
     name: '',
@@ -85,7 +88,7 @@ export const SuperAdminDashboard: React.FC = () => {
     phone: '',
     profilePic: '',
     clinicImages: ['', ''],
-    tags: [] as string[], // <-- Yahan add karein
+    tags: [] as string[],
     timings: '10:00 AM - 02:00 PM & 05:00 PM - 08:00 PM',
     morningShift: '10:00 AM - 02:00 PM',
     eveningShift: '05:00 PM - 08:00 PM',
@@ -102,7 +105,7 @@ export const SuperAdminDashboard: React.FC = () => {
   // Type: Clinic ya Hospital
   const [establishmentType, setEstablishmentType] = useState<'CLINIC' | 'HOSPITAL'>('CLINIC');
 
-  // Hospital ke liye multiple doctors ki list (Har doctor ki apni Profile Pic DP)
+  // Hospital ke liye multiple doctors ki list
   const [hospitalDoctors, setHospitalDoctors] = useState<Array<{
     name: string;
     degree: string;
@@ -350,12 +353,11 @@ export const SuperAdminDashboard: React.FC = () => {
           degree: doc.degree.trim(),
           specialty: doc.specialty.trim(),
           cabinNumber: doc.cabinNumber.trim() || `Cabin ${idx + 1}`,
+          tags: newDoctorForm.tags || [],
           morningShift: doc.morningShift || newDoctorForm.morningShift || '10:00 AM - 02:00 PM',
           eveningShift: doc.eveningShift || newDoctorForm.eveningShift || '05:00 PM - 08:00 PM',
-          // Hospital ke sabhi doctors ke liye ek common reception login credential
           staffUsername: newDoctorForm.staffUsername.trim(),
           staffPassword: newDoctorForm.staffPassword.trim() || 'hospital123',
-          // Har doctor ki apni personal DP
           profilePic: doc.profilePic?.trim() ? doc.profilePic.trim() : defaultPic,
           clinicImages: newDoctorForm.clinicImages || ['', ''],
         });
@@ -389,6 +391,7 @@ export const SuperAdminDashboard: React.FC = () => {
       phone: '',
       profilePic: '',
       clinicImages: ['', ''],
+      tags: [],
       timings: '10:00 AM - 02:00 PM & 05:00 PM - 08:00 PM',
       morningShift: '10:00 AM - 02:00 PM',
       eveningShift: '05:00 PM - 08:00 PM',
@@ -1180,7 +1183,7 @@ export const SuperAdminDashboard: React.FC = () => {
                   </label>
                 </div>
               </div>
-            </form>
+
               {/* 2. Common Establishment Info */}
               <div className="space-y-3">
                 <div>
@@ -1231,7 +1234,7 @@ export const SuperAdminDashboard: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Common Staff / Receptionist Login Credentials (Ek Hi ID/Pass) */}
+                {/* Common Staff / Receptionist Login Credentials */}
                 <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3.5 space-y-2">
                   <span className="text-xs font-bold text-amber-900 uppercase tracking-wider block">
                     {establishmentType === 'CLINIC' ? 'Staff Login Credentials' : 'Hospital Reception Common Login (एक ही लॉगिन आईडी/पासवर्ड)'}
@@ -1348,7 +1351,7 @@ export const SuperAdminDashboard: React.FC = () => {
                 </div>
               )}
 
-              {/* 3B. MULTI-DOCTOR HOSPITAL SECTION (Har Doctor Ki Apni DP) */}
+              {/* 3B. MULTI-DOCTOR HOSPITAL SECTION */}
               {establishmentType === 'HOSPITAL' && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
@@ -1500,7 +1503,7 @@ export const SuperAdminDashboard: React.FC = () => {
                 </div>
               )}
 
-{/* SMART AUTO-TAGS BLOCK (ADMIN ONLY - PUBLIC KO NAHI DIKHEGA) */}
+              {/* SMART AUTO-TAGS BLOCK (ADMIN ONLY - PUBLIC KO NAHI DIKHEGA) */}
               <div className="rounded-2xl bg-indigo-50/70 border border-indigo-200 p-3.5 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-indigo-900 uppercase tracking-wider flex items-center gap-1.5">
@@ -1509,18 +1512,6 @@ export const SuperAdminDashboard: React.FC = () => {
                   </span>
                   <span className="text-[10px] text-indigo-700 font-semibold bg-indigo-100 px-2 py-0.5 rounded-full">
                     Hidden from Public UI
-                  </span>
-                </div>
-
-                {/* SMART AUTO-TAGS BLOCK */}
-              <div className="rounded-2xl bg-indigo-50/70 border border-indigo-200 p-3.5 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-indigo-900 uppercase tracking-wider flex items-center gap-1.5">
-                    <Sparkles className="h-4 w-4 text-indigo-600" />
-                    <span>Search Keywords & Tags (सर्च टैग्स)</span>
-                  </span>
-                  <span className="text-[10px] text-indigo-700 font-semibold bg-indigo-100 px-2 py-0.5 rounded-full">
-                    Auto Generated
                   </span>
                 </div>
 
@@ -1554,14 +1545,13 @@ export const SuperAdminDashboard: React.FC = () => {
                   )}
                 </div>
 
-                {/* Auto Suggestions Bar (Har haal mein suggestions dikhenge) */}
+                {/* Auto Suggestions Bar */}
                 <div className="pt-1.5 border-t border-indigo-200/60">
                   <span className="block text-[10px] font-bold text-indigo-700 uppercase tracking-wider mb-1.5">
                     ✨ Auto-Suggested (Click karke add karein):
                   </span>
                   <div className="flex flex-wrap gap-1.5">
                     {(() => {
-                      // Active specialty nikalna (Clinic ya Hospital se)
                       const currentSpecialty =
                         establishmentType === 'CLINIC'
                           ? newDoctorForm.specialty
@@ -1639,7 +1629,7 @@ export const SuperAdminDashboard: React.FC = () => {
                   </button>
                 </div>
               </div>
-              
+
               {/* RAZORPAY PAYMENT SETTING SECTION */}
               <div className="rounded-2xl bg-blue-50 border border-blue-200 p-4 space-y-3">
                 <div className="flex items-center justify-between">
@@ -1749,8 +1739,10 @@ export const SuperAdminDashboard: React.FC = () => {
                   {establishmentType === 'CLINIC' ? 'Create & Launch Clinic' : 'Create & Launch Hospital'}
                 </button>
               </div>
+            </form>
           </div>
         </div>
+      )}
     </div>
   );
 };
