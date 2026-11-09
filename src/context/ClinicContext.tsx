@@ -53,6 +53,8 @@ export const INITIAL_DOCTORS: Doctor[] = [
     profilePic: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=300&auto=format&fit=crop&q=80',
     avgTimePerPatientMinutes: 10,
     createdAt: new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString(),
+    establishmentType: 'CLINIC',
+    hospitalId: 'staff_rajesh',
     razorpayEnabled: true,
     razorpayKeyId: 'rzp_test_rajesh_9823',
     razorpayKeySecret: 'sec_rajesh_live_98',
@@ -78,6 +80,8 @@ export const INITIAL_DOCTORS: Doctor[] = [
     profilePic: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=300&auto=format&fit=crop&q=80',
     avgTimePerPatientMinutes: 12,
     createdAt: new Date(Date.now() - 20 * 24 * 3600 * 1000).toISOString(),
+    establishmentType: 'CLINIC',
+    hospitalId: 'staff_priya',
     razorpayEnabled: true,
     razorpayKeyId: 'rzp_test_priya_3481',
     razorpayKeySecret: 'sec_priya_live_77',
@@ -103,6 +107,8 @@ export const INITIAL_DOCTORS: Doctor[] = [
     profilePic: 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=300&auto=format&fit=crop&q=80',
     avgTimePerPatientMinutes: 10,
     createdAt: new Date(Date.now() - 15 * 24 * 3600 * 1000).toISOString(),
+    establishmentType: 'CLINIC',
+    hospitalId: 'staff_amit',
     razorpayEnabled: true,
     razorpayKeyId: 'rzp_test_amit_1109',
     razorpayKeySecret: 'sec_amit_live_44',
@@ -114,6 +120,7 @@ export const INITIAL_PATIENTS: Patient[] = [
   {
     id: 'p-1',
     doctorId: 'doc-1',
+    hospitalId: 'staff_rajesh',
     tokenNumber: 1,
     name: 'Suresh Chandra Tiwari',
     mobile: '9839112233',
@@ -134,6 +141,7 @@ export const INITIAL_PATIENTS: Patient[] = [
   {
     id: 'p-2',
     doctorId: 'doc-1',
+    hospitalId: 'staff_rajesh',
     tokenNumber: 2,
     name: 'Anjali Saxena',
     mobile: '9450334455',
@@ -153,6 +161,7 @@ export const INITIAL_PATIENTS: Patient[] = [
   {
     id: 'p-3',
     doctorId: 'doc-1',
+    hospitalId: 'staff_rajesh',
     tokenNumber: 3,
     name: 'Rohan Gupta',
     mobile: '9792445566',
@@ -361,12 +370,10 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [voiceBotSettings]);
 
-const addWalkInPatient = useCallback((data: Omit<Patient, 'id' | 'tokenNumber' | 'status' | 'bookingType' | 'paymentStatus' | 'paymentAmount' | 'createdAt' | 'botCallAlertSent'>): Patient => {
-    // 1. Current Target Date aur Shift nikalna
+  const addWalkInPatient = useCallback((data: Omit<Patient, 'id' | 'tokenNumber' | 'status' | 'bookingType' | 'paymentStatus' | 'paymentAmount' | 'createdAt' | 'botCallAlertSent'>): Patient => {
     const targetDate = (data as any).appointmentDate || new Date().toISOString().split('T')[0];
     const targetShift = ((data as any).selectedShift || (data as any).shift || 'Morning').trim();
 
-    // 2. Doctor, Date aur Shift teeno match karne wale patients filter karein
     const matchingPatients = patients.filter((p) => {
       const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
       const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim();
@@ -378,19 +385,22 @@ const addWalkInPatient = useCallback((data: Omit<Patient, 'id' | 'tokenNumber' |
       );
     });
 
-    // 3. Us shift ka max token number dhundna
     const maxToken = matchingPatients.reduce((max, p) => {
       const num = typeof p.tokenNumber === 'number' ? p.tokenNumber : parseInt(String(p.tokenNumber), 10) || 0;
       return num > max ? num : max;
     }, 0);
 
-    // 4. Reset to 1 on new Date/Shift, warna max + 1
     const nextToken = maxToken + 1;
     const customId = `p-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+    // Inherit hospitalId from Target Doctor
+    const matchedDoctor = doctors.find((d) => d.id === data.doctorId);
+    const resolvedHospitalId = (data as any).hospitalId || matchedDoctor?.hospitalId || matchedDoctor?.staffUsername || '';
 
     const newPatient: Patient = {
       ...data,
       id: customId,
+      hospitalId: resolvedHospitalId,
       tokenNumber: nextToken,
       appointmentDate: targetDate,
       selectedShift: targetShift,
@@ -409,10 +419,9 @@ const addWalkInPatient = useCallback((data: Omit<Patient, 'id' | 'tokenNumber' |
     setLastGeneratedTokenPatient(newPatient);
     setTimeout(() => checkBotAlerts([...patients, newPatient]), 50);
     return newPatient;
-  }, [patients, checkBotAlerts]);
+  }, [patients, doctors, checkBotAlerts]);
 
   const bookOnlineAppointment = useCallback((data: Omit<Patient, 'id' | 'tokenNumber' | 'status' | 'bookingType' | 'paymentStatus' | 'paymentAmount' | 'createdAt' | 'botCallAlertSent'>) => {
-    // 1. Online booking ke liye Date aur Shift filter
     const targetDate = (data as any).appointmentDate || new Date().toISOString().split('T')[0];
     const targetShift = ((data as any).selectedShift || (data as any).shift || 'Morning').trim();
 
@@ -436,9 +445,14 @@ const addWalkInPatient = useCallback((data: Omit<Patient, 'id' | 'tokenNumber' |
     const paymentId = `pay_rzp_${Date.now()}`;
     const customId = `p-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
+    // Inherit hospitalId from Target Doctor
+    const matchedDoctor = doctors.find((d) => d.id === data.doctorId);
+    const resolvedHospitalId = (data as any).hospitalId || matchedDoctor?.hospitalId || matchedDoctor?.staffUsername || '';
+
     const newPatient: Patient = {
       ...data,
       id: customId,
+      hospitalId: resolvedHospitalId,
       tokenNumber: nextToken,
       appointmentDate: targetDate,
       selectedShift: targetShift,
@@ -458,7 +472,7 @@ const addWalkInPatient = useCallback((data: Omit<Patient, 'id' | 'tokenNumber' |
     setLastGeneratedTokenPatient(newPatient);
     setTimeout(() => checkBotAlerts([...patients, newPatient]), 50);
     return { patient: newPatient, paymentId };
-  }, [patients, checkBotAlerts]);
+  }, [patients, doctors, checkBotAlerts]);
 
   const callPatient = useCallback((patientId: string) => {
     const updated = callPatientInCabin(patients, patientId);
@@ -495,14 +509,12 @@ const addWalkInPatient = useCallback((data: Omit<Patient, 'id' | 'tokenNumber' |
     setTimeout(() => checkBotAlerts(updated), 50);
   }, [patients, checkBotAlerts]);
 
-const markEmergency = useCallback((patientId: string) => {
-    // 1. Local state turant update karein taaki screen par patient instant upar shift ho jaye
+  const markEmergency = useCallback((patientId: string) => {
     const updated = patients.map((p) =>
       p.id === patientId ? { ...p, isEmergency: true } : p
     );
     setPatients(updated);
 
-    // 2. Database (Firestore) mein isEmergency: true save karein
     try {
       if (db) {
         updateDoc(doc(db, 'patients', patientId), { isEmergency: true }).catch((err) =>
@@ -527,7 +539,7 @@ const markEmergency = useCallback((patientId: string) => {
     setTimeout(() => checkBotAlerts(updated), 50);
   }, [patients, checkBotAlerts]);
 
-const updateDoctorStatus = useCallback((doctorId: string, status: DoctorStatus, note?: string) => {
+  const updateDoctorStatus = useCallback((doctorId: string, status: DoctorStatus, note?: string) => {
     setDoctors((prev) =>
       prev.map((docItem) => {
         if (docItem.id === doctorId) {
@@ -549,18 +561,18 @@ const updateDoctorStatus = useCallback((doctorId: string, status: DoctorStatus, 
   }, []);
 
   const addNewDoctor = useCallback((data: Omit<Doctor, 'id' | 'status' | 'onlineTokenFee' | 'createdAt'>): Doctor => {
-    // 1. Username se clean document ID banayein
+    // 1. Clean unique username based ID
     const baseUsername = (data.staffUsername || data.name || 'doctor')
       .toLowerCase()
       .trim()
       .replace(/[^a-z0-9_]/g, '_');
 
-    // Hospital multi-doctor ke liye cabin suffix, private clinic ke liye direct username
+    // Hospital multi-doctor cabin suffix vs private clinic
     const customId = data.cabinNumber && data.cabinNumber !== 'Chamber'
       ? `${baseUsername}_${data.cabinNumber.toLowerCase().replace(/[^a-z0-9]/g, '')}`
       : baseUsername;
     
-    // Clean data taaki profilePic save ho aur undefined values Firestore ko crash na karein
+    // Clean fields
     const cleanedData = {
       ...data,
       profilePic: data.profilePic && data.profilePic.trim() !== ''
@@ -577,9 +589,12 @@ const updateDoctorStatus = useCallback((doctorId: string, status: DoctorStatus, 
       status: 'AVAILABLE',
       onlineTokenFee: 20,
       createdAt: new Date().toISOString(),
+      // Preserve hospital hierarchy fields
+      establishmentType: (data as any).establishmentType || 'CLINIC',
+      hospitalId: (data as any).hospitalId || baseUsername,
     };
 
-    // undefined values completely strip karne ke liye safe payload
+    // Remove undefined values before Firestore setDoc
     const safePayload = JSON.parse(JSON.stringify(newDoc));
 
     setDoc(doc(db, 'doctors', customId), safePayload).catch(err => {
