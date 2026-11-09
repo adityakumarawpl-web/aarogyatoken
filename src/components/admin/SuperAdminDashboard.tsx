@@ -31,6 +31,8 @@ import {
   AlertCircle,
   Tag,
   X,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
 export const SuperAdminDashboard: React.FC = () => {
@@ -68,6 +70,10 @@ export const SuperAdminDashboard: React.FC = () => {
   const [showPasswords, setShowPasswords] = useState<{ [key: string]: boolean }>({});
   const [doctorSearch, setDoctorSearch] = useState('');
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
+
+  // Hierarchy Accordion States (Folder-View)
+  const [expandedHospital, setExpandedHospital] = useState<string | null>(null);
+  const [selectedDoctorForPatients, setSelectedDoctorForPatients] = useState<string | null>(null);
 
   // Settings local edit states
   const [localVoiceSettings, setLocalVoiceSettings] = useState(voiceBotSettings);
@@ -404,10 +410,13 @@ export const SuperAdminDashboard: React.FC = () => {
       }
 
       const picToSave = newDoctorForm.profilePic?.trim() ? newDoctorForm.profilePic.trim() : defaultPic;
+      const clinicBaseId = newDoctorForm.staffUsername.trim();
 
       addNewDoctor({
         ...newDoctorForm,
         ...autoRazorpayData,
+        establishmentType: 'CLINIC',
+        hospitalId: clinicBaseId, // Clinic acts as its own parent
         address: formattedPublicAddress,
         city: newDoctorForm.city.trim(),
         cabinNumber: 'Chamber',
@@ -425,10 +434,14 @@ export const SuperAdminDashboard: React.FC = () => {
         return;
       }
 
+      const hospitalBaseId = newDoctorForm.staffUsername.trim();
+
       validDoctors.forEach((doc, idx) => {
         addNewDoctor({
           ...newDoctorForm,
           ...autoRazorpayData,
+          establishmentType: 'HOSPITAL',
+          hospitalId: hospitalBaseId, // Hospital parent link
           address: formattedPublicAddress,
           city: newDoctorForm.city.trim(),
           name: doc.name.trim(),
@@ -438,7 +451,7 @@ export const SuperAdminDashboard: React.FC = () => {
           tags: newDoctorForm.tags || [],
           morningShift: doc.morningShift || newDoctorForm.morningShift || '10:00 AM - 02:00 PM',
           eveningShift: doc.eveningShift || newDoctorForm.eveningShift || '05:00 PM - 08:00 PM',
-          staffUsername: newDoctorForm.staffUsername.trim(),
+          staffUsername: hospitalBaseId,
           staffPassword: newDoctorForm.staffPassword.trim() || 'hospital123',
           profilePic: doc.profilePic?.trim() ? doc.profilePic.trim() : defaultPic,
           clinicImages: newDoctorForm.clinicImages || ['', ''],
@@ -504,13 +517,26 @@ export const SuperAdminDashboard: React.FC = () => {
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
-  const filteredDoctors = doctors.filter((doc) => {
+  // Group Doctors by Hospital / Clinic ID
+  const hospitalGroups = Array.from(
+    new Set(doctors.map((d) => d.hospitalId || d.clinicName))
+  ).map((groupKey) => {
+    const groupDocs = doctors.filter(
+      (d) => (d.hospitalId || d.clinicName) === groupKey
+    );
+    return {
+      groupKey,
+      firstDoc: groupDocs[0],
+      doctors: groupDocs,
+    };
+  }).filter((group) => {
+    if (!doctorSearch.trim()) return true;
     const q = doctorSearch.toLowerCase();
     return (
-      doc.name.toLowerCase().includes(q) ||
-      doc.clinicName.toLowerCase().includes(q) ||
-      doc.specialty.toLowerCase().includes(q) ||
-      doc.staffUsername.toLowerCase().includes(q)
+      group.firstDoc?.clinicName.toLowerCase().includes(q) ||
+      group.firstDoc?.city.toLowerCase().includes(q) ||
+      group.firstDoc?.staffUsername.toLowerCase().includes(q) ||
+      group.doctors.some((d) => d.name.toLowerCase().includes(q) || d.specialty.toLowerCase().includes(q))
     );
   });
 
@@ -593,7 +619,7 @@ export const SuperAdminDashboard: React.FC = () => {
             }`}
           >
             <Building className="h-3.5 w-3.5 text-blue-400" />
-            <span>Doctor Pages & Staff IDs ({doctors.length})</span>
+            <span>Hospitals & Doctor Directory ({hospitalGroups.length} Establishments)</span>
           </button>
 
           <button
@@ -757,165 +783,262 @@ export const SuperAdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* TAB 2: DOCTOR CLINICS & STAFF CREDENTIALS */}
+        {/* TAB 2: HIERARCHICAL FOLDER VIEW (Hospital -> Doctor -> Patients) */}
         {adminTab === 'DOCTORS' && (
-          <div className="rounded-3xl bg-white border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-5 border-b border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="space-y-4">
+            <div className="rounded-3xl bg-white border border-slate-200 shadow-sm p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
                 <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
                   <Building className="h-5 w-5 text-blue-600" />
-                  <span>Doctor Clinics & Staff Credentials Directory</span>
+                  <span>Hospital & Doctor Directory (Organized Hierarchy)</span>
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Manage doctor pages, staff ID/password credentials, and Razorpay API links
+                  Hospital par click karke doctors list dekhein, aur doctor par click karke unke patients ki live queue dekhein
                 </p>
               </div>
 
-              <div className="relative w-full sm:w-64">
+              <div className="relative w-full sm:w-72">
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                 <input
                   type="text"
                   value={doctorSearch}
                   onChange={(e) => setDoctorSearch(e.target.value)}
-                  placeholder="Doctor ya clinic dhoondhein..."
+                  placeholder="Hospital, doctor ya shahar dhoondhein..."
                   className="w-full rounded-xl border border-slate-300 pl-9 pr-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none"
                 />
               </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] tracking-wider border-b border-slate-200">
-                  <tr>
-                    <th className="py-3 px-4 font-bold">Doctor & Clinic</th>
-                    <th className="py-3 px-4 font-bold">Status</th>
-                    <th className="py-3 px-4 font-bold">Staff ID & Password</th>
-                    <th className="py-3 px-4 font-bold">Razorpay API</th>
-                    <th className="py-3 px-4 font-bold">Patients Seen</th>
-                    <th className="py-3 px-4 font-bold text-right">Quick Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredDoctors.map((doc) => {
-                    const docPatients = patients.filter((p) => p.doctorId === doc.id);
-                    const completed = docPatients.filter((p) => p.status === 'COMPLETED').length;
-                    const isPassVisible = showPasswords[doc.id] || false;
+            {/* LEVEL 1: HOSPITALS & CLINICS ACCORDION LIST */}
+            {hospitalGroups.length === 0 ? (
+              <div className="rounded-3xl bg-white border border-slate-200 p-8 text-center text-slate-500 text-sm">
+                Koi Hospital ya Clinic nahi mila.
+              </div>
+            ) : (
+              hospitalGroups.map(({ groupKey, firstDoc, doctors: groupDocs }) => {
+                const isExpanded = expandedHospital === groupKey;
+                const totalHospPatients = patients.filter((p) =>
+                  groupDocs.some((d) => d.id === p.doctorId)
+                );
+                const isHospital = groupDocs.length > 1 || firstDoc?.establishmentType === 'HOSPITAL';
 
-                    return (
-                      <tr key={doc.id} className="hover:bg-slate-50/60 transition">
-                        <td className="py-3.5 px-4">
-                          <div className="flex items-center gap-3">
-                            <img
-                              src={doc.profilePic || ''}
-                              alt={doc.name}
-                              className="h-10 w-10 rounded-xl object-cover border border-slate-200"
-                            />
-                            <div>
-                              <div className="font-bold text-slate-900 text-sm">{doc.name}</div>
-                              <div className="text-slate-500 text-[11px]">{doc.clinicName} ({doc.cabinNumber})</div>
-                              <div className="text-blue-600 text-[10px]">{doc.specialty} • {doc.city}</div>
-                            </div>
-                          </div>
-                        </td>
-
-                        <td className="py-3.5 px-4">
-                          <span
-                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                              doc.status === 'AVAILABLE'
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : doc.status === 'LUNCH'
-                                ? 'bg-amber-100 text-amber-800'
-                                : doc.status === 'SURGERY'
-                                ? 'bg-rose-100 text-rose-800'
-                                : 'bg-slate-100 text-slate-600'
-                            }`}
-                          >
-                            <span className="h-1.5 w-1.5 rounded-full bg-current"></span>
-                            {doc.status}
-                          </span>
-                        </td>
-
-                        <td className="py-3.5 px-4">
-                          <div className="rounded-lg bg-slate-50 border border-slate-200 p-2 space-y-1 font-mono text-[11px]">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-slate-500 font-sans text-[10px]">ID:</span>
-                              <span className="font-bold text-slate-800">{doc.staffUsername}</span>
-                              <button
-                                type="button"
-                                onClick={() => copyToClipboard(doc.staffUsername, `user-${doc.id}`)}
-                                className="text-slate-400 hover:text-slate-600 cursor-pointer"
-                                title="Copy username"
-                              >
-                                {copiedKey === `user-${doc.id}` ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
-                              </button>
-                            </div>
-                            <div className="flex items-center justify-between gap-2 border-t border-slate-200/60 pt-1">
-                              <span className="text-slate-500 font-sans text-[10px]">Pass:</span>
-                              <span className="font-bold text-slate-800">
-                                {isPassVisible ? doc.staffPassword : '••••••••'}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => setShowPasswords({ ...showPasswords, [doc.id]: !isPassVisible })}
-                                className="text-slate-400 hover:text-slate-600 cursor-pointer"
-                                title="Toggle password view"
-                              >
-                                {isPassVisible ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                              </button>
-                            </div>
-                          </div>
-                        </td>
-
-                        <td className="py-3.5 px-4">
-                          <div className="space-y-0.5">
-                            <span className="inline-flex items-center gap-1 rounded bg-blue-50 text-blue-700 px-2 py-0.5 font-mono text-[10px] font-bold border border-blue-200">
-                              <CreditCard className="h-3 w-3" />
-                              {doc.razorpayKeyId || 'rzp_test_live'}
-                            </span>
-                            <span className="block text-[10px] text-slate-500">
-                              {doc.razorpayAccountType || 'PLATFORM_SPLIT'}
+                return (
+                  <div
+                    key={groupKey}
+                    className="rounded-3xl bg-white border border-slate-200 shadow-sm overflow-hidden transition-all"
+                  >
+                    {/* LEVEL 1: HOSPITAL HEADER BAR (Clickable) */}
+                    <div
+                      onClick={() => setExpandedHospital(isExpanded ? null : groupKey)}
+                      className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer hover:bg-slate-50/80 transition select-none"
+                    >
+                      <div className="flex items-center gap-3.5">
+                        <div className={`h-12 w-12 rounded-2xl flex items-center justify-center font-black text-xl shrink-0 ${
+                          isHospital
+                            ? 'bg-blue-50 border border-blue-200 text-blue-600'
+                            : 'bg-emerald-50 border border-emerald-200 text-emerald-600'
+                        }`}>
+                          {isHospital ? '🏥' : '🩺'}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="font-black text-slate-900 text-base">
+                              {firstDoc?.clinicName}
+                            </h4>
+                            <span className={`rounded-full text-[10px] font-bold px-2.5 py-0.5 border ${
+                              isHospital
+                                ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            }`}>
+                              {isHospital ? `Hospital (${groupDocs.length} Doctors / Cabins)` : 'Private Clinic'}
                             </span>
                           </div>
-                        </td>
-
-                        <td className="py-3.5 px-4">
-                          <div className="font-bold text-slate-900">{completed} seen</div>
-                          <div className="text-[10px] text-slate-500">
-                            {docPatients.length} total registered
+                          <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap">
+                            <span>ID: <strong className="font-mono text-slate-700">{firstDoc?.staffUsername}</strong></span>
+                            <span>•</span>
+                            <span>{firstDoc?.city}</span>
+                            <span>•</span>
+                            <span>{firstDoc?.address}</span>
                           </div>
-                        </td>
+                        </div>
+                      </div>
 
-                        <td className="py-3.5 px-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                staffLogin(doc.staffUsername, doc.staffPassword);
-                                setCurrentView('STAFF');
-                              }}
-                              className="rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1.5 text-xs font-bold transition cursor-pointer"
-                            >
-                              Staff Desk
-                            </button>
+                      <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                        <span className="text-xs font-bold text-emerald-800 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+                          {totalHospPatients.length} Total Patients
+                        </span>
 
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedDoctorId(doc.id);
-                                setCurrentView('PUBLIC');
-                              }}
-                              className="rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 px-2.5 py-1.5 text-xs font-bold transition cursor-pointer"
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-xl border border-slate-200">
+                          <span>{isExpanded ? 'Hide Cabins' : 'View Cabins'}</span>
+                          {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* LEVEL 2: DOCTORS LIST INSIDE THIS HOSPITAL */}
+                    {isExpanded && (
+                      <div className="border-t border-slate-200 bg-slate-50/70 p-4 sm:p-5 space-y-4">
+                        <div className="flex items-center justify-between text-xs text-slate-500 font-bold uppercase tracking-wider px-1">
+                          <span>Cabins & Doctors in this Facility ({groupDocs.length})</span>
+                          <span>Staff Login: {firstDoc?.staffUsername} / {firstDoc?.staffPassword}</span>
+                        </div>
+
+                        {groupDocs.map((doc) => {
+                          const docPatients = patients.filter((p) => p.doctorId === doc.id);
+                          const isViewingPatients = selectedDoctorForPatients === doc.id;
+                          const completed = docPatients.filter((p) => p.status === 'COMPLETED').length;
+                          const isPassVisible = showPasswords[doc.id] || false;
+
+                          return (
+                            <div
+                              key={doc.id}
+                              className="rounded-2xl bg-white border border-slate-200 p-4 shadow-2xs space-y-3"
                             >
-                              Public Page
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                                <div className="flex items-center gap-3">
+                                  <img
+                                    src={doc.profilePic || ''}
+                                    alt={doc.name}
+                                    className="h-11 w-11 rounded-xl object-cover border border-slate-200 shrink-0"
+                                  />
+                                  <div>
+                                    <div className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                                      <span>{doc.name}</span>
+                                      <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-md">
+                                        {doc.cabinNumber}
+                                      </span>
+                                      <span
+                                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.2 text-[9px] font-bold ${
+                                          doc.status === 'AVAILABLE'
+                                            ? 'bg-emerald-100 text-emerald-800'
+                                            : 'bg-amber-100 text-amber-800'
+                                        }`}
+                                      >
+                                        ● {doc.status}
+                                      </span>
+                                    </div>
+                                    <div className="text-xs text-slate-500 mt-0.5">
+                                      {doc.specialty} • {doc.degree} • Shift: {doc.morningShift} & {doc.eveningShift}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setSelectedDoctorForPatients(isViewingPatients ? null : doc.id)
+                                    }
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer border flex items-center gap-1.5 ${
+                                      isViewingPatients
+                                        ? 'bg-slate-900 text-white border-slate-900'
+                                        : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                                    }`}
+                                  >
+                                    <Users className="h-3.5 w-3.5 text-blue-500" />
+                                    <span>{docPatients.length} Patients ({completed} Seen)</span>
+                                    {isViewingPatients ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      staffLogin(doc.staffUsername, doc.staffPassword);
+                                      setCurrentView('STAFF');
+                                    }}
+                                    className="rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 px-3 py-1.5 text-xs font-bold transition cursor-pointer"
+                                  >
+                                    Staff Desk
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedDoctorId(doc.id);
+                                      setCurrentView('PUBLIC');
+                                    }}
+                                    className="rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 text-xs font-bold transition cursor-pointer"
+                                  >
+                                    Public Page
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* LEVEL 3: PATIENT QUEUE UNDER THIS SPECIFIC DOCTOR */}
+                              {isViewingPatients && (
+                                <div className="mt-3 pt-3 border-t border-slate-100 overflow-x-auto">
+                                  <div className="text-xs font-bold text-slate-700 mb-2 flex items-center justify-between">
+                                    <span>Mareezon ki List ({doc.name} - {doc.cabinNumber}):</span>
+                                    <span className="text-[11px] text-slate-500">Live Queue Status</span>
+                                  </div>
+
+                                  {docPatients.length === 0 ? (
+                                    <div className="text-center py-4 text-xs text-slate-400 italic bg-slate-50 rounded-xl">
+                                      Abhi is cabin/doctor ke paas koi registered patient nahi hai.
+                                    </div>
+                                  ) : (
+                                    <table className="w-full text-left text-xs bg-slate-50/50 rounded-xl overflow-hidden">
+                                      <thead className="bg-slate-100 text-slate-600 uppercase text-[10px] tracking-wider border-b border-slate-200">
+                                        <tr>
+                                          <th className="py-2.5 px-3 font-bold">Token #</th>
+                                          <th className="py-2.5 px-3 font-bold">Patient Name</th>
+                                          <th className="py-2.5 px-3 font-bold">Mobile</th>
+                                          <th className="py-2.5 px-3 font-bold">Booking Type</th>
+                                          <th className="py-2.5 px-3 font-bold">Payment</th>
+                                          <th className="py-2.5 px-3 font-bold text-right">Queue Status</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-slate-100">
+                                        {docPatients.map((p) => (
+                                          <tr key={p.id} className="hover:bg-white transition">
+                                            <td className="py-2 px-3 font-mono font-bold text-blue-600">
+                                              #{p.tokenNumber}
+                                            </td>
+                                            <td className="py-2 px-3 font-bold text-slate-800">{p.name}</td>
+                                            <td className="py-2 px-3 text-slate-600">{p.mobile || 'N/A'}</td>
+                                            <td className="py-2 px-3">
+                                              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-700">
+                                                {p.bookingType}
+                                              </span>
+                                            </td>
+                                            <td className="py-2 px-3">
+                                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                                                p.paymentStatus === 'PAID'
+                                                  ? 'bg-emerald-100 text-emerald-800'
+                                                  : 'bg-slate-200 text-slate-700'
+                                              }`}>
+                                                {p.paymentStatus}
+                                              </span>
+                                            </td>
+                                            <td className="py-2 px-3 text-right">
+                                              <span
+                                                className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                                                  p.status === 'COMPLETED'
+                                                    ? 'bg-emerald-100 text-emerald-800'
+                                                    : p.status === 'IN_CABIN'
+                                                    ? 'bg-blue-100 text-blue-800'
+                                                    : 'bg-amber-100 text-amber-800'
+                                                }`}
+                                              >
+                                                {p.status}
+                                              </span>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
         )}
 
