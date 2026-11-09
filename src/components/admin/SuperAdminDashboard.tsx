@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useClinic } from '../../context/ClinicContext';
 import { calculatePlatformAnalytics } from '../../utils/queueLogic';
 import { voiceBot } from '../../utils/voiceBot';
@@ -76,7 +76,7 @@ export const SuperAdminDashboard: React.FC = () => {
   // Custom Tag Input State
   const [customTagInput, setCustomTagInput] = useState('');
 
-  // New Doctor Form State
+  // New Doctor Form State (Separate address and city)
   const [newDoctorForm, setNewDoctorForm] = useState({
     name: '',
     degree: '',
@@ -120,6 +120,49 @@ export const SuperAdminDashboard: React.FC = () => {
       morningShift: '10:00 AM - 02:00 PM',
       eveningShift: '05:00 PM - 08:00 PM',
     },
+  ]);
+
+  // SMART USERNAME AUTO-GENERATOR (Uses ONLY separate clean City)
+  useEffect(() => {
+    const cleanCity = newDoctorForm.city
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]/g, '');
+
+    const cleanClinic = newDoctorForm.clinicName
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '');
+
+    if (establishmentType === 'CLINIC') {
+      const cleanDoc = newDoctorForm.name
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '');
+
+      // Dr. Name_Clinic Name_City
+      const parts = [cleanDoc, cleanClinic, cleanCity].filter(Boolean);
+      const generated = parts.join('_');
+      if (generated) {
+        setNewDoctorForm((prev) => ({ ...prev, staffUsername: generated }));
+      }
+    } else {
+      // Hospital Name_City
+      const parts = [cleanClinic, cleanCity].filter(Boolean);
+      const generated = parts.join('_');
+      if (generated) {
+        setNewDoctorForm((prev) => ({ ...prev, staffUsername: generated }));
+      }
+    }
+  }, [
+    establishmentType,
+    newDoctorForm.name,
+    newDoctorForm.clinicName,
+    newDoctorForm.city,
   ]);
 
   // Unique Username Check Helper
@@ -319,6 +362,10 @@ export const SuperAdminDashboard: React.FC = () => {
       alert('Kripya Clinic / Hospital ka Naam bharein!');
       return;
     }
+    if (!newDoctorForm.city.trim()) {
+      alert('Kripya City (Shahar) bharein!');
+      return;
+    }
     if (!newDoctorForm.staffUsername.trim()) {
       alert('Kripya Reception / Staff ID bharein!');
       return;
@@ -345,6 +392,11 @@ export const SuperAdminDashboard: React.FC = () => {
       razorpayAccountType: 'PLATFORM_SPLIT' as 'DIRECT' | 'PLATFORM_SPLIT',
     };
 
+    // Public Display Address Combine Format: "Address, City"
+    const formattedPublicAddress = newDoctorForm.address.trim()
+      ? `${newDoctorForm.address.trim()}, ${newDoctorForm.city.trim()}`
+      : newDoctorForm.city.trim();
+
     if (establishmentType === 'CLINIC') {
       if (!newDoctorForm.name.trim()) {
         alert('Kripya Doctor ka Naam bharein!');
@@ -356,6 +408,8 @@ export const SuperAdminDashboard: React.FC = () => {
       addNewDoctor({
         ...newDoctorForm,
         ...autoRazorpayData,
+        address: formattedPublicAddress,
+        city: newDoctorForm.city.trim(),
         cabinNumber: 'Chamber',
         tags: newDoctorForm.tags || [],
         profilePic: picToSave,
@@ -375,6 +429,8 @@ export const SuperAdminDashboard: React.FC = () => {
         addNewDoctor({
           ...newDoctorForm,
           ...autoRazorpayData,
+          address: formattedPublicAddress,
+          city: newDoctorForm.city.trim(),
           name: doc.name.trim(),
           degree: doc.degree.trim(),
           specialty: doc.specialty.trim(),
@@ -1216,45 +1272,48 @@ export const SuperAdminDashboard: React.FC = () => {
                     type="text"
                     required
                     value={newDoctorForm.clinicName}
-                    onChange={(e) => {
-                      const clinicName = e.target.value;
-                      const slug = clinicName.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 8);
-                      const randomSuffix = Math.floor(100 + Math.random() * 900);
-                      setNewDoctorForm((prev) => ({
-                        ...prev,
-                        clinicName,
-                        staffUsername: prev.staffUsername ? prev.staffUsername : (slug ? `desk_${slug}_${randomSuffix}` : ''),
-                      }));
-                    }}
-                    placeholder={establishmentType === 'CLINIC' ? 'e.g. Sanjeevani Heart Clinic' : 'e.g. Amrita Hospital'}
+                    onChange={(e) => setNewDoctorForm({ ...newDoctorForm, clinicName: e.target.value })}
+                    placeholder={establishmentType === 'CLINIC' ? 'e.g. Rai Clinic' : 'e.g. Aditya Hospital'}
                     className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-blue-600 focus:outline-none"
                   />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Address & City *</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Address (Gali / Mohalla / Landmark) *</label>
                     <input
                       type="text"
                       required
                       value={newDoctorForm.address}
                       onChange={(e) => setNewDoctorForm({ ...newDoctorForm, address: e.target.value })}
-                      placeholder="e.g. Rewa Road, Near Bus Stand, Shahdol"
+                      placeholder="e.g. Rewa Road, Near Old Bus Stand"
                       className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-blue-600 focus:outline-none"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Phone / Helpline *</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">City (Shahar) *</label>
                     <input
-                      type="tel"
+                      type="text"
                       required
-                      value={newDoctorForm.phone}
-                      onChange={(e) => setNewDoctorForm({ ...newDoctorForm, phone: e.target.value })}
-                      placeholder="+91 98765 43210"
+                      value={newDoctorForm.city}
+                      onChange={(e) => setNewDoctorForm({ ...newDoctorForm, city: e.target.value })}
+                      placeholder="e.g. Shahdol"
                       className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-blue-600 focus:outline-none"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Phone / Helpline *</label>
+                  <input
+                    type="tel"
+                    required
+                    value={newDoctorForm.phone}
+                    onChange={(e) => setNewDoctorForm({ ...newDoctorForm, phone: e.target.value })}
+                    placeholder="+91 98765 43210"
+                    className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-blue-600 focus:outline-none"
+                  />
                 </div>
 
                 {/* Common Staff / Receptionist Login Credentials */}
@@ -1266,7 +1325,7 @@ export const SuperAdminDashboard: React.FC = () => {
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <label className="block text-[10px] font-bold text-slate-700">
-                          Receptionist / Staff ID *
+                          Receptionist / Staff ID * (Auto Generated)
                         </label>
                         {newDoctorForm.staffUsername.trim() && (
                           <span
@@ -1288,7 +1347,7 @@ export const SuperAdminDashboard: React.FC = () => {
                           const cleanVal = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '');
                           setNewDoctorForm({ ...newDoctorForm, staffUsername: cleanVal });
                         }}
-                        placeholder="e.g. amrita_desk_101"
+                        placeholder="e.g. dr_ramesh_rai_rai_clinic_shahdol"
                         className={`w-full rounded-xl border px-3 py-1.5 font-mono text-xs font-bold focus:outline-none ${
                           isCurrentUsernameTaken
                             ? 'border-rose-400 bg-rose-50 text-rose-900 focus:border-rose-600'
@@ -1334,7 +1393,7 @@ export const SuperAdminDashboard: React.FC = () => {
                         required
                         value={newDoctorForm.name}
                         onChange={(e) => setNewDoctorForm({ ...newDoctorForm, name: e.target.value })}
-                        placeholder="e.g. Dr. Rajesh Sharma"
+                        placeholder="e.g. Dr. Ramesh Rai"
                         className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs bg-white focus:border-blue-600 focus:outline-none"
                       />
                     </div>
