@@ -1180,7 +1180,7 @@ export const SuperAdminDashboard: React.FC = () => {
                   </label>
                 </div>
               </div>
-
+            </form>
               {/* 2. Common Establishment Info */}
               <div className="space-y-3">
                 <div>
