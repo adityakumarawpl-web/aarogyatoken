@@ -1567,7 +1567,7 @@ export const SuperAdminDashboard: React.FC = () => {
                       ))}
                   </div>
                 </div>
-                )}
+                }
 
                 {/* Custom Tag Input */}
                 <div className="flex gap-2 pt-1">
