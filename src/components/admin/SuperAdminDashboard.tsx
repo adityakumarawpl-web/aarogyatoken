@@ -1512,11 +1512,23 @@ export const SuperAdminDashboard: React.FC = () => {
                   </span>
                 </div>
 
+                {/* SMART AUTO-TAGS BLOCK */}
+              <div className="rounded-2xl bg-indigo-50/70 border border-indigo-200 p-3.5 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-indigo-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="h-4 w-4 text-indigo-600" />
+                    <span>Search Keywords & Tags (सर्च टैग्स)</span>
+                  </span>
+                  <span className="text-[10px] text-indigo-700 font-semibold bg-indigo-100 px-2 py-0.5 rounded-full">
+                    Auto Generated
+                  </span>
+                </div>
+
                 {/* Selected Active Tags (Chips) */}
                 <div className="flex flex-wrap gap-1.5 min-h-[28px]">
-                  {newDoctorForm.tags.length === 0 ? (
+                  {(!newDoctorForm.tags || newDoctorForm.tags.length === 0) ? (
                     <span className="text-[11px] text-slate-400 italic">
-                      Abhi koi tag add nahi hai. Niche suggest kiye gaye tags par click karein.
+                      Abhi koi tag add nahi hai. Niche suggestions par click karein ya apna tag likhein.
                     </span>
                   ) : (
                     newDoctorForm.tags.map((tag) => (
@@ -1542,32 +1554,50 @@ export const SuperAdminDashboard: React.FC = () => {
                   )}
                 </div>
 
-{/* Auto Suggestions Bar (Always shows popular + specialty matches) */}
+                {/* Auto Suggestions Bar (Har haal mein suggestions dikhenge) */}
                 <div className="pt-1.5 border-t border-indigo-200/60">
-                  <span className="block text-[10px] font-bold text-indigo-700 uppercase tracking-wider mb-1">
+                  <span className="block text-[10px] font-bold text-indigo-700 uppercase tracking-wider mb-1.5">
                     ✨ Auto-Suggested (Click karke add karein):
                   </span>
                   <div className="flex flex-wrap gap-1.5">
-                    {getAutoTagSuggestions(newDoctorForm.specialty || '', newDoctorForm.city || '', newDoctorForm.name || '')
-                      .filter((tag) => !newDoctorForm.tags?.includes(tag))
-                      .map((suggestedTag) => (
-                        <button
-                          key={suggestedTag}
-                          type="button"
-                          onClick={() =>
-                            setNewDoctorForm({
-                              ...newDoctorForm,
-                              tags: [...(newDoctorForm.tags || []), suggestedTag],
-                            })
-                          }
-                          className="text-[10px] bg-white border border-indigo-300 text-indigo-800 font-semibold px-2 py-0.5 rounded-md hover:bg-indigo-100 transition cursor-pointer"
-                        >
-                          + {suggestedTag}
-                        </button>
-                      ))}
+                    {(() => {
+                      // Active specialty nikalna (Clinic ya Hospital se)
+                      const currentSpecialty =
+                        establishmentType === 'CLINIC'
+                          ? newDoctorForm.specialty
+                          : (hospitalDoctors[0]?.specialty || newDoctorForm.specialty || '');
+
+                      const currentDocName =
+                        establishmentType === 'CLINIC'
+                          ? newDoctorForm.name
+                          : (hospitalDoctors[0]?.name || newDoctorForm.name || '');
+
+                      const suggested = getAutoTagSuggestions(
+                        currentSpecialty || 'General',
+                        newDoctorForm.city || '',
+                        currentDocName || ''
+                      );
+
+                      return suggested
+                        .filter((tag) => !(newDoctorForm.tags || []).includes(tag))
+                        .map((suggestedTag) => (
+                          <button
+                            key={suggestedTag}
+                            type="button"
+                            onClick={() =>
+                              setNewDoctorForm((prev) => ({
+                                ...prev,
+                                tags: [...(prev.tags || []), suggestedTag],
+                              }))
+                            }
+                            className="text-[11px] bg-white border border-indigo-300 text-indigo-900 font-semibold px-2.5 py-1 rounded-lg hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition cursor-pointer shadow-2xs"
+                          >
+                            + {suggestedTag}
+                          </button>
+                        ));
+                    })()}
                   </div>
                 </div>
-                
 
                 {/* Custom Tag Input */}
                 <div className="flex gap-2 pt-1">
@@ -1578,30 +1608,32 @@ export const SuperAdminDashboard: React.FC = () => {
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
-                        if (customTagInput.trim() && !newDoctorForm.tags.includes(customTagInput.trim())) {
-                          setNewDoctorForm({
-                            ...newDoctorForm,
-                            tags: [...newDoctorForm.tags, customTagInput.trim()],
-                          });
+                        const val = customTagInput.trim();
+                        if (val && !(newDoctorForm.tags || []).includes(val)) {
+                          setNewDoctorForm((prev) => ({
+                            ...prev,
+                            tags: [...(prev.tags || []), val],
+                          }));
                           setCustomTagInput('');
                         }
                       }
                     }}
-                    placeholder="Apna koi keyword likhein aur Enter dabayein..."
+                    placeholder="Apna koi keyword likhein (e.g. Pathri, Sugar) aur Add dabayein..."
                     className="flex-1 rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-indigo-500"
                   />
                   <button
                     type="button"
                     onClick={() => {
-                      if (customTagInput.trim() && !newDoctorForm.tags.includes(customTagInput.trim())) {
-                        setNewDoctorForm({
-                          ...newDoctorForm,
-                          tags: [...newDoctorForm.tags, customTagInput.trim()],
-                        });
+                      const val = customTagInput.trim();
+                      if (val && !(newDoctorForm.tags || []).includes(val)) {
+                        setNewDoctorForm((prev) => ({
+                          ...prev,
+                          tags: [...(prev.tags || []), val],
+                        }));
                         setCustomTagInput('');
                       }
                     }}
-                    className="rounded-xl bg-indigo-600 text-white px-3 py-1.5 text-xs font-bold hover:bg-indigo-700 transition cursor-pointer"
+                    className="rounded-xl bg-indigo-600 text-white px-3.5 py-1.5 text-xs font-bold hover:bg-indigo-700 transition cursor-pointer"
                   >
                     Add
                   </button>
