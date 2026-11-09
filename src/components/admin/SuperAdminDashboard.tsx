@@ -1542,32 +1542,31 @@ export const SuperAdminDashboard: React.FC = () => {
                   )}
                 </div>
 
-                {/* Auto Suggestions Bar (Click to Add) */}
-                {newDoctorForm.specialty && (
-                  <div className="pt-1.5 border-t border-indigo-200/60">
-                    <span className="block text-[10px] font-bold text-indigo-700 uppercase tracking-wider mb-1">
-                      ✨ Auto-Suggested (Click karke add karein):
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {getAutoTagSuggestions(newDoctorForm.specialty, newDoctorForm.city, newDoctorForm.name)
-                        .filter((tag) => !newDoctorForm.tags.includes(tag))
-                        .map((suggestedTag) => (
-                          <button
-                            key={suggestedTag}
-                            type="button"
-                            onClick={() =>
-                              setNewDoctorForm({
-                                ...newDoctorForm,
-                                tags: [...newDoctorForm.tags, suggestedTag],
-                              })
-                            }
-                            className="text-[10px] bg-white border border-indigo-300 text-indigo-800 font-semibold px-2 py-0.5 rounded-md hover:bg-indigo-100 transition cursor-pointer"
-                          >
-                            + {suggestedTag}
-                          </button>
-                        ))}
-                    </div>
+{/* Auto Suggestions Bar (Always shows popular + specialty matches) */}
+                <div className="pt-1.5 border-t border-indigo-200/60">
+                  <span className="block text-[10px] font-bold text-indigo-700 uppercase tracking-wider mb-1">
+                    ✨ Auto-Suggested (Click karke add karein):
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {getAutoTagSuggestions(newDoctorForm.specialty || '', newDoctorForm.city || '', newDoctorForm.name || '')
+                      .filter((tag) => !newDoctorForm.tags?.includes(tag))
+                      .map((suggestedTag) => (
+                        <button
+                          key={suggestedTag}
+                          type="button"
+                          onClick={() =>
+                            setNewDoctorForm({
+                              ...newDoctorForm,
+                              tags: [...(newDoctorForm.tags || []), suggestedTag],
+                            })
+                          }
+                          className="text-[10px] bg-white border border-indigo-300 text-indigo-800 font-semibold px-2 py-0.5 rounded-md hover:bg-indigo-100 transition cursor-pointer"
+                        >
+                          + {suggestedTag}
+                        </button>
+                      ))}
                   </div>
+                </div>
                 )}
 
                 {/* Custom Tag Input */}
