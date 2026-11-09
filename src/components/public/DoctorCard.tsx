@@ -35,7 +35,6 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
 
   // Smart Live Display Calculation: Doctor status + Queue Token
   const getLiveServingDetails = () => {
-    // 1. Agar Doctor AVAILABLE nahi hai toh status text show hoga
     if (doctor.status === 'LUNCH') {
       return {
         displayText: 'Lunch Break',
@@ -58,10 +57,8 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
       };
     }
 
-    // 2. Doctor AVAILABLE hone par: Token ya Ready (Dono Green)
     const todayStr = new Date().toISOString().split('T')[0];
 
-    // Cabin me andar patient
     const inCabinPatient = patients.find(
       (p) => p.doctorId === doctor.id && p.status === 'IN_CABIN'
     );
@@ -73,7 +70,6 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
       };
     }
 
-    // Waiting queue me pehla active patient
     const activeWaiting = patients
       .filter((p) => {
         const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
@@ -98,7 +94,6 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
       };
     }
 
-    // Agar queue poori khali hai
     return {
       displayText: 'Ready',
       textColor: 'text-emerald-600 drop-shadow-[0_0_8px_rgba(16,185,129,0.3)]',
@@ -112,30 +107,30 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
     switch (doctor.status) {
       case 'AVAILABLE':
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 border border-emerald-200 shrink-0">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-800 border border-emerald-300 shrink-0 whitespace-nowrap shadow-2xs">
             <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping"></span>
-            <span>🟢 Available (OPD Open)</span>
+            <span>Available (OPD Open)</span>
           </span>
         );
       case 'LUNCH':
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700 border border-amber-200 shrink-0">
-            <Clock className="h-3.5 w-3.5 text-amber-600" />
-            <span>🟡 In Lunch (Lunch Break)</span>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-800 border border-amber-300 shrink-0 whitespace-nowrap shadow-2xs">
+            <Clock className="h-3 w-3 text-amber-600" />
+            <span>In Lunch</span>
           </span>
         );
       case 'SURGERY':
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700 border border-rose-200 shrink-0">
-            <Activity className="h-3.5 w-3.5 text-rose-600" />
-            <span>🔴 In Surgery (In OT)</span>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-800 border border-rose-300 shrink-0 whitespace-nowrap shadow-2xs">
+            <Activity className="h-3 w-3 text-rose-600" />
+            <span>In Surgery</span>
           </span>
         );
       case 'LEAVE':
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600 border border-slate-300 shrink-0">
-            <AlertTriangle className="h-3.5 w-3.5 text-slate-500" />
-            <span>⚪ On Leave (Unavailable)</span>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-700 border border-slate-300 shrink-0 whitespace-nowrap shadow-2xs">
+            <AlertTriangle className="h-3 w-3 text-slate-500" />
+            <span>On Leave</span>
           </span>
         );
     }
@@ -154,7 +149,6 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
         const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
         const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim().toLowerCase();
 
-        // Strictly check appointment date & current shift
         if (pDate !== todayDateStr || pShift !== activeShift) return false;
 
         const q = tokenSearchQuery.toLowerCase().trim();
@@ -166,28 +160,36 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
 
   return (
     <div className="group rounded-3xl bg-white border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col justify-between">
-      {/* Top Details */}
-      <div className="p-6">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3.5">
+      {/* Top Details Section */}
+      <div className="p-5 sm:p-6 space-y-4">
+        {/* DOCTOR PROFILE + STATUS HEADER (FIXED OVERLAP: Flex Wrap & min-w-0) */}
+        <div className="flex items-start justify-between gap-3 flex-wrap sm:flex-nowrap">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
             <img
-              src={doctor.profilePic || ''}
+              src={doctor.profilePic || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=300'}
               alt={doctor.name}
-              className="h-16 w-16 rounded-2xl object-cover border-2 border-slate-100 shadow-xs group-hover:scale-105 transition-transform"
+              className="h-14 w-14 rounded-2xl object-cover border-2 border-slate-100 shadow-xs shrink-0"
             />
-            <div>
-              <h3 className="font-extrabold text-slate-900 text-lg group-hover:text-blue-600 transition-colors">
+            <div className="min-w-0 flex-1">
+              <h3 className="font-black text-slate-900 text-base leading-tight truncate">
                 {doctor.name}
               </h3>
-              <p className="text-xs text-blue-600 font-semibold">{doctor.degree}</p>
-              <p className="text-xs text-slate-500 mt-0.5">{doctor.specialty}</p>
+              <p className="text-xs text-blue-600 font-bold mt-0.5 truncate">
+                {doctor.degree}
+              </p>
+              <p className="text-[11px] text-slate-500 truncate" title={doctor.specialty}>
+                {doctor.specialty?.startsWith('http') ? 'Specialist' : doctor.specialty}
+              </p>
             </div>
           </div>
-          {getStatusBadge()}
+
+          <div className="shrink-0 self-start">
+            {getStatusBadge()}
+          </div>
         </div>
 
-        {/* 🔍 STATUS KE THEEK NICHE: KNOW YOUR TOKEN SEARCH BOX */}
-        <div className="mt-4 rounded-2xl bg-slate-50 border border-slate-200 p-3 space-y-2">
+        {/* 🔍 KNOW YOUR TOKEN SEARCH BOX */}
+        <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3 space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
               <Search className="h-3 w-3 text-blue-600" />
@@ -234,7 +236,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
                       <span className="font-mono font-black text-blue-600 text-xs bg-blue-50 px-2 py-1 rounded-md border border-blue-200 shrink-0">
                         #{p.tokenNumber}
                       </span>
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <div className="font-bold text-xs text-slate-900 truncate">
                           {p.name}
                         </div>
@@ -263,18 +265,18 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
         </div>
 
         {/* Clinic info */}
-        <div className="mt-4 rounded-2xl bg-slate-50 p-3.5 border border-slate-100 space-y-1.5 text-xs text-slate-600">
-          <div className="font-bold text-slate-800 flex items-center gap-1.5">
-            <Stethoscope className="h-4 w-4 text-blue-600" />
-            <span>{doctor.clinicName} • {doctor.cabinNumber}</span>
+        <div className="rounded-2xl bg-slate-50 p-3.5 border border-slate-100 space-y-1.5 text-xs text-slate-600">
+          <div className="font-bold text-slate-800 flex items-center gap-1.5 truncate">
+            <Stethoscope className="h-4 w-4 text-blue-600 shrink-0" />
+            <span className="truncate">{doctor.clinicName} • {doctor.cabinNumber}</span>
           </div>
           <div className="flex items-center gap-1.5 text-slate-500 text-[11px]">
             <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-            <span className="truncate">{doctor.address}, {doctor.city}</span>
+            <span className="truncate">{doctor.address || doctor.city}</span>
           </div>
           <div className="flex items-center gap-1.5 text-slate-500 text-[11px]">
             <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-            <span>{doctor.timings}</span>
+            <span className="truncate">{doctor.timings || `${doctor.morningShift || '10:00 AM - 02:00 PM'} & ${doctor.eveningShift || '05:00 PM - 08:00 PM'}`}</span>
           </div>
         </div>
 
@@ -289,7 +291,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
           if (validImages.length === 0) return null;
 
           return (
-            <div className="mt-4">
+            <div>
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
                 Clinic Photos
               </span>
@@ -307,8 +309,8 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
           );
         })()}
 
-        {/* LIVE TOKEN / DOCTOR STATUS DISPLAY BOX (Dark White Theme) */}
-        <div className="mt-5 rounded-2xl bg-slate-100/90 border border-slate-300/80 p-4 text-center shadow-inner relative overflow-hidden">
+        {/* LIVE TOKEN / DOCTOR STATUS DISPLAY BOX */}
+        <div className="rounded-2xl bg-slate-100/90 border border-slate-300/80 p-4 text-center shadow-inner relative overflow-hidden">
           <span className="text-[11px] uppercase font-bold text-slate-500 tracking-wider block">
             Current Running Token (Live Token)
           </span>
@@ -327,11 +329,13 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
           type="button"
           disabled={doctor.status === 'LEAVE'}
           onClick={() => onBookOnline(doctor)}
-          className="w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/25 hover:bg-blue-700 transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed group-hover:scale-[1.01]"
+          className="w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/25 hover:bg-blue-700 transition cursor-pointer flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed group-hover:scale-[1.01]"
         >
-          <Sparkles className="h-4 w-4 text-amber-300" />
-          <span>Book Online Token (Instant Token)</span>
-          <span className="rounded-lg bg-blue-700 px-2 py-0.5 text-xs font-extrabold text-white">₹20</span>
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-amber-300" />
+            <span>Book Online Token (Instant Token)</span>
+          </div>
+          <span className="rounded-lg bg-blue-700 px-2 py-0.5 text-xs font-extrabold text-white font-mono">₹20</span>
         </button>
       </div>
     </div>
