@@ -98,7 +98,7 @@ export const SuperAdminDashboard: React.FC = () => {
     timings: '10:00 AM - 02:00 PM & 05:00 PM - 08:00 PM',
     morningShift: '10:00 AM - 02:00 PM',
     eveningShift: '05:00 PM - 08:00 PM',
-    consultationFee: 500,
+    consultationFee: 20,
     staffUsername: '',
     staffPassword: '',
     avgTimePerPatientMinutes: 10,
@@ -128,7 +128,7 @@ export const SuperAdminDashboard: React.FC = () => {
     },
   ]);
 
-  // SMART USERNAME AUTO-GENERATOR (Uses ONLY separate clean City)
+  // SMART USERNAME AUTO-GENERATOR
   useEffect(() => {
     const cleanCity = newDoctorForm.city
       .toLowerCase()
@@ -150,14 +150,12 @@ export const SuperAdminDashboard: React.FC = () => {
         .replace(/_+/g, '_')
         .replace(/^_|_$/g, '');
 
-      // Dr. Name_Clinic Name_City
       const parts = [cleanDoc, cleanClinic, cleanCity].filter(Boolean);
       const generated = parts.join('_');
       if (generated) {
         setNewDoctorForm((prev) => ({ ...prev, staffUsername: generated }));
       }
     } else {
-      // Hospital Name_City
       const parts = [cleanClinic, cleanCity].filter(Boolean);
       const generated = parts.join('_');
       if (generated) {
@@ -390,15 +388,13 @@ export const SuperAdminDashboard: React.FC = () => {
 
     const defaultPic = 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=300';
     
-    // Automatic Razorpay configuration values from platform settings
+    // 🔹 AUTOMATIC IN-BUILT RAZORPAY CONFIGURATION FROM CENTRAL VERCEL ENV
     const autoRazorpayData = {
       razorpayEnabled: true,
-      razorpayKeyId: razorpaySettings.keyId || 'rzp_test_new_doc',
-      razorpayKeySecret: razorpaySettings.keySecret || 'sec_new_doc_live',
+      razorpayKeyId: (import.meta as any).env?.VITE_RAZORPAY_KEY_ID || '',
       razorpayAccountType: 'PLATFORM_SPLIT' as 'DIRECT' | 'PLATFORM_SPLIT',
     };
 
-    // Public Display Address Combine Format: "Address, City"
     const formattedPublicAddress = newDoctorForm.address.trim()
       ? `${newDoctorForm.address.trim()}, ${newDoctorForm.city.trim()}`
       : newDoctorForm.city.trim();
@@ -416,7 +412,7 @@ export const SuperAdminDashboard: React.FC = () => {
         ...newDoctorForm,
         ...autoRazorpayData,
         establishmentType: 'CLINIC',
-        hospitalId: clinicBaseId, // Clinic acts as its own parent
+        hospitalId: clinicBaseId,
         address: formattedPublicAddress,
         city: newDoctorForm.city.trim(),
         cabinNumber: 'Chamber',
@@ -426,7 +422,7 @@ export const SuperAdminDashboard: React.FC = () => {
         morningShift: newDoctorForm.morningShift || '10:00 AM - 02:00 PM',
         eveningShift: newDoctorForm.eveningShift || '05:00 PM - 08:00 PM',
       });
-      setSaveSuccessMsg(`Clinic "${newDoctorForm.clinicName}" created successfully!`);
+      setSaveSuccessMsg(`Clinic "${newDoctorForm.clinicName}" created successfully with in-built Razorpay!`);
     } else {
       const validDoctors = hospitalDoctors.filter((doc) => doc.name.trim());
       if (validDoctors.length === 0) {
@@ -441,7 +437,7 @@ export const SuperAdminDashboard: React.FC = () => {
           ...newDoctorForm,
           ...autoRazorpayData,
           establishmentType: 'HOSPITAL',
-          hospitalId: hospitalBaseId, // Hospital parent link
+          hospitalId: hospitalBaseId,
           address: formattedPublicAddress,
           city: newDoctorForm.city.trim(),
           name: doc.name.trim(),
@@ -490,7 +486,7 @@ export const SuperAdminDashboard: React.FC = () => {
       timings: '10:00 AM - 02:00 PM & 05:00 PM - 08:00 PM',
       morningShift: '10:00 AM - 02:00 PM',
       eveningShift: '05:00 PM - 08:00 PM',
-      consultationFee: 500,
+      consultationFee: 20,
       staffUsername: '',
       staffPassword: '',
       avgTimePerPatientMinutes: 10,
@@ -500,7 +496,7 @@ export const SuperAdminDashboard: React.FC = () => {
   const handleSaveRazorpaySettings = (e: React.FormEvent) => {
     e.preventDefault();
     updateRazorpaySettings(localRazorpaySettings);
-    setSaveSuccessMsg('Razorpay API credentials & payment settings saved successfully!');
+    setSaveSuccessMsg('Razorpay settings saved! (Public checkout will strictly use Vercel Key)');
     setTimeout(() => setSaveSuccessMsg(''), 4000);
   };
 
@@ -509,12 +505,6 @@ export const SuperAdminDashboard: React.FC = () => {
     updateVoiceBotSettings(localVoiceSettings);
     setSaveSuccessMsg('Automatic Call Bot settings & IVR script saved successfully!');
     setTimeout(() => setSaveSuccessMsg(''), 4000);
-  };
-
-  const copyToClipboard = (text: string, key: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedKey(key);
-    setTimeout(() => setCopiedKey(null), 2000);
   };
 
   // Group Doctors by Hospital / Clinic ID
@@ -783,7 +773,7 @@ export const SuperAdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* TAB 2: HIERARCHICAL FOLDER VIEW (Hospital -> Doctor -> Patients) */}
+        {/* TAB 2: HIERARCHICAL FOLDER VIEW */}
         {adminTab === 'DOCTORS' && (
           <div className="space-y-4">
             <div className="rounded-3xl bg-white border border-slate-200 shadow-sm p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -809,7 +799,6 @@ export const SuperAdminDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* LEVEL 1: HOSPITALS & CLINICS ACCORDION LIST */}
             {hospitalGroups.length === 0 ? (
               <div className="rounded-3xl bg-white border border-slate-200 p-8 text-center text-slate-500 text-sm">
                 Koi Hospital ya Clinic nahi mila.
@@ -827,7 +816,6 @@ export const SuperAdminDashboard: React.FC = () => {
                     key={groupKey}
                     className="rounded-3xl bg-white border border-slate-200 shadow-sm overflow-hidden transition-all"
                   >
-                    {/* LEVEL 1: HOSPITAL HEADER BAR (Clickable) */}
                     <div
                       onClick={() => setExpandedHospital(isExpanded ? null : groupKey)}
                       className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer hover:bg-slate-50/80 transition select-none"
@@ -875,7 +863,6 @@ export const SuperAdminDashboard: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* LEVEL 2: DOCTORS LIST INSIDE THIS HOSPITAL */}
                     {isExpanded && (
                       <div className="border-t border-slate-200 bg-slate-50/70 p-4 sm:p-5 space-y-4">
                         <div className="flex items-center justify-between text-xs text-slate-500 font-bold uppercase tracking-wider px-1">
@@ -887,7 +874,6 @@ export const SuperAdminDashboard: React.FC = () => {
                           const docPatients = patients.filter((p) => p.doctorId === doc.id);
                           const isViewingPatients = selectedDoctorForPatients === doc.id;
                           const completed = docPatients.filter((p) => p.status === 'COMPLETED').length;
-                          const isPassVisible = showPasswords[doc.id] || false;
 
                           return (
                             <div
@@ -964,7 +950,6 @@ export const SuperAdminDashboard: React.FC = () => {
                                 </div>
                               </div>
 
-                              {/* LEVEL 3: PATIENT QUEUE UNDER THIS SPECIFIC DOCTOR */}
                               {isViewingPatients && (
                                 <div className="mt-3 pt-3 border-t border-slate-100 overflow-x-auto">
                                   <div className="text-xs font-bold text-slate-700 mb-2 flex items-center justify-between">
@@ -1045,20 +1030,29 @@ export const SuperAdminDashboard: React.FC = () => {
         {/* TAB 3: RAZORPAY PAYMENT GATEWAY SETTINGS */}
         {adminTab === 'RAZORPAY' && (
           <div className="rounded-3xl bg-white border border-slate-200 shadow-sm p-6 sm:p-8 space-y-6">
-            <div className="border-b border-slate-100 pb-4 flex items-center justify-between">
+            <div className="border-b border-slate-100 pb-4 flex items-center justify-between flex-wrap gap-2">
               <div>
                 <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
                   <CreditCard className="h-5 w-5 text-blue-600" />
                   <span>Razorpay API & Payment Gateway Configuration</span>
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Connect your official Razorpay API credentials to accept ₹20 online token payments from patients
+                  Global checkout uses central environment credentials (VITE_RAZORPAY_KEY_ID)
                 </p>
               </div>
               <span className="rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1 border border-emerald-200 flex items-center gap-1.5">
                 <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                <span>Razorpay Gateway Active</span>
+                <span>Central Vercel Key Active</span>
               </span>
+            </div>
+
+            <div className="rounded-2xl bg-blue-50 border border-blue-200 p-4 text-xs text-blue-900 space-y-1">
+              <span className="font-bold flex items-center gap-1.5">
+                ℹ️ Platform Central Key Note:
+              </span>
+              <p>
+                Aapke sabhi doctors aur clinics par ₹20 ka online booking payment direct central Vercel key (<code>VITE_RAZORPAY_KEY_ID</code>) ke through aapke main account me jama hoga. Naye doctor banate waqt alag se Razorpay key bharne ki zaroorat nahi hai.
+              </p>
             </div>
 
             <form onSubmit={handleSaveRazorpaySettings} className="space-y-4 max-w-2xl">
@@ -1074,7 +1068,7 @@ export const SuperAdminDashboard: React.FC = () => {
                     }
                     className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold text-slate-800 focus:border-blue-500 focus:outline-none"
                   >
-                    <option value="test">Test / Sandbox Mode (Recommended for demo)</option>
+                    <option value="test">Test / Sandbox Mode</option>
                     <option value="live">Live Production Mode</option>
                   </select>
                 </div>
@@ -1096,11 +1090,10 @@ export const SuperAdminDashboard: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-700 mb-1">
-                  Razorpay Key ID (Key_ID) *
+                  Razorpay Key ID (Fallback Key)
                 </label>
                 <input
                   type="text"
-                  required
                   value={localRazorpaySettings.keyId}
                   onChange={(e) =>
                     setLocalRazorpaySettings({ ...localRazorpaySettings, keyId: e.target.value })
@@ -1108,16 +1101,14 @@ export const SuperAdminDashboard: React.FC = () => {
                   placeholder="rzp_test_..."
                   className="w-full rounded-xl border border-slate-300 font-mono px-3 py-2 text-xs font-bold text-slate-800 focus:border-blue-500 focus:outline-none"
                 />
-                <span className="text-[10px] text-slate-500">Available from your Razorpay Dashboard → Settings → API Keys</span>
               </div>
 
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-700 mb-1">
-                  Razorpay Key Secret (Key_Secret) *
+                  Razorpay Key Secret (Fallback Secret)
                 </label>
                 <input
                   type="password"
-                  required
                   value={localRazorpaySettings.keySecret}
                   onChange={(e) =>
                     setLocalRazorpaySettings({ ...localRazorpaySettings, keySecret: e.target.value })
@@ -1127,25 +1118,13 @@ export const SuperAdminDashboard: React.FC = () => {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase text-slate-700 mb-1">
-                  Platform Webhook URL (For auto payment status callback)
-                </label>
-                <input
-                  type="text"
-                  readOnly
-                  value="https://api.aarogyatoken.com/api/webhooks/razorpay"
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 font-mono px-3 py-2 text-xs text-slate-600"
-                />
-              </div>
-
               <div className="pt-2">
                 <button
                   type="submit"
                   className="rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-blue-500/20 hover:bg-blue-700 transition cursor-pointer flex items-center gap-2"
                 >
                   <Save className="h-4 w-4" />
-                  <span>Save Razorpay API Configuration</span>
+                  <span>Save Settings</span>
                 </button>
               </div>
             </form>
@@ -1501,7 +1480,7 @@ export const SuperAdminDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* 3A. SINGLE CLINIC DOCTOR SECTION (Cabin field HIDE) */}
+              {/* 3A. SINGLE CLINIC DOCTOR SECTION */}
               {establishmentType === 'CLINIC' && (
                 <div className="space-y-3 p-4 rounded-2xl bg-slate-50 border border-slate-200">
                   <span className="block text-xs font-bold uppercase tracking-wider text-slate-600">
@@ -1591,7 +1570,7 @@ export const SuperAdminDashboard: React.FC = () => {
                         Hospital Doctors & Cabins ({hospitalDoctors.length})
                       </span>
                       <span className="text-[10px] text-slate-500">
-                        Har doctor ke liye cabin aur unki apni profile photo (DP) set karein
+                        Har doctor ke liye cabin aur unki apni profile photo set karein
                       </span>
                     </div>
                     <button
@@ -1712,7 +1691,6 @@ export const SuperAdminDashboard: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Doctor Ki Individual Profile DP */}
                       <div>
                         <label className="block text-[10px] font-bold text-slate-700 mb-1">
                           Doctor Profile Photo (DP URL)
@@ -1734,7 +1712,7 @@ export const SuperAdminDashboard: React.FC = () => {
                 </div>
               )}
 
-              {/* SMART AUTO-TAGS BLOCK (ADMIN ONLY - PUBLIC KO NAHI DIKHEGA) */}
+              {/* SMART AUTO-TAGS BLOCK */}
               <div className="rounded-2xl bg-indigo-50/70 border border-indigo-200 p-3.5 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-indigo-900 uppercase tracking-wider flex items-center gap-1.5">
@@ -1746,7 +1724,6 @@ export const SuperAdminDashboard: React.FC = () => {
                   </span>
                 </div>
 
-                {/* Selected Active Tags (Chips) */}
                 <div className="flex flex-wrap gap-1.5 min-h-[28px]">
                   {(!newDoctorForm.tags || newDoctorForm.tags.length === 0) ? (
                     <span className="text-[11px] text-slate-400 italic">
@@ -1776,7 +1753,6 @@ export const SuperAdminDashboard: React.FC = () => {
                   )}
                 </div>
 
-                {/* Auto Suggestions Bar */}
                 <div className="pt-1.5 border-t border-indigo-200/60">
                   <span className="block text-[10px] font-bold text-indigo-700 uppercase tracking-wider mb-1.5">
                     ✨ Auto-Suggested (Click karke add karein):
@@ -1820,7 +1796,6 @@ export const SuperAdminDashboard: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Custom Tag Input */}
                 <div className="flex gap-2 pt-1">
                   <input
                     type="text"
