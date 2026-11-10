@@ -26,7 +26,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
   const { patients, bookOnlineAppointment, triggerBotCallAlert, razorpaySettings } = useClinic();
 
   const parseTimeToMinutes = (timeStr: string) => {
-    if (!timeStr) return 13 * 60;
+    if (!timeStr) return 13 * 60; // 01:00 PM default cutoff
     const cleanStr = timeStr.trim().toUpperCase();
     const isPM = cleanStr.includes('PM');
     const isAM = cleanStr.includes('AM');
@@ -62,14 +62,17 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
     return false;
   };
 
+  const todayStr = new Date().toISOString().split('T')[0];
+  const initialMorningActive = isMorningShiftActiveForDoctor(todayStr, doctor);
+
   const [step, setStep] = useState<'DETAILS' | 'PAYMENT' | 'SUCCESS'>('DETAILS');
   const [formData, setFormData] = useState({
     name: '',
     mobile: '',
     age: '',
     gender: 'Male' as 'Male' | 'Female' | 'Other',
-    appointmentDate: new Date().toISOString().split('T')[0],
-    selectedShift: 'Morning',
+    appointmentDate: todayStr,
+    selectedShift: initialMorningActive ? 'Morning' : 'Evening', // 👈 Smart default based on current time
     address: '',
     complaint: '',
   });
@@ -102,7 +105,11 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
     return num > max ? num : max;
   }, 0) + 1;
 
-  const activeRazorpayKey = doctor.razorpayKeyId || razorpaySettings.keyId;
+  // 🔹 PRIORITY 1: Central Vercel Key, PRIORITY 2: Doctor Key, PRIORITY 3: Razorpay Settings
+  const activeRazorpayKey =
+    (import.meta as any).env?.VITE_RAZORPAY_KEY_ID ||
+    doctor.razorpayKeyId ||
+    razorpaySettings.keyId;
 
   const handleDetailsSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,18 +134,25 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
     name: string;
     tokenNumber: number;
     doctorName: string;
+    clinicName: string;
   }) => {
     try {
+      const cleanPhone = patientData.phone.replace(/\D/g, '');
+      const formattedPhone = cleanPhone.startsWith('91') && cleanPhone.length === 12
+        ? cleanPhone
+        : `91${cleanPhone.slice(-10)}`;
+
       const response = await fetch('/api/send-whatsapp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          phone: '91' + patientData.phone,
+          phone: formattedPhone,
           patientName: patientData.name,
-          tokenNumber: patientData.tokenNumber,
           doctorName: patientData.doctorName,
+          tokenNumber: `#${patientData.tokenNumber}`,
+          clinicName: patientData.clinicName,
         }),
       });
 
@@ -146,10 +160,10 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
       if (response.ok) {
         console.log('WhatsApp message sent successfully:', result);
       } else {
-        console.error('Failed to send WhatsApp:', result);
+        console.warn('WhatsApp API Response:', result);
       }
     } catch (err) {
-      console.error('Error triggering WhatsApp:', err);
+      console.error('Error triggering WhatsApp notification:', err);
     }
   };
 
@@ -157,7 +171,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
     const razorpayKey = activeRazorpayKey;
 
     if (!razorpayKey) {
-      setErrorMsg('Razorpay Key ID missing! Please configure key.');
+      setErrorMsg('Payment gateway key configure nahi hai. Kripya admin se sampark karein.');
       return;
     }
 
@@ -173,13 +187,14 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
 
     const options = {
       key: razorpayKey,
-      amount: 20 * 100,
-      currency: "INR",
-      name: doctor.clinicName || "Aarogya Token Clinic",
+      amount: 20 * 100, // ₹20 in paise
+      currency: 'INR',
+      name: doctor.clinicName || 'Aarogya Token Clinic',
       description: `OPD Consultation Fee - Dr. ${doctor.name}`,
       handler: function (response: any) {
         setIsProcessingPayment(false);
 
+        // 👈 Explicit selectedShift & shift passed to store correct slot
         const result = bookOnlineAppointment({
           doctorId: doctor.id,
           hospitalId: resolvedHospitalId,
@@ -189,10 +204,11 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
           gender: formData.gender,
           appointmentDate: formData.appointmentDate,
           selectedShift: formData.selectedShift,
+          shift: formData.selectedShift,
           address: formData.address.trim(),
           complaint: formData.complaint.trim() || 'General OPD Consultation',
           isEmergency: false,
-          paymentId: response.razorpay_payment_id,
+          paymentId: response.razorpay_payment_id || `pay_online_${Date.now()}`,
         } as any);
 
         setConfirmedPatient(result.patient);
@@ -203,6 +219,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
           name: formData.name.trim(),
           tokenNumber: result.patient.tokenNumber,
           doctorName: doctor.name,
+          clinicName: doctor.clinicName || 'Aarogya Clinic',
         });
 
         try {
@@ -212,7 +229,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
             origin: { y: 0.6 },
           });
         } catch {
-          // ignore
+          // confetti fallback ignore
         }
       },
       prefill: {
@@ -220,7 +237,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
         contact: formData.mobile.trim(),
       },
       theme: {
-        color: "#2563eb",
+        color: '#2563eb',
       },
       modal: {
         ondismiss: function () {
@@ -242,7 +259,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
   return (
     <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/70 p-2 sm:p-4 backdrop-blur-xs overflow-y-auto animate-in fade-in">
       <div className="relative w-full max-w-lg rounded-2xl sm:rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-2 sm:my-6 flex flex-col max-h-[92vh]">
-        {/* 🔹 FIXED HEADER (Always visible on mobile & desktop) */}
+        {/* FIXED HEADER */}
         <div className="sticky top-0 z-20 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 px-4 sm:px-6 py-3.5 sm:py-4 text-white flex items-center justify-between shrink-0 shadow-sm">
           <div className="min-w-0 pr-2">
             <div className="flex items-center gap-1.5 flex-wrap">
@@ -264,7 +281,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
           </button>
         </div>
 
-        {/* 🔹 STEP PROGRESS TRACKER (Mobile Optimized) */}
+        {/* STEP PROGRESS TRACKER */}
         <div className="sticky top-[68px] sm:top-[76px] z-10 bg-slate-50 border-b border-slate-200 px-3 sm:px-6 py-2.5 flex items-center justify-between text-xs shrink-0">
           <div className={`flex items-center gap-1 sm:gap-1.5 font-semibold ${step === 'DETAILS' ? 'text-blue-600' : 'text-slate-400'}`}>
             <span className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold ${step === 'DETAILS' ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'}`}>1</span>
@@ -282,7 +299,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
           </div>
         </div>
 
-        {/* 🔹 SCROLLABLE BODY */}
+        {/* SCROLLABLE BODY */}
         <div className="p-4 sm:p-6 overflow-y-auto flex-1">
           {errorMsg && (
             <div className="mb-4 rounded-xl bg-rose-50 border border-rose-200 p-2.5 sm:p-3 text-xs text-rose-700 flex items-center gap-2">
@@ -312,7 +329,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                   </label>
                   <input
                     type="date"
-                    min={new Date().toISOString().split('T')[0]}
+                    min={todayStr}
                     value={formData.appointmentDate}
                     onChange={(e) => handleDateChange(e.target.value)}
                     className="w-full rounded-lg border border-slate-300 p-2 text-xs font-medium bg-white focus:outline-none focus:border-blue-500"
@@ -351,7 +368,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                 />
               </div>
 
-              {/* Mobile Number & Age/Gender (Responsive Row on mobile) */}
+              {/* Mobile Number & Age/Gender */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] sm:text-xs font-semibold text-slate-700 mb-1">
@@ -449,7 +466,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                     <div>
                       <span className="text-xs font-bold text-white tracking-wide">Aarogya Instant Pay</span>
                       <span className="text-[10px] text-blue-400 block font-mono">
-                        Key: {activeRazorpayKey}
+                        Key: {activeRazorpayKey ? `${String(activeRazorpayKey).slice(0, 12)}...` : 'Not Set'}
                       </span>
                     </div>
                   </div>
@@ -563,6 +580,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                   </div>
                   <div className="text-xs font-bold text-slate-800">
                     {confirmedPatient.name} ({confirmedPatient.gender}, {confirmedPatient.age} yrs)
+                  </div>
+                  <div className="mt-1 text-[11px] font-semibold text-slate-600">
+                    Shift: <span className="text-blue-700">{confirmedPatient.selectedShift || (confirmedPatient as any).shift}</span>
                   </div>
                 </div>
 
