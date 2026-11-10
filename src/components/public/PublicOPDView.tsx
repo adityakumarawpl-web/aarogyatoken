@@ -43,7 +43,7 @@ export const PublicOPDView: React.FC = () => {
 
   return (
     <div
-      className="min-h-[calc(100vh-4rem)] bg-slate-50 pb-16 w-full max-w-[100vw] overflow-x-hidden relative"
+      className="min-h-[calc(100vh-4rem)] bg-slate-50 pb-16 w-full"
       onTouchStart={(e) => {
         const target = e.target as HTMLElement;
         if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
@@ -56,13 +56,11 @@ export const PublicOPDView: React.FC = () => {
       {/* 🔹 COMPACT HERO TITLE SECTION */}
       <div className="bg-gradient-to-b from-blue-900 to-blue-800 text-white pt-4 pb-3 px-3 sm:px-6 w-full shadow-xs">
         <div className="max-w-4xl mx-auto text-center space-y-1.5">
-          {/* Status Chip */}
           <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/25 px-2.5 py-0.5 text-[10px] sm:text-xs font-semibold text-blue-100 border border-blue-400/30">
             <Radio className="h-3 w-3 text-emerald-400 animate-pulse" />
             <span>Live OPD Token & Doctor Availability</span>
           </div>
 
-          {/* Heading */}
           <h1 className="text-xl sm:text-3xl font-black tracking-tight text-white leading-tight">
             Live Doctor Status &{' '}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-200 to-emerald-300">
@@ -72,10 +70,9 @@ export const PublicOPDView: React.FC = () => {
         </div>
       </div>
 
-      {/* 🔹 STICKY SEARCH & FILTER BAR (Scroll hone par screen top me lock hoga) */}
-      <div className="sticky top-14 sm:top-16 z-30 bg-blue-900/95 backdrop-blur-md px-3 sm:px-6 py-2 border-b border-blue-700/60 shadow-md">
+      {/* 🔹 FIXED STICKY SEARCH & FILTER BAR (Navbar ke theek neeche chipkega) */}
+      <div className="sticky top-[56px] sm:top-[64px] z-30 bg-blue-900/95 backdrop-blur-md px-3 sm:px-6 py-2 border-b border-blue-700/60 shadow-md">
         <div className="max-w-xl mx-auto">
-          {/* Search bar */}
           <div className="relative flex items-center">
             <Search className="absolute left-3.5 h-4 w-4 text-slate-400 pointer-events-none" />
             <input
