@@ -12,6 +12,7 @@ import {
   Sparkles,
   PhoneCall,
   Lock,
+  X,
 } from 'lucide-react';
 
 export const PublicOPDView: React.FC = () => {
@@ -46,11 +47,22 @@ export const PublicOPDView: React.FC = () => {
   });
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-slate-50 pb-20">
+    <div
+      className="min-h-[calc(100vh-4rem)] bg-slate-50 pb-20 w-full max-w-[100vw] overflow-x-hidden"
+      onTouchStart={(e) => {
+        // Agar user input ke alawa screen par kahin bhi tap ya scroll kare toh mobile keyboard band ho jaye
+        const target = e.target as HTMLElement;
+        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+          if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+          }
+        }
+      }}
+    >
       {/* Hero Search Section */}
-      <div className="relative bg-gradient-to-b from-blue-900 via-blue-800 to-slate-900 text-white pt-10 pb-16 px-4 sm:px-6 lg:px-8 overflow-hidden">
+      <div className="relative bg-gradient-to-b from-blue-900 via-blue-800 to-slate-900 text-white pt-8 pb-14 sm:pt-10 sm:pb-16 px-4 sm:px-6 lg:px-8 overflow-hidden w-full max-w-[100vw]">
         {/* Subtle grid pattern */}
-        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#3b82f6_1px,transparent_1px)] [background-size:16px_16px]"></div>
+        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#3b82f6_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none"></div>
 
         <div className="relative max-w-5xl mx-auto text-center space-y-4">
           <div className="inline-flex items-center gap-2 rounded-full bg-blue-500/20 px-3.5 py-1 text-xs font-semibold text-blue-200 border border-blue-400/30 backdrop-blur-md">
@@ -58,56 +70,68 @@ export const PublicOPDView: React.FC = () => {
             <span>Live OPD Token & Doctor Status Portal</span>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-white leading-tight">
+          <h1 className="text-2xl sm:text-5xl font-black tracking-tight text-white leading-tight">
             Live Doctor Status &{' '}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-300 via-teal-200 to-emerald-300">
               Running Token Tracker
             </span>
           </h1>
 
-          <p className="max-w-2xl mx-auto text-sm sm:text-base text-blue-100 font-normal leading-relaxed">
+          <p className="max-w-2xl mx-auto text-xs sm:text-base text-blue-100 font-normal leading-relaxed">
             Check live doctor availability, view currently serving token numbers in real-time, or book your token online from home for just <strong className="text-emerald-300 font-bold">₹20</strong> with automated bot voice call alerts before your turn!
           </p>
 
           {/* Privacy Guarantee Badge */}
-          <div className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs text-blue-100 backdrop-blur-sm border border-white/15">
-            <ShieldCheck className="h-4 w-4 text-emerald-400" />
-            <span>100% Patient Privacy Guaranteed: No patient names or queue lists are published publicly</span>
+          <div className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[11px] sm:text-xs text-blue-100 backdrop-blur-sm border border-white/15 max-w-full">
+            <ShieldCheck className="h-4 w-4 text-emerald-400 shrink-0" />
+            <span className="truncate sm:whitespace-normal">100% Patient Privacy: No public patient queue list published</span>
           </div>
 
-          {/* Search bar */}
-          <div className="max-w-2xl mx-auto pt-4">
+          {/* Search bar & Filter Chips */}
+          <div className="max-w-2xl mx-auto pt-3 sm:pt-4">
             <div className="relative flex items-center">
               <Search className="absolute left-4 h-5 w-5 text-slate-400 pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  // Mobile keyboard par 'Enter' / 'Done' / 'Search' dabate hi keyboard band ho jaye
+                  if (e.key === 'Enter') {
+                    (e.target as HTMLInputElement).blur();
+                  }
+                }}
                 placeholder="Doctor ka naam, Bimari/Specialty, ya Clinic dhoondhein..."
-                className="w-full rounded-2xl bg-white text-slate-900 pl-12 pr-4 py-3.5 text-sm sm:text-base font-medium shadow-xl shadow-black/20 focus:outline-none focus:ring-4 focus:ring-blue-400/40"
+                className="w-full rounded-2xl bg-white text-slate-900 pl-11 pr-10 py-3 text-sm sm:text-base font-medium shadow-xl shadow-black/20 focus:outline-none focus:ring-4 focus:ring-blue-400/40"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-4 text-xs font-semibold text-slate-400 hover:text-slate-600 cursor-pointer"
+                  className="absolute right-3.5 p-1 rounded-full text-xs font-bold text-slate-400 hover:text-slate-600 bg-slate-100 cursor-pointer"
                 >
-                  Clear
+                  <X className="h-4 w-4" />
                 </button>
               )}
             </div>
 
-            {/* Specialty chips */}
-            <div className="flex items-center gap-2 mt-3 overflow-x-auto pb-1 scrollbar-none justify-center">
+            {/* Specialty Chips: FIXED - justify-start on mobile, smooth touch scrolling */}
+            <div className="flex items-center gap-2 mt-3 overflow-x-auto py-1 scrollbar-none justify-start sm:justify-center px-1 touch-pan-x w-full">
               {['ALL', 'Physician', 'Gynecologist', 'Orthopedics'].map((spec) => (
                 <button
                   key={spec}
                   type="button"
-                  onClick={() => setSelectedSpecialty(spec)}
-                  className={`px-3 py-1 rounded-full text-xs font-medium transition cursor-pointer shrink-0 ${
+                  onClick={() => {
+                    setSelectedSpecialty(spec);
+                    // Filter chip select hote hi screen se keyboard blur ho jaye
+                    if (document.activeElement instanceof HTMLElement) {
+                      document.activeElement.blur();
+                    }
+                  }}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition cursor-pointer shrink-0 whitespace-nowrap active:scale-95 ${
                     selectedSpecialty === spec
-                      ? 'bg-blue-500 text-white font-bold shadow-xs'
-                      : 'bg-white/10 text-blue-100 hover:bg-white/20'
+                      ? 'bg-blue-500 text-white shadow-md'
+                      : 'bg-white/15 text-blue-100 hover:bg-white/25 border border-white/20'
                   }`}
                 >
                   {spec === 'ALL' ? 'Sabhi Doctors (All)' : spec}
@@ -120,9 +144,9 @@ export const PublicOPDView: React.FC = () => {
 
       {/* Main Content Area: STRICTLY DOCTOR CARDS WITH LIVE STATUS & RUNNING TOKEN */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 -mt-6">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-5">
           <div>
-            <h2 className="text-xl font-black text-slate-900">
+            <h2 className="text-lg sm:text-xl font-black text-slate-900">
               Live OPD Clinics ({filteredDoctors.length})
             </h2>
             <p className="text-xs text-slate-500">
