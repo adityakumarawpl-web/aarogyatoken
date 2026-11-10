@@ -29,8 +29,8 @@ export default async function handler(req: any, res: any) {
           to: phone,
           type: 'template',
           template: {
-            name: 'opd_token_confirmation',
-            language: { code: 'hi' },
+            name: 'hello_world',
+            language: { code: 'en_US' },
             components: [
               {
                 type: 'body',
