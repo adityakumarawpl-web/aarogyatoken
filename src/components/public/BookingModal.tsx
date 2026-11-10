@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
 import { Doctor, Patient } from '../../types';
 import { useClinic } from '../../context/ClinicContext';
-import { getNextTokenNumber, getPatientsAheadCount } from '../../utils/queueLogic';
+import { getPatientsAheadCount } from '../../utils/queueLogic';
 import confetti from 'canvas-confetti';
 import {
   X,
-  CreditCard,
   QrCode,
-  Smartphone,
   ShieldCheck,
   CheckCircle2,
   Clock,
@@ -27,7 +25,6 @@ interface BookingModalProps {
 export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) => {
   const { patients, bookOnlineAppointment, triggerBotCallAlert, razorpaySettings } = useClinic();
 
-  // Time ko minutes mein parse karna
   const parseTimeToMinutes = (timeStr: string) => {
     if (!timeStr) return 13 * 60;
     const cleanStr = timeStr.trim().toUpperCase();
@@ -44,7 +41,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
     return hours * 60 + minutes;
   };
 
-  // Doctor profile timing ke according check karna
   const isMorningShiftActiveForDoctor = (targetDate: string, doc: any) => {
     const todayStr = new Date().toISOString().split('T')[0];
     if (targetDate > todayStr) return true;
@@ -72,8 +68,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
     mobile: '',
     age: '',
     gender: 'Male' as 'Male' | 'Female' | 'Other',
-    appointmentDate: new Date().toISOString().split('T')[0], // Default aaj ki date
-    selectedShift: 'Morning', // Default morning
+    appointmentDate: new Date().toISOString().split('T')[0],
+    selectedShift: 'Morning',
     address: '',
     complaint: '',
   });
@@ -139,7 +135,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          phone: '91' + patientData.phone, // 10-digit number ke aage country code '91'
+          phone: '91' + patientData.phone,
           patientName: patientData.name,
           tokenNumber: patientData.tokenNumber,
           doctorName: patientData.doctorName,
@@ -173,12 +169,11 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
     setIsProcessingPayment(true);
     setErrorMsg('');
 
-    // Parent Hospital ID resolve karna
     const resolvedHospitalId = doctor.hospitalId || doctor.staffUsername || doctor.id;
 
     const options = {
       key: razorpayKey,
-      amount: 20 * 100, // ₹20 in paise
+      amount: 20 * 100,
       currency: "INR",
       name: doctor.clinicName || "Aarogya Token Clinic",
       description: `OPD Consultation Fee - Dr. ${doctor.name}`,
@@ -203,7 +198,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
         setConfirmedPatient(result.patient);
         setStep('SUCCESS');
 
-        // Automatic WhatsApp confirmation dispatch
         sendWhatsAppNotification({
           phone: formData.mobile.trim(),
           name: formData.name.trim(),
@@ -246,51 +240,52 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs overflow-y-auto animate-in fade-in">
-      <div className="relative w-full max-w-lg rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-6">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 px-6 py-4 text-white flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="rounded bg-white/20 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white">
-                Online Token Booking
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/70 p-2 sm:p-4 backdrop-blur-xs overflow-y-auto animate-in fade-in">
+      <div className="relative w-full max-w-lg rounded-2xl sm:rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-2 sm:my-6 flex flex-col max-h-[92vh]">
+        {/* 🔹 FIXED HEADER (Always visible on mobile & desktop) */}
+        <div className="sticky top-0 z-20 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 px-4 sm:px-6 py-3.5 sm:py-4 text-white flex items-center justify-between shrink-0 shadow-sm">
+          <div className="min-w-0 pr-2">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="rounded bg-white/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+                Online Token
               </span>
-              <span className="text-xs text-blue-100">घर बैठे टोकन लें</span>
+              <span className="text-[11px] text-blue-100">घर बैठे टोकन लें</span>
             </div>
-            <h3 className="text-lg font-bold mt-1">{doctor.name}</h3>
-            <p className="text-xs text-blue-100">{doctor.clinicName} • {doctor.cabinNumber}</p>
+            <h3 className="text-base sm:text-lg font-bold mt-0.5 truncate">{doctor.name}</h3>
+            <p className="text-[11px] text-blue-100 truncate">{doctor.clinicName} • {doctor.cabinNumber}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full bg-white/10 p-1.5 text-white hover:bg-white/20 transition cursor-pointer"
+            className="rounded-full bg-white/10 p-1.5 text-white hover:bg-white/25 transition cursor-pointer shrink-0"
             aria-label="Close dialog"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Step Progress Tracker */}
-        <div className="bg-slate-50 border-b border-slate-200 px-6 py-3 flex items-center justify-between text-xs">
-          <div className={`flex items-center gap-1.5 font-semibold ${step === 'DETAILS' ? 'text-blue-600' : 'text-slate-400'}`}>
-            <span className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] ${step === 'DETAILS' ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'}`}>1</span>
-            <span>Mareez Details</span>
+        {/* 🔹 STEP PROGRESS TRACKER (Mobile Optimized) */}
+        <div className="sticky top-[68px] sm:top-[76px] z-10 bg-slate-50 border-b border-slate-200 px-3 sm:px-6 py-2.5 flex items-center justify-between text-xs shrink-0">
+          <div className={`flex items-center gap-1 sm:gap-1.5 font-semibold ${step === 'DETAILS' ? 'text-blue-600' : 'text-slate-400'}`}>
+            <span className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold ${step === 'DETAILS' ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'}`}>1</span>
+            <span className="text-[11px] sm:text-xs">Details</span>
           </div>
-          <div className="h-0.5 w-8 bg-slate-200"></div>
-          <div className={`flex items-center gap-1.5 font-semibold ${step === 'PAYMENT' ? 'text-blue-600' : 'text-slate-400'}`}>
-            <span className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] ${step === 'PAYMENT' ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'}`}>2</span>
-            <span>Razorpay ₹20 Fee</span>
+          <div className="h-0.5 flex-1 max-w-[40px] sm:max-w-[60px] bg-slate-200 mx-1"></div>
+          <div className={`flex items-center gap-1 sm:gap-1.5 font-semibold ${step === 'PAYMENT' ? 'text-blue-600' : 'text-slate-400'}`}>
+            <span className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold ${step === 'PAYMENT' ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'}`}>2</span>
+            <span className="text-[11px] sm:text-xs">₹20 Fee</span>
           </div>
-          <div className="h-0.5 w-8 bg-slate-200"></div>
-          <div className={`flex items-center gap-1.5 font-semibold ${step === 'SUCCESS' ? 'text-emerald-600' : 'text-slate-400'}`}>
-            <span className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] ${step === 'SUCCESS' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}`}>3</span>
-            <span>Confirmed Token</span>
+          <div className="h-0.5 flex-1 max-w-[40px] sm:max-w-[60px] bg-slate-200 mx-1"></div>
+          <div className={`flex items-center gap-1 sm:gap-1.5 font-semibold ${step === 'SUCCESS' ? 'text-emerald-600' : 'text-slate-400'}`}>
+            <span className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold ${step === 'SUCCESS' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}`}>3</span>
+            <span className="text-[11px] sm:text-xs">Token</span>
           </div>
         </div>
 
-        <div className="p-6">
+        {/* 🔹 SCROLLABLE BODY */}
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1">
           {errorMsg && (
-            <div className="mb-4 rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700 flex items-center gap-2">
+            <div className="mb-4 rounded-xl bg-rose-50 border border-rose-200 p-2.5 sm:p-3 text-xs text-rose-700 flex items-center gap-2">
               <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
               <span>{errorMsg}</span>
             </div>
@@ -298,21 +293,21 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
 
           {/* STEP 1: PATIENT DETAILS */}
           {step === 'DETAILS' && (
-            <form onSubmit={handleDetailsSubmit} className="space-y-4">
-              <div className="rounded-2xl bg-blue-50/70 border border-blue-200/70 p-3.5 text-xs text-blue-900 flex items-start gap-2.5">
+            <form onSubmit={handleDetailsSubmit} className="space-y-3.5 sm:space-y-4">
+              <div className="rounded-2xl bg-blue-50/80 border border-blue-200 p-3 text-xs text-blue-900 flex items-start gap-2.5">
                 <Sparkles className="h-4 w-4 shrink-0 text-blue-600 mt-0.5" />
                 <div>
-                  <span className="font-bold">Next Available Token: #{nextEstimatedToken}</span>
-                  <p className="text-blue-700 text-[11px] mt-0.5 leading-relaxed">
-                    Online token fee is ₹20. Staff/Walk-in at clinic is free. You will get live token tracking & automated bot call reminder!
+                  <span className="font-bold text-blue-950">Next Available Token: #{nextEstimatedToken}</span>
+                  <p className="text-blue-800 text-[11px] mt-0.5 leading-relaxed">
+                    Online token fee is ₹20. Clinic walk-in is free. Live tracking & call alert included!
                   </p>
                 </div>
               </div>
 
               {/* Date & Shift Selection */}
-              <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 bg-slate-50 p-2.5 sm:p-3 rounded-xl border border-slate-200">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-[11px] sm:text-xs font-semibold text-slate-700 mb-1">
                     Appointment Date
                   </label>
                   <input
@@ -325,7 +320,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-[11px] sm:text-xs font-semibold text-slate-700 mb-1">
                     Preferred Shift
                   </label>
                   <select
@@ -341,8 +336,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                 </div>
               </div>
 
+              {/* Patient Name */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-[11px] sm:text-xs font-semibold text-slate-700 mb-1">
                   1. Patient Full Name (मरीज़ का नाम) *
                 </label>
                 <input
@@ -351,13 +347,14 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="e.g. Ramesh Chandra"
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {/* Mobile Number & Age/Gender (Responsive Row on mobile) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-[11px] sm:text-xs font-semibold text-slate-700 mb-1">
                     2. Mobile Number (मोबाइल नंबर) *
                   </label>
                   <input
@@ -366,14 +363,15 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                     maxLength={10}
                     value={formData.mobile}
                     onChange={(e) => setFormData({ ...formData, mobile: e.target.value.replace(/\D/g, '') })}
-                    placeholder="10 digit mobile"
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    placeholder="10-digit mobile number"
+                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
                   />
-                  <span className="text-[10px] text-slate-500">Alert Bot will call this number</span>
+                  <span className="text-[10px] text-slate-500 block mt-0.5">Alert Bot will call this number</span>
                 </div>
+
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Age & Gender *
+                  <label className="block text-[11px] sm:text-xs font-semibold text-slate-700 mb-1">
+                    Age & Gender (उम्र / लिंग) *
                   </label>
                   <div className="flex gap-2">
                     <input
@@ -383,12 +381,13 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                       value={formData.age}
                       onChange={(e) => setFormData({ ...formData, age: e.target.value })}
                       placeholder="Age"
-                      className="w-20 rounded-xl border border-slate-300 px-2 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                      className="w-20 rounded-xl border border-slate-300 px-2.5 py-2 text-xs sm:text-sm focus:border-blue-500 focus:outline-none"
+                      required
                     />
                     <select
                       value={formData.gender}
                       onChange={(e) => setFormData({ ...formData, gender: e.target.value as any })}
-                      className="flex-1 rounded-xl border border-slate-300 px-2 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                      className="flex-1 rounded-xl border border-slate-300 px-2.5 py-2 text-xs sm:text-sm focus:border-blue-500 focus:outline-none bg-white"
                     >
                       <option value="Male">Male</option>
                       <option value="Female">Female</option>
@@ -398,8 +397,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                 </div>
               </div>
 
+              {/* Address */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-[11px] sm:text-xs font-semibold text-slate-700 mb-1">
                   3. Address / Colony / City (मरीज़ का पता) *
                 </label>
                 <input
@@ -407,13 +407,14 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                   required
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  placeholder="e.g. Civil Lines, Kanpur"
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  placeholder="e.g. Ghanghri Naka, Umaria"
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
                 />
               </div>
 
+              {/* Complaint */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-[11px] sm:text-xs font-semibold text-slate-700 mb-1">
                   Chief Complaint / Reason (समस्या / लक्षण)
                 </label>
                 <input
@@ -421,14 +422,14 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                   value={formData.complaint}
                   onChange={(e) => setFormData({ ...formData, complaint: e.target.value })}
                   placeholder="e.g. Fever & Cough, BP checkup, Knee pain"
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
                 />
               </div>
 
               <div className="pt-2">
                 <button
                   type="submit"
-                  className="w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/25 hover:bg-blue-700 transition cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full rounded-2xl bg-blue-600 px-4 py-3 text-xs sm:text-sm font-bold text-white shadow-lg shadow-blue-500/25 hover:bg-blue-700 transition cursor-pointer flex items-center justify-center gap-2"
                 >
                   <span>Proceed to Pay ₹20 (आगे बढ़ें)</span>
                 </button>
@@ -439,9 +440,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
           {/* STEP 2: RAZORPAY / UPI ₹20 PAYMENT GATEWAY */}
           {step === 'PAYMENT' && (
             <div className="space-y-4">
-              {/* Payment Summary Header */}
-              <div className="rounded-2xl bg-slate-900 text-white p-4">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="rounded-2xl bg-slate-900 text-white p-3.5 sm:p-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
                   <div className="flex items-center gap-2">
                     <div className="h-6 w-6 rounded-md bg-blue-600 flex items-center justify-center text-[10px] font-black text-white">
                       ₹
@@ -454,36 +454,36 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                     </div>
                   </div>
                   <span className="rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold px-2 py-0.5">
-                    Secured Payment Gateway
+                    Secured
                   </span>
                 </div>
 
-                <div className="pt-3 flex items-center justify-between">
+                <div className="pt-2.5 flex items-center justify-between">
                   <div>
-                    <span className="text-xs text-slate-400">Online Token Convenience Fee</span>
-                    <div className="text-3xl font-black text-emerald-400">₹20.00</div>
+                    <span className="text-[11px] text-slate-400">Online Token Fee</span>
+                    <div className="text-2xl sm:text-3xl font-black text-emerald-400">₹20.00</div>
                   </div>
                   <div className="text-right">
                     <span className="text-xs text-blue-200 font-bold block">
                       Token #{nextEstimatedToken}
                     </span>
-                    <span className="text-[10px] text-slate-400">Hold for {formData.name}</span>
+                    <span className="text-[10px] text-slate-400">For {formData.name}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Dynamic ₹20 QR Code Display */}
-              <div className="rounded-3xl border-2 border-dashed border-blue-300 p-5 text-center bg-blue-50/40 flex flex-col items-center justify-center">
-                <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 text-white text-[11px] font-bold px-3 py-1 mb-3">
+              {/* Dynamic ₹20 QR Code */}
+              <div className="rounded-2xl border-2 border-dashed border-blue-300 p-4 text-center bg-blue-50/40 flex flex-col items-center justify-center">
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 text-white text-[10px] sm:text-[11px] font-bold px-3 py-1 mb-2.5">
                   <QrCode className="h-3.5 w-3.5" />
                   <span>Scan to Pay ₹20 (QR कोड स्कैन करें)</span>
                 </div>
 
-                <div className="relative h-44 w-44 bg-white p-3 rounded-2xl border-2 border-slate-200 shadow-md flex items-center justify-center">
+                <div className="relative h-40 w-40 bg-white p-2.5 rounded-2xl border-2 border-slate-200 shadow-md flex items-center justify-center">
                   <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=upi://pay?pa=aarogya.opd@icici%26pn=${encodeURIComponent(doctor.name)}%26am=20.00%26cu=INR%26tn=Token_${doctor.id}_${Date.now()}`}
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=upi://pay?pa=aarogya.opd@icici%26pn=${encodeURIComponent(doctor.name)}%26am=20.00%26cu=INR%26tn=Token_${doctor.id}_${Date.now()}`}
                     alt="Scan ₹20 QR Code"
-                    className="h-38 w-38"
+                    className="h-34 w-34"
                   />
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <div className="bg-white/95 rounded-md px-1.5 py-0.5 text-[9px] font-black text-blue-700 shadow-xs border border-blue-200">
@@ -492,23 +492,23 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                   </div>
                 </div>
 
-                <div className="mt-3">
+                <div className="mt-2.5">
                   <span className="text-xs font-mono font-bold text-slate-800 block">
                     UPI ID: aarogya.opd@icici
                   </span>
-                  <p className="text-[11px] text-slate-600 mt-0.5 max-w-xs">
-                    Kisi bhi mobile se <strong>Google Pay, PhonePe, Paytm, BHIM</strong> se QR scan karein ya neeche diye gaye button par click karein.
+                  <p className="text-[10px] text-slate-600 mt-0.5 max-w-xs">
+                    <strong>GPay, PhonePe, Paytm, BHIM</strong> se scan karein ya neeche button dabayein.
                   </p>
                 </div>
               </div>
 
-              {/* Direct Pay Button beneath the QR Code */}
+              {/* Action Buttons */}
               <div className="space-y-2 pt-1">
                 <button
                   type="button"
                   disabled={isProcessingPayment}
                   onClick={handleProcessPayment}
-                  className="w-full rounded-2xl bg-emerald-600 py-3.5 px-4 text-sm font-extrabold text-white shadow-xl shadow-emerald-600/30 hover:bg-emerald-700 active:scale-[0.99] transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="w-full rounded-2xl bg-emerald-600 py-3 px-4 text-xs sm:text-sm font-extrabold text-white shadow-xl shadow-emerald-600/30 hover:bg-emerald-700 active:scale-[0.99] transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {isProcessingPayment ? (
                     <>
@@ -517,8 +517,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                     </>
                   ) : (
                     <>
-                      <ShieldCheck className="h-5 w-5 text-white" />
-                      <span>Pay ₹20 Now / Payment Complete (आगे बढ़ें)</span>
+                      <ShieldCheck className="h-4 w-4 text-white" />
+                      <span>Pay ₹20 Now (पेमेंट पूरा करें)</span>
                     </>
                   )}
                 </button>
@@ -531,8 +531,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                   >
                     ← Back (Edit Details)
                   </button>
-                  <span className="text-[11px] text-emerald-700 font-medium flex items-center gap-1">
-                    <Lock className="h-3 w-3" /> Pay hone par hi token generate hoga
+                  <span className="text-[10px] text-emerald-700 font-medium flex items-center gap-1">
+                    <Lock className="h-3 w-3" /> Pay hone par hi token banega
                   </span>
                 </div>
               </div>
@@ -542,23 +542,23 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
           {/* STEP 3: SUCCESS CONFIRMED TOKEN PASS */}
           {step === 'SUCCESS' && confirmedPatient && (
             <div className="space-y-4">
-              <div className="rounded-3xl border-2 border-emerald-500 bg-emerald-50/40 p-5 text-center">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500 text-white shadow-md shadow-emerald-500/30">
-                  <CheckCircle2 className="h-7 w-7" />
+              <div className="rounded-2xl sm:rounded-3xl border-2 border-emerald-500 bg-emerald-50/40 p-4 text-center">
+                <div className="mx-auto flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-emerald-500 text-white shadow-md shadow-emerald-500/30">
+                  <CheckCircle2 className="h-6 w-6 sm:h-7 sm:w-7" />
                 </div>
-                <h4 className="mt-2 text-base font-extrabold text-slate-900">
+                <h4 className="mt-2 text-sm sm:text-base font-extrabold text-slate-900">
                   Token Confirmed! (टोकन जारी हुआ)
                 </h4>
-                <p className="text-xs text-emerald-800 font-medium">
+                <p className="text-[11px] text-emerald-800 font-medium">
                   Razorpay Verified • TXN: {confirmedPatient.paymentId}
                 </p>
 
-                {/* Big Token Number Callout */}
-                <div className="my-4 rounded-2xl bg-white border border-emerald-200 p-4 shadow-sm">
-                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
+                {/* Token Box */}
+                <div className="my-3 rounded-2xl bg-white border border-emerald-200 p-3 sm:p-4 shadow-sm">
+                  <span className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-widest">
                     Aapka Token Number
                   </span>
-                  <div className="text-5xl font-black text-blue-600 tracking-tight my-1">
+                  <div className="text-4xl sm:text-5xl font-black text-blue-600 tracking-tight my-1">
                     #{confirmedPatient.tokenNumber}
                   </div>
                   <div className="text-xs font-bold text-slate-800">
@@ -566,8 +566,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                   </div>
                 </div>
 
-                {/* Queue status breakdown */}
-                <div className="rounded-2xl bg-slate-900 text-white p-3.5 text-left space-y-1.5 text-xs">
+                {/* Queue Details */}
+                <div className="rounded-xl sm:rounded-2xl bg-slate-900 text-white p-3 text-left space-y-1.5 text-xs">
                   <div className="flex items-center justify-between">
                     <span className="text-slate-400">Doctor:</span>
                     <span className="font-bold text-white">{doctor.name}</span>
@@ -592,16 +592,14 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                 </div>
               </div>
 
-              {/* Bot Alert feature showcase */}
-              <div className="rounded-2xl bg-gradient-to-r from-amber-500/10 to-blue-500/10 border border-blue-200 p-4 text-xs text-slate-800 space-y-2">
-                <div className="flex items-center gap-2 font-bold text-blue-900">
-                  <PhoneCall className="h-4 w-4 text-blue-600 animate-pulse" />
+              {/* Bot Call Reminder Notice */}
+              <div className="rounded-2xl bg-gradient-to-r from-amber-500/10 to-blue-500/10 border border-blue-200 p-3 text-xs text-slate-800 space-y-2">
+                <div className="flex items-center gap-1.5 font-bold text-blue-900">
+                  <PhoneCall className="h-3.5 w-3.5 text-blue-600 animate-pulse" />
                   <span>Automatic Voice Bot Call Reminder Active!</span>
                 </div>
-                <p className="text-slate-600 text-[11px] leading-relaxed">
-                  Jaise hi aapke aage 3 se 4 mareez bachenge, hamara system aapke number{' '}
-                  <span className="font-bold text-slate-900">+91 {confirmedPatient.mobile}</span> par ek
-                  automatic IVR Call bhejega taki aap samay par clinic pahunch sakein.
+                <p className="text-slate-600 text-[10px] leading-relaxed">
+                  Jaise hi 3 se 4 mareez bachenge, <span className="font-bold text-slate-900">+91 {confirmedPatient.mobile}</span> par IVR call aayegi.
                 </p>
                 <button
                   type="button"
@@ -609,16 +607,16 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                   className="w-full rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white hover:bg-blue-700 transition cursor-pointer flex items-center justify-center gap-2"
                 >
                   <PhoneCall className="h-3.5 w-3.5" />
-                  <span>Test Automated Bot Call Now (सुनकर देखें)</span>
+                  <span>Test Automated Bot Call (सुनकर देखें)</span>
                 </button>
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center gap-2 pt-2">
+              <div className="flex items-center gap-2 pt-1">
                 <button
                   type="button"
                   onClick={() => window.print()}
-                  className="flex-1 rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer flex items-center justify-center gap-1.5"
+                  className="flex-1 rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer flex items-center justify-center gap-1"
                 >
                   <Printer className="h-3.5 w-3.5 text-slate-500" />
                   <span>Print Slip</span>
@@ -630,16 +628,16 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                     const text = `AarogyaToken Pass - Dr. ${doctor.name}, Token #${confirmedPatient.tokenNumber}. Clinic: ${doctor.clinicName}.`;
                     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
                   }}
-                  className="flex-1 rounded-xl bg-emerald-600 px-3 py-2.5 text-xs font-semibold text-white hover:bg-emerald-700 transition cursor-pointer flex items-center justify-center gap-1.5"
+                  className="flex-1 rounded-xl bg-emerald-600 px-2.5 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition cursor-pointer flex items-center justify-center gap-1"
                 >
                   <Share2 className="h-3.5 w-3.5" />
-                  <span>Share WhatsApp</span>
+                  <span>Share</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={onClose}
-                  className="rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white hover:bg-slate-800 transition cursor-pointer"
+                  className="rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition cursor-pointer"
                 >
                   Done
                 </button>
