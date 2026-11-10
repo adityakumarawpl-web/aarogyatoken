@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useClinic } from '../../context/ClinicContext';
 import { DoctorCard } from './DoctorCard';
 import { BookingModal } from './BookingModal';
@@ -11,6 +11,7 @@ import {
   PhoneCall,
   Lock,
   X,
+  ArrowUp,
 } from 'lucide-react';
 
 export const PublicOPDView: React.FC = () => {
@@ -19,6 +20,28 @@ export const PublicOPDView: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>('ALL');
   const [activeDoctorForBooking, setActiveDoctorForBooking] = useState<Doctor | null>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+
+  // Scroll detect karke Scroll-to-Top button dikhana/chhipana
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 250) {
+        setShowScrollTop(true);
+      } else {
+        setShowScrollTop(false);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth',
+    });
+  };
 
   const filteredDoctors = doctors.filter((doc) => {
     const query = searchQuery.toLowerCase().trim();
@@ -43,7 +66,7 @@ export const PublicOPDView: React.FC = () => {
 
   return (
     <div
-      className="min-h-[calc(100vh-4rem)] bg-slate-50 pb-16 w-full"
+      className="min-h-[calc(100vh-4rem)] bg-slate-50 pb-20 w-full relative"
       onTouchStart={(e) => {
         const target = e.target as HTMLElement;
         if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
@@ -53,7 +76,7 @@ export const PublicOPDView: React.FC = () => {
         }
       }}
     >
-      {/* 🔹 COMPACT HERO TITLE SECTION */}
+      {/* COMPACT HERO TITLE SECTION */}
       <div className="bg-gradient-to-b from-blue-900 to-blue-800 text-white pt-4 pb-3 px-3 sm:px-6 w-full shadow-xs">
         <div className="max-w-4xl mx-auto text-center space-y-1.5">
           <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/25 px-2.5 py-0.5 text-[10px] sm:text-xs font-semibold text-blue-100 border border-blue-400/30">
@@ -70,8 +93,8 @@ export const PublicOPDView: React.FC = () => {
         </div>
       </div>
 
-      {/* 🔹 FIXED STICKY SEARCH & FILTER BAR (Navbar ke theek neeche chipkega) */}
-      <div className="sticky top-[56px] sm:top-[64px] z-30 bg-blue-900/95 backdrop-blur-md px-3 sm:px-6 py-2 border-b border-blue-700/60 shadow-md">
+      {/* SEARCH & FILTER BAR */}
+      <div className="bg-blue-900/95 px-3 sm:px-6 py-2 border-b border-blue-700/60 shadow-md">
         <div className="max-w-xl mx-auto">
           <div className="relative flex items-center">
             <Search className="absolute left-3.5 h-4 w-4 text-slate-400 pointer-events-none" />
@@ -123,7 +146,7 @@ export const PublicOPDView: React.FC = () => {
         </div>
       </div>
 
-      {/* 🔹 MAIN DOCTOR CARDS AREA */}
+      {/* MAIN DOCTOR CARDS AREA */}
       <div className="max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 pt-4">
         <div className="flex items-center justify-between mb-3 px-1">
           <div>
@@ -200,6 +223,18 @@ export const PublicOPDView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* 🚀 FLOATING SCROLL TO TOP BUTTON (Mobile & Desktop) */}
+      {showScrollTop && (
+        <button
+          type="button"
+          onClick={scrollToTop}
+          aria-label="Scroll to top"
+          className="fixed bottom-6 right-5 z-40 h-11 w-11 rounded-full bg-blue-600 text-white shadow-xl shadow-blue-600/40 border border-blue-400/30 flex items-center justify-center hover:bg-blue-700 active:scale-90 transition-all duration-200 cursor-pointer animate-in fade-in zoom-in-75"
+        >
+          <ArrowUp className="h-5 w-5 stroke-[2.5]" />
+        </button>
+      )}
 
       {/* Online Booking Modal */}
       {activeDoctorForBooking && (
