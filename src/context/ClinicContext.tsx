@@ -360,7 +360,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
         updateDoc(doc(db, 'patients', p.id), {
           botCallAlertSent: true,
-          botCallAlertSentAt: alerted.botCallAlertSent
+          botCallAlertSentAt: alerted.botCallAlertSentAt
         }).catch(err => console.error("Error updating bot alert:", err));
       }
     });
@@ -372,7 +372,9 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const addWalkInPatient = useCallback((data: Omit<Patient, 'id' | 'tokenNumber' | 'status' | 'bookingType' | 'paymentStatus' | 'paymentAmount' | 'createdAt' | 'botCallAlertSent'>): Patient => {
     const targetDate = (data as any).appointmentDate || new Date().toISOString().split('T')[0];
-    const targetShift = ((data as any).selectedShift || (data as any).shift || 'Morning').trim();
+    const currentHour = new Date().getHours();
+    const fallbackShift = currentHour >= 13 ? 'Evening' : 'Morning';
+    const targetShift = ((data as any).selectedShift || (data as any).shift || fallbackShift).trim();
 
     const matchingPatients = patients.filter((p) => {
       const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
@@ -393,7 +395,6 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const nextToken = maxToken + 1;
     const customId = `p-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-    // Inherit hospitalId from Target Doctor
     const matchedDoctor = doctors.find((d) => d.id === data.doctorId);
     const resolvedHospitalId = (data as any).hospitalId || matchedDoctor?.hospitalId || matchedDoctor?.staffUsername || '';
 
@@ -404,18 +405,20 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       tokenNumber: nextToken,
       appointmentDate: targetDate,
       selectedShift: targetShift,
+      shift: targetShift,
       bookingType: 'WALK_IN',
       status: 'WAITING',
       paymentStatus: 'FREE',
       paymentAmount: 0,
       createdAt: new Date().toISOString(),
       botCallAlertSent: false,
-    } as Patient;
+    } as any;
 
     setDoc(doc(db, 'patients', customId), newPatient).catch(err => {
       console.error("Error adding walk-in patient:", err);
     });
 
+    setPatients((prev) => [...prev, newPatient]);
     setLastGeneratedTokenPatient(newPatient);
     setTimeout(() => checkBotAlerts([...patients, newPatient]), 50);
     return newPatient;
@@ -423,7 +426,9 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const bookOnlineAppointment = useCallback((data: Omit<Patient, 'id' | 'tokenNumber' | 'status' | 'bookingType' | 'paymentStatus' | 'paymentAmount' | 'createdAt' | 'botCallAlertSent'>) => {
     const targetDate = (data as any).appointmentDate || new Date().toISOString().split('T')[0];
-    const targetShift = ((data as any).selectedShift || (data as any).shift || 'Morning').trim();
+    const currentHour = new Date().getHours();
+    const fallbackShift = currentHour >= 13 ? 'Evening' : 'Morning';
+    const targetShift = ((data as any).selectedShift || (data as any).shift || fallbackShift).trim();
 
     const matchingPatients = patients.filter((p) => {
       const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
@@ -442,10 +447,9 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }, 0);
 
     const nextToken = maxToken + 1;
-    const paymentId = `pay_rzp_${Date.now()}`;
+    const paymentId = (data as any).paymentId || `pay_rzp_${Date.now()}`;
     const customId = `p-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-    // Inherit hospitalId from Target Doctor
     const matchedDoctor = doctors.find((d) => d.id === data.doctorId);
     const resolvedHospitalId = (data as any).hospitalId || matchedDoctor?.hospitalId || matchedDoctor?.staffUsername || '';
 
@@ -456,6 +460,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       tokenNumber: nextToken,
       appointmentDate: targetDate,
       selectedShift: targetShift,
+      shift: targetShift,
       bookingType: 'ONLINE',
       status: 'WAITING',
       paymentStatus: 'PAID',
@@ -463,12 +468,13 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       paymentId,
       createdAt: new Date().toISOString(),
       botCallAlertSent: false,
-    } as Patient;
+    } as any;
 
     setDoc(doc(db, 'patients', customId), newPatient).catch(err => {
       console.error("Error adding online patient:", err);
     });
 
+    setPatients((prev) => [...prev, newPatient]);
     setLastGeneratedTokenPatient(newPatient);
     setTimeout(() => checkBotAlerts([...patients, newPatient]), 50);
     return { patient: newPatient, paymentId };
@@ -477,6 +483,8 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const callPatient = useCallback((patientId: string) => {
     const updated = callPatientInCabin(patients, patientId);
     const target = updated.find(p => p.id === patientId);
+    setPatients(updated);
+
     if (target) {
       updateDoc(doc(db, 'patients', patientId), {
         status: target.status,
@@ -489,6 +497,8 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const completePatient = useCallback((patientId: string) => {
     const updated = completePatientConsultation(patients, patientId);
     const target = updated.find(p => p.id === patientId);
+    setPatients(updated);
+
     if (target) {
       updateDoc(doc(db, 'patients', patientId), {
         status: target.status,
@@ -501,6 +511,8 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const markNotAvailable = useCallback((patientId: string) => {
     const updated = markPatientNotAvailable(patients, patientId);
     const target = updated.find(p => p.id === patientId);
+    setPatients(updated);
+
     if (target) {
       updateDoc(doc(db, 'patients', patientId), {
         status: target.status
@@ -531,6 +543,8 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const recallPatient = useCallback((patientId: string) => {
     const updated = recallPatientLogic(patients, patientId);
     const target = updated.find(p => p.id === patientId);
+    setPatients(updated);
+
     if (target) {
       updateDoc(doc(db, 'patients', patientId), {
         status: target.status
@@ -561,18 +575,17 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, []);
 
   const addNewDoctor = useCallback((data: Omit<Doctor, 'id' | 'status' | 'onlineTokenFee' | 'createdAt'>): Doctor => {
-    // 1. Clean unique username based ID
     const baseUsername = (data.staffUsername || data.name || 'doctor')
       .toLowerCase()
       .trim()
       .replace(/[^a-z0-9_]/g, '_');
 
-    // Hospital multi-doctor cabin suffix vs private clinic
     const customId = data.cabinNumber && data.cabinNumber !== 'Chamber'
       ? `${baseUsername}_${data.cabinNumber.toLowerCase().replace(/[^a-z0-9]/g, '')}`
       : baseUsername;
     
-    // Clean fields
+    const centralKey = (import.meta as any).env?.VITE_RAZORPAY_KEY_ID || '';
+
     const cleanedData = {
       ...data,
       profilePic: data.profilePic && data.profilePic.trim() !== ''
@@ -580,7 +593,8 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         : 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=300',
       clinicImages: Array.isArray(data.clinicImages)
         ? data.clinicImages.filter(img => typeof img === 'string' && img.trim() !== '')
-        : []
+        : [],
+      razorpayKeyId: data.razorpayKeyId || centralKey,
     };
 
     const newDoc: Doctor = {
@@ -589,12 +603,10 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       status: 'AVAILABLE',
       onlineTokenFee: 20,
       createdAt: new Date().toISOString(),
-      // Preserve hospital hierarchy fields
       establishmentType: (data as any).establishmentType || 'CLINIC',
       hospitalId: (data as any).hospitalId || baseUsername,
     };
 
-    // Remove undefined values before Firestore setDoc
     const safePayload = JSON.parse(JSON.stringify(newDoc));
 
     setDoc(doc(db, 'doctors', customId), safePayload).catch(err => {
