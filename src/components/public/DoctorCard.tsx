@@ -25,6 +25,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
   const { patients } = useClinic();
   const [tokenSearchQuery, setTokenSearchQuery] = useState('');
 
+  // Mobile number mask karne ka helper (1234567890 -> ********90)
   const maskMobile = (mobileStr?: string) => {
     if (!mobileStr) return 'N/A';
     const clean = mobileStr.trim();
@@ -32,6 +33,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
     return `********${clean.slice(-2)}`;
   };
 
+  // Smart Live Display Calculation: Doctor status + Queue Token
   const getLiveServingDetails = () => {
     if (doctor.status === 'LUNCH') {
       return {
@@ -87,7 +89,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
           ? 'text-rose-600 drop-shadow-[0_0_10px_rgba(225,29,72,0.4)]'
           : 'text-emerald-600 drop-shadow-[0_0_10px_rgba(16,185,129,0.4)]',
         label: nextInLine.isEmergency
-          ? '🚨 Emergency Turn Active'
+          ? '🚨 Emergency Case (Turn Active)'
           : 'Calling / Current Turn Active',
       };
     }
@@ -107,36 +109,38 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
         return (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-0.5 text-[11px] font-bold text-emerald-800 border border-emerald-300 shadow-2xs">
             <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping"></span>
-            <span>Available (OPD Open)</span>
+            <span>🟢 Available (OPD Open)</span>
           </span>
         );
       case 'LUNCH':
         return (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-0.5 text-[11px] font-bold text-amber-800 border border-amber-300 shadow-2xs">
             <Clock className="h-3 w-3 text-amber-600" />
-            <span>In Lunch (Break)</span>
+            <span>🟡 In Lunch (Lunch Break)</span>
           </span>
         );
       case 'SURGERY':
         return (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-3 py-0.5 text-[11px] font-bold text-rose-700 border border-rose-300 shadow-2xs">
             <Activity className="h-3 w-3 text-rose-600" />
-            <span>In Surgery (OT)</span>
+            <span>🔴 In Surgery (In OT)</span>
           </span>
         );
       case 'LEAVE':
         return (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-0.5 text-[11px] font-bold text-slate-700 border border-slate-300 shadow-2xs">
             <AlertTriangle className="h-3 w-3 text-slate-500" />
-            <span>On Leave</span>
+            <span>⚪ On Leave (Unavailable)</span>
           </span>
         );
     }
   };
 
+  // Current Date & Active Shift
   const todayDateStr = new Date().toISOString().split('T')[0];
   const activeShift = new Date().getHours() < 14 ? 'morning' : 'evening';
 
+  // Search matching patients under this doctor
   const matchedPatients = tokenSearchQuery.trim() === ''
     ? []
     : patients.filter((p) => {
@@ -158,12 +162,12 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
     <div className="group rounded-2xl sm:rounded-3xl bg-white border border-slate-200 shadow-xs hover:shadow-lg transition-all duration-300 overflow-hidden flex flex-col justify-between w-full">
       {/* Top Details Section with Compact Padding */}
       <div className="p-3.5 sm:p-5 space-y-2.5">
-        {/* 1. Status Badge */}
+        {/* 1. TOP CENTER STATUS BADGE */}
         <div className="flex justify-center w-full">
           {getStatusBadge()}
         </div>
 
-        {/* 2. Doctor Profile Details */}
+        {/* 2. DOCTOR PROFILE DETAILS */}
         <div className="flex items-center gap-3 pt-0.5">
           <img
             src={doctor.profilePic || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=300'}
@@ -183,7 +187,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
           </div>
         </div>
 
-        {/* 3. Know Your Token Search Box */}
+        {/* 3. 🔍 KNOW YOUR TOKEN SEARCH BOX (Compact Height) */}
         <div className="rounded-xl bg-slate-50 border border-slate-200 p-2 sm:p-2.5 space-y-1.5">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1">
@@ -232,6 +236,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
                     key={p.id}
                     className="rounded-xl bg-white border border-blue-200 p-2 shadow-2xs space-y-1.5"
                   >
+                    {/* Top Row */}
                     <div className="flex items-center justify-between gap-1.5">
                       <div className="flex items-center gap-1.5 min-w-0">
                         <span className="font-mono font-black text-blue-700 text-xs bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-200 shrink-0">
@@ -255,6 +260,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
                       </span>
                     </div>
 
+                    {/* Details Row */}
                     <div className="rounded-lg bg-slate-50 p-1.5 border border-slate-100 text-[10px] text-slate-600 space-y-0.5">
                       <div className="flex items-center gap-1 font-mono text-slate-700">
                         <Phone className="h-2.5 w-2.5 text-slate-400 shrink-0" />
@@ -274,7 +280,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
           )}
         </div>
 
-        {/* 4. Clinic Info */}
+        {/* 4. Clinic info (Compact Rows) */}
         <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-100 space-y-1 text-xs text-slate-600">
           <div className="font-bold text-slate-800 flex items-center gap-1.5">
             <Stethoscope className="h-3.5 w-3.5 text-blue-600 shrink-0" />
@@ -290,7 +296,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
           </div>
         </div>
 
-        {/* 5. Clinic Photos */}
+        {/* 5. Clinic Images Gallery Section */}
         {(() => {
           const imgs = doctor.clinicImages;
           if (!imgs) return null;
@@ -319,7 +325,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
           );
         })()}
 
-        {/* 6. Live Token Box */}
+        {/* 6. LIVE TOKEN / DOCTOR STATUS DISPLAY BOX (Compact Height) */}
         <div className="rounded-xl bg-slate-100/90 border border-slate-300/80 py-2.5 px-3 text-center shadow-inner relative overflow-hidden">
           <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block">
             Current Running Token (Live Token)
@@ -333,7 +339,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
         </div>
       </div>
 
-      {/* Book Online Token Button */}
+      {/* Book Online Token Action Footer */}
       <div className="p-3 bg-slate-50/90 border-t border-slate-100">
         <button
           type="button"
