@@ -72,7 +72,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
     age: '',
     gender: 'Male' as 'Male' | 'Female' | 'Other',
     appointmentDate: todayStr,
-    selectedShift: initialMorningActive ? 'Morning' : 'Evening', // 👈 Smart default based on current time
+    selectedShift: initialMorningActive ? 'Morning' : 'Evening', // Smart default based on current time
     address: '',
     complaint: '',
   });
@@ -105,7 +105,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
     return num > max ? num : max;
   }, 0) + 1;
 
-  // 🔹 PRIORITY 1: Central Vercel Key, PRIORITY 2: Doctor Key, PRIORITY 3: Razorpay Settings
+  // PRIORITY 1: Central Vercel Key, PRIORITY 2: Doctor Key, PRIORITY 3: Razorpay Settings
   const activeRazorpayKey =
     (import.meta as any).env?.VITE_RAZORPAY_KEY_ID ||
     doctor.razorpayKeyId ||
@@ -117,8 +117,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
       setErrorMsg('Kripya mareez ka naam bharein (Enter Patient Name)');
       return;
     }
-    if (!formData.mobile.trim() || formData.mobile.length < 10) {
-      setErrorMsg('Kripya 10 ankon ka mobile number bharein (Enter valid 10-digit mobile)');
+    if (!formData.mobile.trim() || formData.mobile.length !== 10) {
+      setErrorMsg('Kripya 10 ankon ka valid mobile number bharein');
       return;
     }
     if (!formData.address.trim()) {
@@ -137,10 +137,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
     clinicName: string;
   }) => {
     try {
-      const cleanPhone = patientData.phone.replace(/\D/g, '');
-      const formattedPhone = cleanPhone.startsWith('91') && cleanPhone.length === 12
-        ? cleanPhone
-        : `91${cleanPhone.slice(-10)}`;
+      const cleanDigits = patientData.phone.replace(/\D/g, '');
+      const formattedPhone = cleanDigits.length === 10 ? `91${cleanDigits}` : cleanDigits;
 
       const response = await fetch('/api/send-whatsapp', {
         method: 'POST',
@@ -194,7 +192,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
       handler: function (response: any) {
         setIsProcessingPayment(false);
 
-        // 👈 Explicit selectedShift & shift passed to store correct slot
         const result = bookOnlineAppointment({
           doctorId: doctor.id,
           hospitalId: resolvedHospitalId,
@@ -370,20 +367,36 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
 
               {/* Mobile Number & Age/Gender */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* 2. Mobile Number (Pre-fixed +91 with 10-digit limit) */}
                 <div>
                   <label className="block text-[11px] sm:text-xs font-semibold text-slate-700 mb-1">
                     2. Mobile Number (मोबाइल नंबर) *
                   </label>
-                  <input
-                    type="tel"
-                    required
-                    maxLength={10}
-                    value={formData.mobile}
-                    onChange={(e) => setFormData({ ...formData, mobile: e.target.value.replace(/\D/g, '') })}
-                    placeholder="10-digit mobile number"
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                  />
-                  <span className="text-[10px] text-slate-500 block mt-0.5">Alert Bot will call this number</span>
+                  <div className="relative flex items-center">
+                    <div className="absolute left-0 top-0 bottom-0 flex items-center justify-center px-3 bg-slate-100 border-r border-slate-300 rounded-l-xl text-xs font-bold text-slate-700 select-none pointer-events-none">
+                      🇮🇳 +91
+                    </div>
+                    <input
+                      type="tel"
+                      required
+                      maxLength={10}
+                      value={formData.mobile}
+                      onChange={(e) => {
+                        let val = e.target.value.replace(/\D/g, '');
+                        if (val.startsWith('91') && val.length > 10) {
+                          val = val.slice(2);
+                        } else if (val.startsWith('0')) {
+                          val = val.slice(1);
+                        }
+                        setFormData({ ...formData, mobile: val.slice(0, 10) });
+                      }}
+                      placeholder="10-digit number"
+                      className="w-full rounded-xl border border-slate-300 pl-16 pr-3 py-2 text-xs sm:text-sm font-medium tracking-wide focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 bg-white"
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-500 block mt-0.5">
+                    Alert Bot isi number par WhatsApp aur Call alert bhejega
+                  </span>
                 </div>
 
                 <div>
