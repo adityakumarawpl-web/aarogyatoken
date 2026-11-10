@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useClinic } from '../../context/ClinicContext';
 import { DoctorCard } from './DoctorCard';
 import { BookingModal } from './BookingModal';
@@ -12,6 +12,8 @@ import {
   Lock,
   X,
   ArrowUp,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 export const PublicOPDView: React.FC = () => {
@@ -21,14 +23,14 @@ export const PublicOPDView: React.FC = () => {
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>('ALL');
   const [activeDoctorForBooking, setActiveDoctorForBooking] = useState<Doctor | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const chipsScrollRef = useRef<HTMLDivElement>(null);
 
-  // 🔹 DYNAMIC SPECIALTY CHIPS GENERATION: Doctors ki unique specialty nikalna
+  // Dynamic Unique Specialty Chips
   const specialtyList = useMemo(() => {
     const list: string[] = [];
     doctors.forEach((doc) => {
       if (doc.specialty && typeof doc.specialty === 'string') {
         const clean = doc.specialty.trim();
-        // Link ya image URL na ho
         if (clean && !clean.startsWith('http') && !list.includes(clean)) {
           list.push(clean);
         }
@@ -37,7 +39,14 @@ export const PublicOPDView: React.FC = () => {
     return list;
   }, [doctors]);
 
-  // Scroll detect karke Scroll-to-Top button dikhana/chhipana
+  // Scroll buttons handler for chips
+  const scrollChips = (direction: 'left' | 'right') => {
+    if (chipsScrollRef.current) {
+      const scrollAmount = direction === 'left' ? -200 : 200;
+      chipsScrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
+
   useEffect(() => {
     const handleScroll = () => {
       if (window.scrollY > 250) {
@@ -61,7 +70,6 @@ export const PublicOPDView: React.FC = () => {
   const filteredDoctors = doctors.filter((doc) => {
     const query = searchQuery.toLowerCase().trim();
 
-    // Specialty Chip Filter
     if (selectedSpecialty !== 'ALL') {
       const specMatch = doc.specialty?.toLowerCase().trim() === selectedSpecialty.toLowerCase().trim();
       if (!specMatch) return false;
@@ -69,7 +77,6 @@ export const PublicOPDView: React.FC = () => {
 
     if (!query) return true;
 
-    // Search query matches: Doctor Name, Specialty, Clinic Name, City
     return (
       doc.name.toLowerCase().includes(query) ||
       doc.specialty?.toLowerCase().includes(query) ||
@@ -108,9 +115,9 @@ export const PublicOPDView: React.FC = () => {
       </div>
 
       {/* SEARCH & FILTER BAR */}
-      <div className="bg-blue-900/95 px-3 sm:px-6 py-2 border-b border-blue-700/60 shadow-md">
-        <div className="max-w-xl mx-auto">
-          {/* Search box (Bimari word removed) */}
+      <div className="bg-blue-900/95 px-3 sm:px-6 py-2.5 border-b border-blue-700/60 shadow-md">
+        <div className="max-w-2xl mx-auto">
+          {/* Search Box */}
           <div className="relative flex items-center">
             <Search className="absolute left-3.5 h-4 w-4 text-slate-400 pointer-events-none" />
             <input
@@ -135,9 +142,26 @@ export const PublicOPDView: React.FC = () => {
               </button>
             )}
           </div>
+        </div>
 
-          {/* Dynamic Specialty Filter Chips */}
-          <div className="flex items-center gap-1.5 mt-2 overflow-x-auto py-0.5 scrollbar-none justify-start sm:justify-center px-0.5 touch-pan-x w-full">
+        {/* 🔹 FULL-WIDTH SMOOTH SLIDER WITH CONTROLS */}
+        <div className="max-w-4xl mx-auto mt-2.5 relative flex items-center group">
+          {/* Left Arrow Button (Desktop View) */}
+          <button
+            type="button"
+            onClick={() => scrollChips('left')}
+            className="hidden sm:flex absolute -left-3 z-10 h-7 w-7 rounded-full bg-blue-800/90 text-white border border-blue-600 shadow-md items-center justify-center hover:bg-blue-700 cursor-pointer"
+            aria-label="Scroll left"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+
+          {/* Chips Scrollable Area */}
+          <div
+            ref={chipsScrollRef}
+            className="flex items-center gap-2 overflow-x-auto py-1 scroll-smooth scrollbar-none w-full px-2 touch-pan-x"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
             <button
               type="button"
               onClick={() => {
@@ -146,10 +170,10 @@ export const PublicOPDView: React.FC = () => {
                   document.activeElement.blur();
                 }
               }}
-              className={`px-3 py-1 rounded-full text-[11px] font-bold transition cursor-pointer shrink-0 whitespace-nowrap active:scale-95 ${
+              className={`px-3.5 py-1 rounded-full text-xs font-bold transition cursor-pointer shrink-0 whitespace-nowrap ${
                 selectedSpecialty === 'ALL'
-                  ? 'bg-blue-500 text-white shadow-xs'
-                  : 'bg-white/15 text-blue-100 hover:bg-white/25 border border-white/15'
+                  ? 'bg-blue-500 text-white shadow-sm'
+                  : 'bg-white/15 text-blue-100 hover:bg-white/25 border border-white/20'
               }`}
             >
               Sabhi Doctors (All)
@@ -165,16 +189,26 @@ export const PublicOPDView: React.FC = () => {
                     document.activeElement.blur();
                   }
                 }}
-                className={`px-3 py-1 rounded-full text-[11px] font-bold transition cursor-pointer shrink-0 whitespace-nowrap active:scale-95 ${
+                className={`px-3.5 py-1 rounded-full text-xs font-bold transition cursor-pointer shrink-0 whitespace-nowrap ${
                   selectedSpecialty === spec
-                    ? 'bg-blue-500 text-white shadow-xs'
-                    : 'bg-white/15 text-blue-100 hover:bg-white/25 border border-white/15'
+                    ? 'bg-blue-500 text-white shadow-sm'
+                    : 'bg-white/15 text-blue-100 hover:bg-white/25 border border-white/20'
                 }`}
               >
                 {spec}
               </button>
             ))}
           </div>
+
+          {/* Right Arrow Button (Desktop View) */}
+          <button
+            type="button"
+            onClick={() => scrollChips('right')}
+            className="hidden sm:flex absolute -right-3 z-10 h-7 w-7 rounded-full bg-blue-800/90 text-white border border-blue-600 shadow-md items-center justify-center hover:bg-blue-700 cursor-pointer"
+            aria-label="Scroll right"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
         </div>
       </div>
 
