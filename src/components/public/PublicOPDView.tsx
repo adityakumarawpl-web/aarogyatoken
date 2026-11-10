@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useClinic } from '../../context/ClinicContext';
 import { DoctorCard } from './DoctorCard';
 import { BookingModal } from './BookingModal';
@@ -21,6 +21,21 @@ export const PublicOPDView: React.FC = () => {
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>('ALL');
   const [activeDoctorForBooking, setActiveDoctorForBooking] = useState<Doctor | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
+
+  // 🔹 DYNAMIC SPECIALTY CHIPS GENERATION: Doctors ki unique specialty nikalna
+  const specialtyList = useMemo(() => {
+    const list: string[] = [];
+    doctors.forEach((doc) => {
+      if (doc.specialty && typeof doc.specialty === 'string') {
+        const clean = doc.specialty.trim();
+        // Link ya image URL na ho
+        if (clean && !clean.startsWith('http') && !list.includes(clean)) {
+          list.push(clean);
+        }
+      }
+    });
+    return list;
+  }, [doctors]);
 
   // Scroll detect karke Scroll-to-Top button dikhana/chhipana
   useEffect(() => {
@@ -46,22 +61,21 @@ export const PublicOPDView: React.FC = () => {
   const filteredDoctors = doctors.filter((doc) => {
     const query = searchQuery.toLowerCase().trim();
 
+    // Specialty Chip Filter
     if (selectedSpecialty !== 'ALL') {
-      const specMatch = doc.specialty?.toLowerCase().includes(selectedSpecialty.toLowerCase());
+      const specMatch = doc.specialty?.toLowerCase().trim() === selectedSpecialty.toLowerCase().trim();
       if (!specMatch) return false;
     }
 
     if (!query) return true;
 
-    const matchesVisible =
+    // Search query matches: Doctor Name, Specialty, Clinic Name, City
+    return (
       doc.name.toLowerCase().includes(query) ||
-      doc.specialty.toLowerCase().includes(query) ||
-      doc.clinicName.toLowerCase().includes(query) ||
-      doc.city.toLowerCase().includes(query);
-
-    const matchesTags = doc.tags?.some((t) => t.toLowerCase().includes(query));
-
-    return matchesVisible || matchesTags;
+      doc.specialty?.toLowerCase().includes(query) ||
+      doc.clinicName?.toLowerCase().includes(query) ||
+      doc.city?.toLowerCase().includes(query)
+    );
   });
 
   return (
@@ -96,6 +110,7 @@ export const PublicOPDView: React.FC = () => {
       {/* SEARCH & FILTER BAR */}
       <div className="bg-blue-900/95 px-3 sm:px-6 py-2 border-b border-blue-700/60 shadow-md">
         <div className="max-w-xl mx-auto">
+          {/* Search box (Bimari word removed) */}
           <div className="relative flex items-center">
             <Search className="absolute left-3.5 h-4 w-4 text-slate-400 pointer-events-none" />
             <input
@@ -107,7 +122,7 @@ export const PublicOPDView: React.FC = () => {
                   (e.target as HTMLInputElement).blur();
                 }
               }}
-              placeholder="Doctor, bimari ya clinic search karein..."
+              placeholder="Doctor ka naam, Specialty ya Clinic dhoondhein..."
               className="w-full rounded-xl bg-white text-slate-900 pl-10 pr-9 py-2 text-xs sm:text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
             {searchQuery && (
@@ -121,9 +136,26 @@ export const PublicOPDView: React.FC = () => {
             )}
           </div>
 
-          {/* Specialty Filter Chips */}
+          {/* Dynamic Specialty Filter Chips */}
           <div className="flex items-center gap-1.5 mt-2 overflow-x-auto py-0.5 scrollbar-none justify-start sm:justify-center px-0.5 touch-pan-x w-full">
-            {['ALL', 'Physician', 'Gynecologist', 'Orthopedics'].map((spec) => (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedSpecialty('ALL');
+                if (document.activeElement instanceof HTMLElement) {
+                  document.activeElement.blur();
+                }
+              }}
+              className={`px-3 py-1 rounded-full text-[11px] font-bold transition cursor-pointer shrink-0 whitespace-nowrap active:scale-95 ${
+                selectedSpecialty === 'ALL'
+                  ? 'bg-blue-500 text-white shadow-xs'
+                  : 'bg-white/15 text-blue-100 hover:bg-white/25 border border-white/15'
+              }`}
+            >
+              Sabhi Doctors (All)
+            </button>
+
+            {specialtyList.map((spec) => (
               <button
                 key={spec}
                 type="button"
@@ -139,7 +171,7 @@ export const PublicOPDView: React.FC = () => {
                     : 'bg-white/15 text-blue-100 hover:bg-white/25 border border-white/15'
                 }`}
               >
-                {spec === 'ALL' ? 'Sabhi Doctors (All)' : spec}
+                {spec}
               </button>
             ))}
           </div>
@@ -163,7 +195,7 @@ export const PublicOPDView: React.FC = () => {
           <div className="rounded-3xl bg-white p-8 text-center border border-slate-200 shadow-sm">
             <Activity className="mx-auto h-10 w-10 text-slate-400" />
             <h3 className="text-sm font-bold text-slate-800 mt-2">Koi doctor nahi mila</h3>
-            <p className="text-xs text-slate-500 mt-0.5">Kripya doosra naam ya specialty search karein</p>
+            <p className="text-xs text-slate-500 mt-0.5">Kripya doosra naam ya specialty filter chunein</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
@@ -224,7 +256,7 @@ export const PublicOPDView: React.FC = () => {
         </div>
       </div>
 
-      {/* 🚀 FLOATING SCROLL TO TOP BUTTON (Mobile & Desktop) */}
+      {/* Floating Scroll To Top Button */}
       {showScrollTop && (
         <button
           type="button"
