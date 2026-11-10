@@ -12,6 +12,7 @@ import {
   Lock,
   X,
   ArrowUp,
+  ArrowDown,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -23,6 +24,7 @@ export const PublicOPDView: React.FC = () => {
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>('ALL');
   const [activeDoctorForBooking, setActiveDoctorForBooking] = useState<Doctor | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [showScrollBottom, setShowScrollBottom] = useState(true);
   const chipsScrollRef = useRef<HTMLDivElement>(null);
 
   // Dynamic Unique Specialty Chips
@@ -39,7 +41,7 @@ export const PublicOPDView: React.FC = () => {
     return list;
   }, [doctors]);
 
-  // Scroll buttons handler for chips
+  // Scroll chips left/right handler
   const scrollChips = (direction: 'left' | 'right') => {
     if (chipsScrollRef.current) {
       const scrollAmount = direction === 'left' ? -200 : 200;
@@ -47,22 +49,41 @@ export const PublicOPDView: React.FC = () => {
     }
   };
 
+  // Scroll visibility listeners (Top & Bottom buttons)
   useEffect(() => {
     const handleScroll = () => {
+      // 1. Scroll-to-Top Button (> 250px neeche aane par dikhega)
       if (window.scrollY > 250) {
         setShowScrollTop(true);
       } else {
         setShowScrollTop(false);
       }
+
+      // 2. Scroll-to-Bottom Button (Page ke aakhir mein aate hi hide ho jayega)
+      const currentScroll = window.innerHeight + window.scrollY;
+      const totalPageHeight = document.documentElement.scrollHeight;
+      if (currentScroll >= totalPageHeight - 120) {
+        setShowScrollBottom(false);
+      } else {
+        setShowScrollBottom(true);
+      }
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   const scrollToTop = () => {
     window.scrollTo({
       top: 0,
+      behavior: 'smooth',
+    });
+  };
+
+  const scrollToBottom = () => {
+    window.scrollTo({
+      top: document.documentElement.scrollHeight,
       behavior: 'smooth',
     });
   };
@@ -144,9 +165,8 @@ export const PublicOPDView: React.FC = () => {
           </div>
         </div>
 
-        {/* 🔹 FULL-WIDTH SMOOTH SLIDER WITH CONTROLS */}
+        {/* FULL-WIDTH SMOOTH SLIDER WITH CONTROLS */}
         <div className="max-w-4xl mx-auto mt-2.5 relative flex items-center group">
-          {/* Left Arrow Button (Desktop View) */}
           <button
             type="button"
             onClick={() => scrollChips('left')}
@@ -156,7 +176,6 @@ export const PublicOPDView: React.FC = () => {
             <ChevronLeft className="h-4 w-4" />
           </button>
 
-          {/* Chips Scrollable Area */}
           <div
             ref={chipsScrollRef}
             className="flex items-center gap-2 overflow-x-auto py-1 scroll-smooth scrollbar-none w-full px-2 touch-pan-x"
@@ -200,7 +219,6 @@ export const PublicOPDView: React.FC = () => {
             ))}
           </div>
 
-          {/* Right Arrow Button (Desktop View) */}
           <button
             type="button"
             onClick={() => scrollChips('right')}
@@ -290,7 +308,19 @@ export const PublicOPDView: React.FC = () => {
         </div>
       </div>
 
-      {/* Floating Scroll To Top Button */}
+      {/* 🔹 LEFT: FLOATING SCROLL TO BOTTOM BUTTON */}
+      {showScrollBottom && (
+        <button
+          type="button"
+          onClick={scrollToBottom}
+          aria-label="Scroll to bottom"
+          className="fixed bottom-6 left-5 z-40 h-11 w-11 rounded-full bg-slate-900/90 text-white shadow-xl shadow-slate-900/40 border border-slate-700/50 flex items-center justify-center hover:bg-slate-800 active:scale-90 transition-all duration-200 cursor-pointer animate-in fade-in zoom-in-75"
+        >
+          <ArrowDown className="h-5 w-5 stroke-[2.5]" />
+        </button>
+      )}
+
+      {/* 🔹 RIGHT: FLOATING SCROLL TO TOP BUTTON */}
       {showScrollTop && (
         <button
           type="button"
