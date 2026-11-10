@@ -159,7 +159,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
       });
 
   return (
-    <div className="group rounded-3xl bg-white border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col justify-between">
+    <div className="group rounded-3xl bg-white border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col justify-between w-full">
       {/* Top Details Section */}
       <div className="p-5 sm:p-6 space-y-4">
         {/* 1. TOP CENTER STATUS BADGE */}
@@ -204,58 +204,75 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
               type="text"
               value={tokenSearchQuery}
               onChange={(e) => setTokenSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  (e.target as HTMLInputElement).blur();
+                }
+              }}
               placeholder="Apna Naam ya Mobile Number likhein..."
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none"
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none"
             />
             {tokenSearchQuery.trim() && (
               <button
                 type="button"
                 onClick={() => setTokenSearchQuery('')}
-                className="absolute right-2.5 top-1.5 text-xs font-bold text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="absolute right-2.5 top-2 text-xs font-bold text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
             )}
           </div>
 
-          {/* Search Result Dropdown List */}
+          {/* Search Result Dropdown List (2-Line Responsive Layout: No horizontal slide needed) */}
           {tokenSearchQuery.trim() !== '' && (
-            <div className="pt-1 space-y-1.5 max-h-40 overflow-y-auto">
+            <div className="pt-1 space-y-2 max-h-56 overflow-y-auto">
               {matchedPatients.length === 0 ? (
-                <div className="rounded-xl bg-amber-50 border border-amber-200 p-2 text-center text-[10px] text-amber-800 font-semibold">
+                <div className="rounded-xl bg-amber-50 border border-amber-200 p-2.5 text-center text-xs text-amber-800 font-semibold">
                   Aaj ki is shift mein is naam/number ka koi token nahi mila.
                 </div>
               ) : (
                 matchedPatients.map((p) => (
                   <div
                     key={p.id}
-                    className="rounded-xl bg-white border border-blue-200 p-2 shadow-2xs flex items-center justify-between gap-2"
+                    className="rounded-2xl bg-white border border-blue-200 p-3 shadow-xs space-y-2"
                   >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="font-mono font-black text-blue-600 text-xs bg-blue-50 px-2 py-1 rounded-md border border-blue-200 shrink-0">
-                        #{p.tokenNumber}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="font-bold text-xs text-slate-900 truncate">
+                    {/* Top Row: Token Badge + Name + Queue Status */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-mono font-black text-blue-700 text-sm bg-blue-50 px-2.5 py-1 rounded-xl border border-blue-200 shrink-0">
+                          #{p.tokenNumber}
+                        </span>
+                        <span className="font-extrabold text-sm text-slate-900 break-words leading-tight">
                           {p.name}
-                        </div>
-                        <div className="text-[10px] text-slate-500 font-mono mt-0.5 truncate">
-                          Mo: {maskMobile(p.mobile)} • Add: {p.address || 'N/A'}
-                        </div>
+                        </span>
                       </div>
+
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap ${
+                          p.status === 'COMPLETED'
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                            : p.status === 'IN_CABIN'
+                            ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                            : 'bg-amber-100 text-amber-800 border border-amber-200'
+                        }`}
+                      >
+                        {p.status === 'IN_CABIN' ? 'In Cabin' : p.status === 'COMPLETED' ? 'Done' : 'Waiting'}
+                      </span>
                     </div>
 
-                    <span
-                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ${
-                        p.status === 'COMPLETED'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : p.status === 'IN_CABIN'
-                          ? 'bg-blue-100 text-blue-800'
-                          : 'bg-amber-100 text-amber-800'
-                      }`}
-                    >
-                      {p.status === 'IN_CABIN' ? 'In Cabin' : p.status === 'COMPLETED' ? 'Done' : 'Waiting'}
-                    </span>
+                    {/* Details Row: Mobile Number & Complete Address (Full View, No Truncation) */}
+                    <div className="rounded-xl bg-slate-50 p-2 border border-slate-100 text-[11px] text-slate-600 space-y-1">
+                      <div className="flex items-center gap-1.5 font-mono text-slate-700">
+                        <Phone className="h-3 w-3 text-slate-400 shrink-0" />
+                        <span>Mo: <strong className="font-bold">{maskMobile(p.mobile)}</strong></span>
+                      </div>
+                      <div className="flex items-start gap-1.5 text-slate-700">
+                        <MapPin className="h-3 w-3 text-slate-400 shrink-0 mt-0.5" />
+                        <span className="break-words leading-snug">
+                          Pata: <strong className="font-semibold text-slate-800">{p.address || 'Umaria'}</strong>
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 ))
               )}
