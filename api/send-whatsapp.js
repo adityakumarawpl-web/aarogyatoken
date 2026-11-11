@@ -26,9 +26,8 @@ export default async function handler(req, res) {
       }
     }
 
-    const { phone, patientName, doctorName, tokenNumber, clinicName } = body || {};
+    const { phone, patientName, doctorName, tokenNumber, clinicName, templateName } = body || {};
 
-    // Phone Clean (Strictly 91 + 10 digits)
     const rawDigits = String(phone || '').replace(/\D/g, '');
     const cleanPhone = rawDigits.startsWith('91') && rawDigits.length === 12
       ? rawDigits
@@ -40,13 +39,15 @@ export default async function handler(req, res) {
     if (!WHATSAPP_TOKEN || !PHONE_NUMBER_ID) {
       return res.status(500).json({
         success: false,
-        error: 'Vercel environment variables missing (META_ACCESS_TOKEN / META_PHONE_NUMBER_ID)',
+        error: 'Vercel environment variables missing',
       });
     }
 
+    // Currently approved template
+    const activeTemplate = templateName || 'opd_token_confirmation';
+
     const metaUrl = `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`;
 
-    // 🔹 Approved Hindi Template: opd_token_confirmation
     const metaResponse = await fetch(metaUrl, {
       method: 'POST',
       headers: {
@@ -58,7 +59,7 @@ export default async function handler(req, res) {
         to: cleanPhone,
         type: 'template',
         template: {
-          name: 'opd_token_confirmation',
+          name: activeTemplate,
           language: { code: 'hi' },
           components: [
             {
@@ -67,7 +68,7 @@ export default async function handler(req, res) {
                 { type: 'text', text: patientName || 'Patient' },
                 { type: 'text', text: doctorName || 'Doctor' },
                 { type: 'text', text: String(tokenNumber || '#1') },
-                { type: 'text', text: clinicName || 'Clinic' },
+                { type: 'text', text: String(clinicName || 'Clinic') },
               ],
             },
           ],
@@ -86,6 +87,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       success: true,
+      templateUsed: activeTemplate,
       data: metaData,
     });
   } catch (error) {
