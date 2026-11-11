@@ -21,6 +21,8 @@ import {
   Users,
   Building2,
   ChevronLeft,
+  PlayCircle,
+  PauseCircle,
 } from 'lucide-react';
 
 export const StaffPortal: React.FC = () => {
@@ -31,6 +33,8 @@ export const StaffPortal: React.FC = () => {
     staffLogin,
     staffLogout,
     updateDoctorStatus,
+    startDoctorSession,
+    pauseDoctorSession,
     addWalkInPatient,
     setSelectedDoctorId,
   } = useClinic();
@@ -152,7 +156,7 @@ export const StaffPortal: React.FC = () => {
               <Lock className="h-7 w-7" />
             </div>
 
-            {/* 1. Radio Button: Clinic vs Hospital Selector */}
+            {/* Radio Button: Clinic vs Hospital Selector */}
             <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1.5 rounded-2xl mb-5 border border-slate-200">
               <label
                 className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold cursor-pointer transition ${
@@ -304,7 +308,6 @@ export const StaffPortal: React.FC = () => {
 
   // ==========================================
   // VIEW 2: HOSPITAL MULTI-DOCTOR SELECTION DIRECTORY
-  // (Jab hospital login ho aur koi specific cabin select na kiya ho)
   // ==========================================
   const loggedInDoctor = doctors.find((d) => d.id === staffDoctorId);
   const hospitalDoctorsList = doctors.filter(
@@ -316,7 +319,6 @@ export const StaffPortal: React.FC = () => {
     return (
       <div className="min-h-[calc(100vh-4rem)] bg-slate-100 p-4 sm:p-8 pb-20">
         <div className="max-w-6xl mx-auto space-y-6">
-          {/* Hospital Header Strip */}
           <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
@@ -343,7 +345,6 @@ export const StaffPortal: React.FC = () => {
             </button>
           </div>
 
-          {/* Doctors & Cabins Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {hospitalDoctorsList.map((doc) => {
               const docWaitingPatients = patients.filter(
@@ -409,6 +410,8 @@ export const StaffPortal: React.FC = () => {
   // VIEW 3: LIVE OPD DESK (Single Doctor / Selected Cabin)
   // ==========================================
   if (!currentDoctor) return null;
+
+  const isSessionActive = Boolean(currentDoctor.isSessionActive);
 
   const doctorPatients = patients.filter((p) => {
     if (p.doctorId !== currentDoctor?.id) return false;
@@ -547,6 +550,15 @@ export const StaffPortal: React.FC = () => {
                 <span className="rounded bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-0.5">
                   {currentDoctor.cabinNumber}
                 </span>
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    isSessionActive
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                      : 'bg-amber-100 text-amber-800 border border-amber-300'
+                  }`}
+                >
+                  {isSessionActive ? '🟢 Session Active' : '🔴 Session Not Started'}
+                </span>
               </div>
               <p className="text-xs text-slate-500">
                 {currentDoctor.clinicName} • Operator Staff Desk ({currentDoctor.staffUsername})
@@ -607,6 +619,58 @@ export const StaffPortal: React.FC = () => {
 
       {/* Main Staff Container */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        {/* 🔹 START TOKEN SESSION CONTROLLER BAR */}
+        <div className="rounded-2xl border-2 border-blue-200 bg-gradient-to-r from-blue-50 via-indigo-50 to-white p-4 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className={`h-11 w-11 rounded-2xl flex items-center justify-center shrink-0 ${
+              isSessionActive ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30' : 'bg-blue-600 text-white shadow-md shadow-blue-500/30'
+            }`}>
+              {isSessionActive ? <PlayCircle className="h-6 w-6" /> : <Clock className="h-6 w-6" />}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-800">
+                  OPD Live Token Session
+                </span>
+                <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                  isSessionActive ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                }`}>
+                  {isSessionActive ? 'ACTIVE (Tokens Calling)' : 'NOT STARTED (Calling Locked)'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 mt-0.5">
+                {isSessionActive
+                  ? 'Session shuru hai. Aap cabin me mareez ko "Andar Bulayein" dabakar call kar sakte hain.'
+                  : 'OPD shuru hone se 10-15 min pehle "Start Token" dabayein. Isse online mareezon ko turant alert jayega.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            {!isSessionActive ? (
+              <button
+                type="button"
+                onClick={() => startDoctorSession(currentDoctor.id)}
+                className="w-full sm:w-auto rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 text-xs font-black shadow-md shadow-emerald-500/25 transition active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+              >
+                <PlayCircle className="h-4 w-4" />
+                <span>Start Token (10 Min Pehle)</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => pauseDoctorSession(currentDoctor.id)}
+                className="w-full sm:w-auto rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2.5 text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1.5"
+                title="Session ko temporary pause karein"
+              >
+                <PauseCircle className="h-4 w-4 text-slate-500" />
+                <span>Pause Session</span>
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* 3 Main Action Buttons Strip */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <button
@@ -785,6 +849,33 @@ export const StaffPortal: React.FC = () => {
           </div>
         )}
 
+        {/* ⚠️ Session Inactive Warning Banner when Doctor is AVAILABLE */}
+        {currentDoctor.status === 'AVAILABLE' && !isSessionActive && (
+          <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 text-amber-900 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-xl bg-amber-200 flex items-center justify-center shrink-0 font-bold text-amber-900">
+                🔒
+              </div>
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-wider text-amber-900">
+                  "Start Token" Button Dabana Zaroori Hai
+                </h4>
+                <p className="text-xs text-amber-800 mt-0.5">
+                  OPD cabin shuru karne ke liye pehle upar <strong>"Start Token"</strong> button dabayein, tabhi "Andar Bulayein" button unlock hoga aur online mareezon ko SMS/WhatsApp alert jayega.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => startDoctorSession(currentDoctor.id)}
+              className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition cursor-pointer shrink-0 flex items-center gap-1.5"
+            >
+              <PlayCircle className="h-4 w-4" />
+              <span>Start Token Now</span>
+            </button>
+          </div>
+        )}
+
         {/* TAB 1: ACTIVE QUEUE */}
         {activeTab === 'QUEUE' && (
           <div className="space-y-3">
@@ -813,6 +904,7 @@ export const StaffPortal: React.FC = () => {
                   patient={patient}
                   isFirstWaiting={index === 0 && patient.status === 'WAITING'}
                   isDoctorAvailable={currentDoctor.status === 'AVAILABLE'}
+                  isSessionActive={isSessionActive}
                   doctorStatus={currentDoctor.status}
                   currentActiveDate={realTodayDate}
                   currentActiveShift={realCurrentShift}
@@ -835,6 +927,7 @@ export const StaffPortal: React.FC = () => {
                   key={patient.id}
                   patient={patient}
                   isDoctorAvailable={currentDoctor.status === 'AVAILABLE'}
+                  isSessionActive={isSessionActive}
                   doctorStatus={currentDoctor.status}
                 />
               ))
@@ -855,6 +948,7 @@ export const StaffPortal: React.FC = () => {
                   key={patient.id}
                   patient={patient}
                   isDoctorAvailable={currentDoctor.status === 'AVAILABLE'}
+                  isSessionActive={isSessionActive}
                   doctorStatus={currentDoctor.status}
                 />
               ))
@@ -891,6 +985,7 @@ export const StaffPortal: React.FC = () => {
                   patient={patient}
                   isFirstWaiting={false}
                   isDoctorAvailable={currentDoctor.status === 'AVAILABLE'}
+                  isSessionActive={isSessionActive}
                   doctorStatus={currentDoctor.status}
                   currentActiveDate={realTodayDate}
                   currentActiveShift={realCurrentShift}
