@@ -341,6 +341,34 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [razorpaySettings]);
 
+  // Automated WhatsApp Turn Reminder Dispatch
+  const sendTurnReminderWhatsApp = async (patient: Patient, doctor: Doctor | undefined, aheadCount: number) => {
+    try {
+      const rawDigits = String(patient.mobile || '').replace(/\D/g, '');
+      const cleanPhone = rawDigits.startsWith('91') && rawDigits.length === 12
+        ? rawDigits
+        : `91${rawDigits.slice(-10)}`;
+
+      const response = await fetch('/api/send-whatsapp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: cleanPhone,
+          templateName: 'opd_turn_reminder',
+          patientName: patient.name,
+          doctorName: doctor?.name || 'Doctor',
+          tokenNumber: `#${patient.tokenNumber}`,
+          clinicName: `${aheadCount} मरीज़`, // Parameter {{4}} me remaining patients jayega
+        }),
+      });
+
+      const resData = await response.json();
+      console.log(`WhatsApp Turn Alert sent for Token #${patient.tokenNumber}:`, resData);
+    } catch (err) {
+      console.error('Failed to send turn reminder WhatsApp:', err);
+    }
+  };
+
   const checkBotAlerts = useCallback((currentPatients: Patient[]) => {
     if (!voiceBotSettings.enabled) return;
 
@@ -348,27 +376,52 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     let newlyAlertedPatient: Patient | null = null;
 
     currentPatients.forEach((p) => {
-      if (shouldSendBotCallAlert(currentPatients, p, voiceBotSettings.triggerThreshold) && !p.botCallAlertSent) {
+      // 1. Sirf ONLINE booking wale mareez ke liye check karein
+      const isOnline = p.bookingType === 'ONLINE';
+
+      if (isOnline && shouldSendBotCallAlert(currentPatients, p, voiceBotSettings.triggerThreshold) && !p.botCallAlertSent) {
         triggeredAny = true;
         const alerted = {
           ...p,
           botCallAlertSent: true,
           botCallAlertSentAt: new Date().toISOString(),
         };
+
         if (!newlyAlertedPatient) {
           newlyAlertedPatient = alerted;
         }
+
+        // Firestore me alert state save karein taaki duplicate message na jaye
         updateDoc(doc(db, 'patients', p.id), {
           botCallAlertSent: true,
-          botCallAlertSentAt: alerted.botCallAlertSentAt
-        }).catch(err => console.error("Error updating bot alert:", err));
+          botCallAlertSentAt: alerted.botCallAlertSentAt,
+        }).catch((err) => console.error("Error updating bot alert:", err));
+
+        // Remaining patients ahead calculate karein
+        const targetShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim().toLowerCase();
+        const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
+
+        const aheadCount = currentPatients.filter((other) => {
+          const otherDate = other.appointmentDate || (other.createdAt ? other.createdAt.split('T')[0] : '');
+          const otherShift = ((other as any).selectedShift || (other as any).shift || 'Morning').trim().toLowerCase();
+          return (
+            other.doctorId === p.doctorId &&
+            otherDate === pDate &&
+            otherShift === targetShift &&
+            other.status === 'WAITING' &&
+            Number(other.tokenNumber) < Number(p.tokenNumber)
+          );
+        }).length;
+
+        const matchedDoc = doctors.find((d) => d.id === p.doctorId);
+        sendTurnReminderWhatsApp(p, matchedDoc, aheadCount || voiceBotSettings.triggerThreshold);
       }
     });
 
     if (triggeredAny && newlyAlertedPatient) {
       setActiveBotCallPatient(newlyAlertedPatient);
     }
-  }, [voiceBotSettings]);
+  }, [voiceBotSettings, doctors]);
 
   const addWalkInPatient = useCallback((data: Omit<Patient, 'id' | 'tokenNumber' | 'status' | 'bookingType' | 'paymentStatus' | 'paymentAmount' | 'createdAt' | 'botCallAlertSent'>): Patient => {
     const targetDate = (data as any).appointmentDate || new Date().toISOString().split('T')[0];
@@ -414,7 +467,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       botCallAlertSent: false,
     } as any;
 
-    setDoc(doc(db, 'patients', customId), newPatient).catch(err => {
+    setDoc(doc(db, 'patients', customId), newPatient).catch((err) => {
       console.error("Error adding walk-in patient:", err);
     });
 
@@ -470,7 +523,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       botCallAlertSent: false,
     } as any;
 
-    setDoc(doc(db, 'patients', customId), newPatient).catch(err => {
+    setDoc(doc(db, 'patients', customId), newPatient).catch((err) => {
       console.error("Error adding online patient:", err);
     });
 
@@ -482,41 +535,41 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const callPatient = useCallback((patientId: string) => {
     const updated = callPatientInCabin(patients, patientId);
-    const target = updated.find(p => p.id === patientId);
+    const target = updated.find((p) => p.id === patientId);
     setPatients(updated);
 
     if (target) {
       updateDoc(doc(db, 'patients', patientId), {
         status: target.status,
-        calledInAt: target.calledInAt
-      }).catch(err => console.error("Error updating callPatient:", err));
+        calledInAt: target.calledInAt,
+      }).catch((err) => console.error("Error updating callPatient:", err));
     }
     setTimeout(() => checkBotAlerts(updated), 50);
   }, [patients, checkBotAlerts]);
 
   const completePatient = useCallback((patientId: string) => {
     const updated = completePatientConsultation(patients, patientId);
-    const target = updated.find(p => p.id === patientId);
+    const target = updated.find((p) => p.id === patientId);
     setPatients(updated);
 
     if (target) {
       updateDoc(doc(db, 'patients', patientId), {
         status: target.status,
-        completedAt: target.completedAt
-      }).catch(err => console.error("Error updating completePatient:", err));
+        completedAt: target.completedAt,
+      }).catch((err) => console.error("Error updating completePatient:", err));
     }
     setTimeout(() => checkBotAlerts(updated), 50);
   }, [patients, checkBotAlerts]);
 
   const markNotAvailable = useCallback((patientId: string) => {
     const updated = markPatientNotAvailable(patients, patientId);
-    const target = updated.find(p => p.id === patientId);
+    const target = updated.find((p) => p.id === patientId);
     setPatients(updated);
 
     if (target) {
       updateDoc(doc(db, 'patients', patientId), {
-        status: target.status
-      }).catch(err => console.error("Error updating markNotAvailable:", err));
+        status: target.status,
+      }).catch((err) => console.error("Error updating markNotAvailable:", err));
     }
     setTimeout(() => checkBotAlerts(updated), 50);
   }, [patients, checkBotAlerts]);
@@ -542,13 +595,13 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const recallPatient = useCallback((patientId: string) => {
     const updated = recallPatientLogic(patients, patientId);
-    const target = updated.find(p => p.id === patientId);
+    const target = updated.find((p) => p.id === patientId);
     setPatients(updated);
 
     if (target) {
       updateDoc(doc(db, 'patients', patientId), {
-        status: target.status
-      }).catch(err => console.error("Error updating recallPatient:", err));
+        status: target.status,
+      }).catch((err) => console.error("Error updating recallPatient:", err));
     }
     setTimeout(() => checkBotAlerts(updated), 50);
   }, [patients, checkBotAlerts]);
@@ -560,8 +613,8 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           const updatedNote = (note !== undefined ? note : (docItem.statusNote || '')) || '';
           updateDoc(doc(db, 'doctors', doctorId), {
             status: status,
-            statusNote: updatedNote
-          }).catch(err => console.error("Error updating doctor status:", err));
+            statusNote: updatedNote,
+          }).catch((err) => console.error("Error updating doctor status:", err));
 
           return {
             ...docItem,
@@ -583,7 +636,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const customId = data.cabinNumber && data.cabinNumber !== 'Chamber'
       ? `${baseUsername}_${data.cabinNumber.toLowerCase().replace(/[^a-z0-9]/g, '')}`
       : baseUsername;
-    
+
     const centralKey = (import.meta as any).env?.VITE_RAZORPAY_KEY_ID || '';
 
     const cleanedData = {
@@ -592,7 +645,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         ? data.profilePic.trim()
         : 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=300',
       clinicImages: Array.isArray(data.clinicImages)
-        ? data.clinicImages.filter(img => typeof img === 'string' && img.trim() !== '')
+        ? data.clinicImages.filter((img) => typeof img === 'string' && img.trim() !== '')
         : [],
       razorpayKeyId: data.razorpayKeyId || centralKey,
     };
@@ -609,7 +662,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const safePayload = JSON.parse(JSON.stringify(newDoc));
 
-    setDoc(doc(db, 'doctors', customId), safePayload).catch(err => {
+    setDoc(doc(db, 'doctors', customId), safePayload).catch((err) => {
       console.error("Error adding new doctor:", err);
     });
 
