@@ -59,6 +59,7 @@ export const INITIAL_DOCTORS: Doctor[] = [
     razorpayKeyId: 'rzp_test_rajesh_9823',
     razorpayKeySecret: 'sec_rajesh_live_98',
     razorpayAccountType: 'PLATFORM_SPLIT',
+    isSessionActive: false,
   },
   {
     id: 'doc-2',
@@ -86,6 +87,7 @@ export const INITIAL_DOCTORS: Doctor[] = [
     razorpayKeyId: 'rzp_test_priya_3481',
     razorpayKeySecret: 'sec_priya_live_77',
     razorpayAccountType: 'PLATFORM_SPLIT',
+    isSessionActive: false,
   },
   {
     id: 'doc-3',
@@ -113,6 +115,7 @@ export const INITIAL_DOCTORS: Doctor[] = [
     razorpayKeyId: 'rzp_test_amit_1109',
     razorpayKeySecret: 'sec_amit_live_44',
     razorpayAccountType: 'PLATFORM_SPLIT',
+    isSessionActive: false,
   },
 ];
 
@@ -195,6 +198,8 @@ interface ClinicContextType {
   markEmergency: (patientId: string) => void;
   recallPatient: (patientId: string) => void;
   updateDoctorStatus: (doctorId: string, status: DoctorStatus, note?: string) => void;
+  startDoctorSession: (doctorId: string) => Promise<void>;
+  pauseDoctorSession: (doctorId: string) => Promise<void>;
   addNewDoctor: (doctor: Omit<Doctor, 'id' | 'status' | 'onlineTokenFee' | 'createdAt'>) => Doctor;
   staffLogin: (username: string, password: string) => { success: boolean; message: string; doctor?: Doctor };
   staffLogout: () => void;
@@ -341,7 +346,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [razorpaySettings]);
 
-  // Automated WhatsApp Turn Reminder Dispatch (Using Currently Approved Template)
+  // Automated WhatsApp Turn Reminder Dispatch (Using Approved Template)
   const sendTurnReminderWhatsApp = async (patient: Patient, doctor: Doctor | undefined, aheadCount: number) => {
     try {
       const rawDigits = String(patient.mobile || '').replace(/\D/g, '');
@@ -376,7 +381,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     let newlyAlertedPatient: Patient | null = null;
 
     currentPatients.forEach((p) => {
-      // 1. Sirf ONLINE booking wale mareez ke liye check karein
+      // Sirf ONLINE booking wale mareez ke liye check karein
       const isOnline = p.bookingType === 'ONLINE';
 
       if (isOnline && shouldSendBotCallAlert(currentPatients, p, voiceBotSettings.triggerThreshold) && !p.botCallAlertSent) {
@@ -391,13 +396,11 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           newlyAlertedPatient = alerted;
         }
 
-        // Firestore me alert state save karein taaki duplicate message na jaye
         updateDoc(doc(db, 'patients', p.id), {
           botCallAlertSent: true,
           botCallAlertSentAt: alerted.botCallAlertSentAt,
         }).catch((err) => console.error("Error updating bot alert:", err));
 
-        // Remaining patients ahead calculate karein
         const targetShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim().toLowerCase();
         const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
 
@@ -422,6 +425,74 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setActiveBotCallPatient(newlyAlertedPatient);
     }
   }, [voiceBotSettings, doctors]);
+
+  // 🔹 Start Token Session: Staff clicks "Start Token"
+  // Top 4 me se SIRF vahi mareez message receive karega jiska bookingType 'ONLINE' hai
+  const startDoctorSession = useCallback(async (doctorId: string) => {
+    setDoctors((prev) =>
+      prev.map((d) => (d.id === doctorId ? { ...d, isSessionActive: true } : d))
+    );
+
+    try {
+      await updateDoc(doc(db, 'doctors', doctorId), {
+        isSessionActive: true,
+      });
+    } catch (e) {
+      console.error("Error setting isSessionActive in Firestore:", e);
+    }
+
+    const targetDate = new Date().toISOString().split('T')[0];
+    const currentHour = new Date().getHours();
+    const fallbackShift = currentHour >= 13 ? 'Evening' : 'Morning';
+
+    const targetPatients = patients.filter((p) => {
+      const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
+      const pShift = ((p as any).selectedShift || (p as any).shift || fallbackShift).trim().toLowerCase();
+      return (
+        p.doctorId === doctorId &&
+        pDate === targetDate &&
+        pShift === fallbackShift.toLowerCase() &&
+        p.status === 'WAITING'
+      );
+    }).sort((a, b) => Number(a.tokenNumber) - Number(b.tokenNumber));
+
+    // Top 4 waiting list
+    const topWaitingList = targetPatients.slice(0, 4);
+    const matchedDoc = doctors.find((d) => d.id === doctorId);
+
+    topWaitingList.forEach((patient) => {
+      // ⚠️ STRICT FILTER: Sirf ONLINE booking wale patient ko WhatsApp bhejein
+      if (patient.bookingType !== 'ONLINE' || patient.botCallAlertSent) {
+        return;
+      }
+
+      const aheadCount = targetPatients.filter(
+        (other) => Number(other.tokenNumber) < Number(patient.tokenNumber)
+      ).length;
+
+      updateDoc(doc(db, 'patients', patient.id), {
+        botCallAlertSent: true,
+        botCallAlertSentAt: new Date().toISOString(),
+      }).catch(console.error);
+
+      sendTurnReminderWhatsApp(patient, matchedDoc, aheadCount);
+    });
+  }, [doctors, patients]);
+
+  // 🔹 Pause / Reset Session
+  const pauseDoctorSession = useCallback(async (doctorId: string) => {
+    setDoctors((prev) =>
+      prev.map((d) => (d.id === doctorId ? { ...d, isSessionActive: false } : d))
+    );
+
+    try {
+      await updateDoc(doc(db, 'doctors', doctorId), {
+        isSessionActive: false,
+      });
+    } catch (e) {
+      console.error("Error pausing session in Firestore:", e);
+    }
+  }, []);
 
   const addWalkInPatient = useCallback((data: Omit<Patient, 'id' | 'tokenNumber' | 'status' | 'bookingType' | 'paymentStatus' | 'paymentAmount' | 'createdAt' | 'botCallAlertSent'>): Patient => {
     const targetDate = (data as any).appointmentDate || new Date().toISOString().split('T')[0];
@@ -658,6 +729,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       createdAt: new Date().toISOString(),
       establishmentType: (data as any).establishmentType || 'CLINIC',
       hospitalId: (data as any).hospitalId || baseUsername,
+      isSessionActive: false,
     };
 
     const safePayload = JSON.parse(JSON.stringify(newDoc));
@@ -760,6 +832,8 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         markEmergency,
         recallPatient,
         updateDoctorStatus,
+        startDoctorSession,
+        pauseDoctorSession,
         addNewDoctor,
         staffLogin,
         staffLogout,
