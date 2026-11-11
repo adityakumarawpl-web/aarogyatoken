@@ -33,6 +33,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
   };
 
   const getLiveServingDetails = () => {
+    // 1. Doctor Break / Surgery / Leave States
     if (doctor.status === 'LUNCH') {
       return {
         displayText: 'Lunch Break',
@@ -55,8 +56,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
       };
     }
 
-    const todayStr = new Date().toISOString().split('T')[0];
-
+    // 2. Cabin me patient chal raha hai toh hamesha token number dikhega
     const inCabinPatient = patients.find(
       (p) => p.doctorId === doctor.id && p.status === 'IN_CABIN'
     );
@@ -68,34 +68,20 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
       };
     }
 
-    const activeWaiting = patients
-      .filter((p) => {
-        const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
-        return p.doctorId === doctor.id && p.status === 'WAITING' && pDate === todayStr;
-      })
-      .sort((a, b) => {
-        if (a.isEmergency && !b.isEmergency) return -1;
-        if (!a.isEmergency && b.isEmergency) return 1;
-        return (a.tokenNumber || 0) - (b.tokenNumber || 0);
-      });
-
-    if (activeWaiting.length > 0) {
-      const nextInLine = activeWaiting[0];
+    // 3. Staff ne "Start Token" dabaya hai lekin abhi andar nahi bulaya
+    if (doctor.isSessionActive) {
       return {
-        displayText: `#${nextInLine.tokenNumber}`,
-        textColor: nextInLine.isEmergency
-          ? 'text-rose-600 drop-shadow-[0_0_10px_rgba(225,29,72,0.4)]'
-          : 'text-emerald-600 drop-shadow-[0_0_10px_rgba(16,185,129,0.4)]',
-        label: nextInLine.isEmergency
-          ? 'Emergency Turn Active'
-          : 'Calling / Current Turn Active',
+        displayText: 'Token Start',
+        textColor: 'text-emerald-600 animate-pulse text-2xl sm:text-3xl drop-shadow-[0_0_10px_rgba(16,185,129,0.4)]',
+        label: 'Token shuru ho gaya hai • Cabin me bulaya ja raha hai',
       };
     }
 
+    // 4. Staff ne abhi tak "Start Token" nahi dabaya hai
     return {
-      displayText: 'Ready',
-      textColor: 'text-emerald-600 drop-shadow-[0_0_8px_rgba(16,185,129,0.3)]',
-      label: 'Cabin Ready for Patients',
+      displayText: 'Not Started',
+      textColor: 'text-slate-500 text-2xl sm:text-3xl',
+      label: 'OPD Token session shuru nahi hua hai',
     };
   };
 
@@ -324,7 +310,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
           <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block">
             Current Running Token (Live Token)
           </span>
-          <div className={`my-0.5 text-3xl sm:text-4xl font-mono font-black tracking-tight ${servingInfo.textColor}`}>
+          <div className={`my-0.5 font-mono font-black tracking-tight ${servingInfo.textColor}`}>
             {servingInfo.displayText}
           </div>
           <span className="text-[10px] font-medium text-slate-600 block">
