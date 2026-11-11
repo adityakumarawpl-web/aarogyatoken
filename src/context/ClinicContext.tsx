@@ -341,7 +341,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [razorpaySettings]);
 
-  // Automated WhatsApp Turn Reminder Dispatch
+  // Automated WhatsApp Turn Reminder Dispatch (Using Currently Approved Template)
   const sendTurnReminderWhatsApp = async (patient: Patient, doctor: Doctor | undefined, aheadCount: number) => {
     try {
       const rawDigits = String(patient.mobile || '').replace(/\D/g, '');
@@ -354,11 +354,11 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           phone: cleanPhone,
-          templateName: 'opd_turn_reminder',
+          templateName: 'opd_token_confirmation',
           patientName: patient.name,
-          doctorName: doctor?.name || 'Doctor',
-          tokenNumber: `#${patient.tokenNumber}`,
-          clinicName: `${aheadCount} मरीज़`, // Parameter {{4}} me remaining patients jayega
+          doctorName: `${doctor?.name || 'Doctor'} (Alert: Keval ${aheadCount} Mareez Bache Hain)`,
+          tokenNumber: `#${patient.tokenNumber} - Kripya Clinic Pahunche`,
+          clinicName: doctor?.clinicName || 'Aarogya Clinic',
         }),
       });
 
