@@ -33,6 +33,9 @@ export interface Doctor {
   avgTimePerPatientMinutes: number;
   createdAt: string;
 
+  // Token Session Control (Staff "Start Token" toggle)
+  isSessionActive?: boolean;
+
   // Hospital & Hierarchy Linkage
   establishmentType?: EstablishmentType; // 'CLINIC' ya 'HOSPITAL'
   hospitalId?: string; // Parent Hospital ID / Username (e.g. 'aditya_hospital_shahdol')
