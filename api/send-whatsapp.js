@@ -26,9 +26,9 @@ export default async function handler(req, res) {
       }
     }
 
-    const { phone } = body || {};
+    const { phone, patientName, doctorName, tokenNumber, clinicName } = body || {};
 
-    // Phone Clean: Only digits, ensure 91 prefix
+    // Phone Clean (Strictly 91 + 10 digits)
     const rawDigits = String(phone || '').replace(/\D/g, '');
     const cleanPhone = rawDigits.startsWith('91') && rawDigits.length === 12
       ? rawDigits
@@ -46,6 +46,7 @@ export default async function handler(req, res) {
 
     const metaUrl = `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`;
 
+    // 🔹 Approved Hindi Template: opd_token_confirmation
     const metaResponse = await fetch(metaUrl, {
       method: 'POST',
       headers: {
@@ -57,8 +58,19 @@ export default async function handler(req, res) {
         to: cleanPhone,
         type: 'template',
         template: {
-          name: 'hello_world',
-          language: { code: 'en_US' },
+          name: 'opd_token_confirmation',
+          language: { code: 'hi' },
+          components: [
+            {
+              type: 'body',
+              parameters: [
+                { type: 'text', text: patientName || 'Patient' },
+                { type: 'text', text: doctorName || 'Doctor' },
+                { type: 'text', text: String(tokenNumber || '#1') },
+                { type: 'text', text: clinicName || 'Clinic' },
+              ],
+            },
+          ],
         },
       }),
     });
