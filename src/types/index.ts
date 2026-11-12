@@ -33,8 +33,14 @@ export interface Doctor {
   avgTimePerPatientMinutes: number;
   createdAt: string;
 
-  // Token Session Control (Staff "Start Token" toggle)
+  // Token Session & Shift Control
   isSessionActive?: boolean;
+  activeShift?: 'Morning' | 'Evening';
+  morningCompletedDate?: string;
+
+  // Doctor Leave Date Range
+  leaveStartDate?: string; // YYYY-MM-DD
+  leaveEndDate?: string;   // YYYY-MM-DD
 
   // Hospital & Hierarchy Linkage
   establishmentType?: EstablishmentType; // 'CLINIC' ya 'HOSPITAL'
