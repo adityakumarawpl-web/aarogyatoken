@@ -75,6 +75,25 @@ export const StaffPortal: React.FC = () => {
     }
   }, [currentDoctor?.id, currentDoctor?.leaveStartDate, currentDoctor?.leaveEndDate, realTodayDate]);
 
+  // 🔹 Helper: Check karein ki koi date doctor ki Leave range me padti hai ya nahi
+  const isDateInLeaveRange = (targetDate: string, doctor: any) => {
+    if (!doctor || doctor.status !== 'LEAVE') return false;
+    if (doctor.leaveStartDate && doctor.leaveEndDate) {
+      return targetDate >= doctor.leaveStartDate && targetDate <= doctor.leaveEndDate;
+    }
+    return targetDate === realTodayDate;
+  };
+
+  // 🔹 Helper: Leave khatam hone ke agle din ki date nikaalein
+  const getNextAvailableDateAfterLeave = (doctor: any) => {
+    if (doctor?.status === 'LEAVE' && doctor?.leaveEndDate && doctor.leaveEndDate >= realTodayDate) {
+      const [y, m, d] = doctor.leaveEndDate.split('-').map(Number);
+      const nextDay = new Date(y, m - 1, d + 1);
+      return nextDay.toISOString().split('T')[0];
+    }
+    return realTodayDate;
+  };
+
   // 🔹 Staff-Controlled Active Shift (Time-based auto-jump disabled until Morning Shift Complete)
   const activeDoctorShift: 'Morning' | 'Evening' = currentDoctor?.activeShift || 'Morning';
   const realCurrentShift = activeDoctorShift;
@@ -82,11 +101,11 @@ export const StaffPortal: React.FC = () => {
   const isMorningShiftActiveForDoctor = (targetDate: string, doctor: any) => {
     const todayStr = new Date().toISOString().split('T')[0];
     if (targetDate > todayStr) return true;
-    // Aaj ke liye Morning tab tak active rahegi jab tak staff Morning Shift Complete na kar de
     return (doctor?.activeShift || 'Morning') === 'Morning';
   };
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [walkInError, setWalkInError] = useState('');
   const [walkInForm, setWalkInForm] = useState({
     name: '',
     mobile: '',
@@ -95,13 +114,14 @@ export const StaffPortal: React.FC = () => {
     address: '',
     complaint: '',
     isEmergency: false,
-    appointmentDate: new Date().toISOString().split('T')[0],
+    appointmentDate: realTodayDate,
     selectedShift: 'Morning',
   });
 
   const [reportPeriod, setReportPeriod] = useState<'day' | 'week' | 'month' | 'year'>('day');
 
   const handleDateChange = (newDate: string) => {
+    setWalkInError('');
     const morningAllowed = isMorningShiftActiveForDoctor(newDate, currentDoctor);
     setWalkInForm((prev) => ({
       ...prev,
@@ -379,12 +399,23 @@ export const StaffPortal: React.FC = () => {
 
   const isSessionActive = Boolean(currentDoctor.isSessionActive);
 
+  // Check karein ki aaj ki current date doctor ki fed Leave date range me aati hai ya nahi
+  const isDoctorOnLeaveToday = isDateInLeaveRange(realTodayDate, currentDoctor);
+
   // Leave Start Date Lock Check: Agar start date aaj se pehle ki ho chuki hai toh edit disable rahega
   const isLeaveStartLocked = Boolean(
     currentDoctor.status === 'LEAVE' &&
     currentDoctor.leaveStartDate &&
     realTodayDate > currentDoctor.leaveStartDate
   );
+
+  // 🔹 Button Enable/Disable Conditions:
+  // 1. Jab doctor aaj Leave par ho toh kewal Add Patient, Summary aur Move to Next Shift hi chalu rahenge
+  // 2. Jab staff Shift Start click kare tabhi Pause aur Shift Complete chalu honge
+  // 3. Move to Next Shift sabhi conditions me ON rahega
+  const canStartShift = !isDoctorOnLeaveToday && currentDoctor.status === 'AVAILABLE' && !isSessionActive;
+  const canPauseOrCompleteShift = !isDoctorOnLeaveToday && currentDoctor.status === 'AVAILABLE' && isSessionActive;
+  const canAccessLiveQueue = !isDoctorOnLeaveToday && currentDoctor.status === 'AVAILABLE';
 
   const doctorPatients = patients.filter((p) => {
     if (p.doctorId !== currentDoctor?.id) return false;
@@ -429,7 +460,7 @@ export const StaffPortal: React.FC = () => {
   const currentlyServing = getCurrentlyServingToken(patients, currentDoctor?.id);
   const summary = generateDoctorSummary(patients, currentDoctor?.id, reportPeriod);
 
-  const currentActiveDate = selectedDateFilter || new Date().toISOString().split('T')[0];
+  const defaultBookingDate = getNextAvailableDateAfterLeave(currentDoctor);
   const currentActiveShift = (selectedShiftFilter && selectedShiftFilter !== 'ALL') ? selectedShiftFilter : activeDoctorShift;
 
   const matchingShiftPatients = patients.filter((p) => {
@@ -437,7 +468,7 @@ export const StaffPortal: React.FC = () => {
     const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim();
     return (
       p.doctorId === currentDoctor?.id &&
-      pDate === currentActiveDate &&
+      pDate === defaultBookingDate &&
       pShift.toLowerCase() === currentActiveShift.toLowerCase()
     );
   });
@@ -450,6 +481,16 @@ export const StaffPortal: React.FC = () => {
   const handleAddWalkInSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!walkInForm.name.trim() || !walkInForm.mobile.trim() || !currentDoctor?.id) return;
+
+    // Leave date validation: Leave date ko chhod kar hi token banega
+    if (isDateInLeaveRange(walkInForm.appointmentDate, currentDoctor)) {
+      setWalkInError(
+        `Doctor ${currentDoctor.leaveStartDate || realTodayDate} se ${currentDoctor.leaveEndDate || realTodayDate} tak Leave par hain. Kripya leave date ko chhod kar koi aur tarikh chunein.`
+      );
+      return;
+    }
+
+    setWalkInError('');
 
     addWalkInPatient({
       doctorId: currentDoctor.id,
@@ -476,8 +517,8 @@ export const StaffPortal: React.FC = () => {
       .then((res) => res.json())
       .catch((err) => console.error('WhatsApp trigger error:', err));
 
-    const todayStr = new Date().toISOString().split('T')[0];
-    const defaultShift = isMorningShiftActiveForDoctor(todayStr, currentDoctor) ? 'Morning' : 'Evening';
+    const nextValidDate = getNextAvailableDateAfterLeave(currentDoctor);
+    const defaultShift = isMorningShiftActiveForDoctor(nextValidDate, currentDoctor) ? 'Morning' : 'Evening';
 
     setWalkInForm({
       name: '',
@@ -487,7 +528,7 @@ export const StaffPortal: React.FC = () => {
       address: '',
       complaint: '',
       isEmergency: false,
-      appointmentDate: todayStr,
+      appointmentDate: nextValidDate,
       selectedShift: defaultShift,
     });
 
@@ -528,12 +569,16 @@ export const StaffPortal: React.FC = () => {
                 </span>
                 <span
                   className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    isSessionActive
+                    isSessionActive && !isDoctorOnLeaveToday
                       ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                       : 'bg-amber-100 text-amber-800 border border-amber-300'
                   }`}
                 >
-                  {isSessionActive ? '🟢 Session Active' : '🔴 Session Not Started'}
+                  {isDoctorOnLeaveToday
+                    ? '⚪ Doctor On Leave Today'
+                    : isSessionActive
+                    ? '🟢 Session Active'
+                    : '🔴 Session Not Started'}
                 </span>
               </div>
               <p className="text-xs text-slate-500">
@@ -674,9 +719,11 @@ export const StaffPortal: React.FC = () => {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className={`h-11 w-11 rounded-2xl flex items-center justify-center shrink-0 ${
-                isSessionActive ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30' : 'bg-blue-600 text-white shadow-md shadow-blue-500/30'
+                isSessionActive && !isDoctorOnLeaveToday
+                  ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30'
+                  : 'bg-blue-600 text-white shadow-md shadow-blue-500/30'
               }`}>
-                {isSessionActive ? <PlayCircle className="h-6 w-6" /> : <Clock className="h-6 w-6" />}
+                {isSessionActive && !isDoctorOnLeaveToday ? <PlayCircle className="h-6 w-6" /> : <Clock className="h-6 w-6" />}
               </div>
               <div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -684,17 +731,25 @@ export const StaffPortal: React.FC = () => {
                     {activeDoctorShift} Shift Session Control
                   </span>
                   <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full ${
-                    isSessionActive
+                    isDoctorOnLeaveToday
+                      ? 'bg-slate-200 text-slate-700 border border-slate-300'
+                      : isSessionActive
                       ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                       : 'bg-amber-100 text-amber-800 border border-amber-300'
                   }`}>
-                    {isSessionActive ? `🟢 ${activeDoctorShift} Shift Running` : `⏸️ ${activeDoctorShift} Shift Paused / Not Started`}
+                    {isDoctorOnLeaveToday
+                      ? '⚪ Doctor On Leave Today (Session Locked)'
+                      : isSessionActive
+                      ? `🟢 ${activeDoctorShift} Shift Running`
+                      : `⏸️ ${activeDoctorShift} Shift Paused / Not Started`}
                   </span>
                 </div>
                 <p className="text-xs text-slate-600 mt-0.5">
-                  {activeDoctorShift === 'Morning'
-                    ? 'Jab tak aap "Morning Shift Complete" nahi dabayenge, system Morning Shift par hi lock rahega.'
-                    : 'Evening Shift active hai. Session khatam hone par "Evening Shift Complete" dabayein.'}
+                  {isDoctorOnLeaveToday
+                    ? 'Aaj Doctor Leave par hain. Aap advance dates ke liye "Add Patient" kar sakte hain ya "Move to Next Shift" chala sakte hain.'
+                    : !isSessionActive
+                    ? `Pehle "${activeDoctorShift} Shift Start" dabayein, tabhi Pause aur Shift Complete button chalu honge.`
+                    : `Session active hai. Session khatam hone par "${activeDoctorShift} Shift Complete" dabayein.`}
                 </p>
               </div>
             </div>
@@ -705,36 +760,47 @@ export const StaffPortal: React.FC = () => {
             {/* Button 1: Morning/Evening Shift Start */}
             <button
               type="button"
-              disabled={isSessionActive}
+              disabled={!canStartShift}
               onClick={() => startDoctorSession(currentDoctor.id)}
               className={`rounded-xl px-3.5 py-2.5 text-xs font-black transition flex items-center justify-center gap-1.5 ${
-                isSessionActive
-                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                !canStartShift
+                  ? 'bg-slate-200 text-slate-400 border border-slate-300 cursor-not-allowed'
                   : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/25 cursor-pointer active:scale-95'
               }`}
+              title={
+                isDoctorOnLeaveToday
+                  ? 'Doctor aaj Leave par hain'
+                  : currentDoctor.status !== 'AVAILABLE'
+                  ? 'Doctor status Available karein'
+                  : isSessionActive
+                  ? 'Session pehle se chal raha hai'
+                  : `${activeDoctorShift} Shift shuru karein`
+              }
             >
               <PlayCircle className="h-4 w-4 shrink-0" />
               <span>{activeDoctorShift} Shift Start</span>
             </button>
 
-            {/* Button 2: Pause */}
+            {/* Button 2: Pause (Sirf Shift Start hone ke baad chalu hoga) */}
             <button
               type="button"
-              disabled={!isSessionActive}
+              disabled={!canPauseOrCompleteShift}
               onClick={() => pauseDoctorSession(currentDoctor.id)}
               className={`rounded-xl px-3.5 py-2.5 text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-                !isSessionActive
+                !canPauseOrCompleteShift
                   ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
                   : 'bg-amber-500 hover:bg-amber-600 text-white shadow-sm cursor-pointer active:scale-95'
               }`}
+              title={!canPauseOrCompleteShift ? `Pehle "${activeDoctorShift} Shift Start" dabayein` : 'Session ko temporary pause karein'}
             >
               <PauseCircle className="h-4 w-4 shrink-0" />
               <span>Pause</span>
             </button>
 
-            {/* Button 3: Morning/Evening Shift Complete */}
+            {/* Button 3: Morning/Evening Shift Complete (Sirf Shift Start hone ke baad chalu hoga) */}
             <button
               type="button"
+              disabled={!canPauseOrCompleteShift}
               onClick={() => {
                 const confirmMsg =
                   activeDoctorShift === 'Morning'
@@ -744,13 +810,18 @@ export const StaffPortal: React.FC = () => {
                   completeDoctorShift(currentDoctor.id);
                 }
               }}
-              className="rounded-xl bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-2.5 text-xs font-bold shadow-sm transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
+              className={`rounded-xl px-3.5 py-2.5 text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                !canPauseOrCompleteShift
+                  ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                  : 'bg-slate-900 hover:bg-slate-800 text-white shadow-sm cursor-pointer active:scale-95'
+              }`}
+              title={!canPauseOrCompleteShift ? `Pehle "${activeDoctorShift} Shift Start" dabayein` : `${activeDoctorShift} Shift complete karein`}
             >
-              <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+              <CheckCircle2 className={`h-4 w-4 shrink-0 ${canPauseOrCompleteShift ? 'text-emerald-400' : 'text-slate-400'}`} />
               <span>{activeDoctorShift} Shift Complete</span>
             </button>
 
-            {/* Button 4: Move to Next Shift (Urgent Unavailability Carry-Forward) */}
+            {/* Button 4: Move to Next Shift (Sabhi condition me ON rahega) */}
             <button
               type="button"
               onClick={async () => {
@@ -766,7 +837,7 @@ export const StaffPortal: React.FC = () => {
                 );
               }}
               className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2.5 text-xs font-bold shadow-sm transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
-              title="Urgent kaam aane par bache hue sabhi patients ko agli shift ke sabse upar transfer karein"
+              title="Urgent kaam aane par bache hue sabhi patients ko agli shift ke sabse upar transfer karein (Hamesha Active)"
             >
               <ArrowRightCircle className="h-4 w-4 text-indigo-200 shrink-0" />
               <span>Move to Next Shift</span>
@@ -776,11 +847,13 @@ export const StaffPortal: React.FC = () => {
 
         {/* 3 Main Action Buttons Strip */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Button A: Add Patient (Hamesha Chalu - Leave par bhi chalu rahega) */}
           <button
             type="button"
             onClick={() => {
-              const todayStr = new Date().toISOString().split('T')[0];
-              const defaultShift = isMorningShiftActiveForDoctor(todayStr, currentDoctor) ? 'Morning' : 'Evening';
+              const nextValidDate = getNextAvailableDateAfterLeave(currentDoctor);
+              const defaultShift = isMorningShiftActiveForDoctor(nextValidDate, currentDoctor) ? 'Morning' : 'Evening';
+              setWalkInError('');
               setWalkInForm({
                 name: '',
                 mobile: '',
@@ -789,7 +862,7 @@ export const StaffPortal: React.FC = () => {
                 address: '',
                 complaint: '',
                 isEmergency: false,
-                appointmentDate: todayStr,
+                appointmentDate: nextValidDate,
                 selectedShift: defaultShift,
               });
               setShowAddModal(true);
@@ -803,27 +876,31 @@ export const StaffPortal: React.FC = () => {
             </span>
           </button>
 
+          {/* Button B: Live OPD Queue (Leave par locked rahega) */}
           <button
             type="button"
-            disabled={currentDoctor?.status !== 'AVAILABLE'}
-            onClick={() => setActiveTab('QUEUE')}
-            className={`w-full rounded-2xl p-4 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition cursor-pointer ${
-              activeTab === 'QUEUE'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20 ring-2 ring-blue-400'
-                : currentDoctor?.status === 'AVAILABLE'
-                ? 'bg-white hover:bg-blue-50 text-blue-700 border border-blue-200'
-                : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
+            disabled={!canAccessLiveQueue}
+            onClick={() => {
+              if (canAccessLiveQueue) setActiveTab('QUEUE');
+            }}
+            className={`w-full rounded-2xl p-4 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition ${
+              !canAccessLiveQueue
+                ? 'bg-slate-200 text-slate-400 border border-slate-300 cursor-not-allowed opacity-70'
+                : activeTab === 'QUEUE'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20 ring-2 ring-blue-400 cursor-pointer'
+                : 'bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 cursor-pointer'
             }`}
             title={
-              currentDoctor?.status !== 'AVAILABLE'
-                ? 'Doctor Available hone par hi Queue access hogi'
+              !canAccessLiveQueue
+                ? 'Doctor Leave/Break par hain. Available hone par hi Live Queue khulegi.'
                 : 'Live OPD Queue View'
             }
           >
             <span>📋 Live OPD Queue</span>
-            {currentDoctor?.status !== 'AVAILABLE' && <span className="text-xs">🔒</span>}
+            {!canAccessLiveQueue && <span className="text-xs">🔒</span>}
           </button>
 
+          {/* Button C: Clinic Summary & Stats (Hamesha Chalu - Leave par bhi chalu rahega) */}
           <button
             type="button"
             onClick={() => setActiveTab('REPORTS')}
@@ -938,7 +1015,9 @@ export const StaffPortal: React.FC = () => {
                   Doctor Status: {currentDoctor.status === 'LUNCH' ? 'Lunch Break (लंच)' : currentDoctor.status === 'SURGERY' ? 'In Surgery (सर्जरी)' : `On Leave (${currentDoctor.leaveStartDate || ''} se ${currentDoctor.leaveEndDate || ''})`} — Patient Calling Blocked
                 </h4>
                 <p className="text-xs text-amber-800 mt-0.5">
-                  Doctor abhi mareez nahi dekh rahe hain. Cabin me bulane ke sabhi buttons band hain. Doctor ke aane par upar <strong>🟢 Available</strong> par click karein.
+                  {isDoctorOnLeaveToday
+                    ? 'Aaj Doctor Leave par hain. Kewal "Add Patient (Leave date chhod kar)", "Move to Next Shift", aur "Clinic Summary" chalu hain.'
+                    : 'Doctor abhi mareez nahi dekh rahe hain. Cabin me bulane ke sabhi buttons band hain. Doctor ke aane par upar Available par click karein.'}
                 </p>
               </div>
             </div>
@@ -964,7 +1043,7 @@ export const StaffPortal: React.FC = () => {
                   "{activeDoctorShift} Shift Start" Button Dabana Zaroori Hai
                 </h4>
                 <p className="text-xs text-amber-800 mt-0.5">
-                  OPD cabin shuru karne ke liye pehle upar <strong>"{activeDoctorShift} Shift Start"</strong> button dabayein, tabhi "Andar Gaye" button unlock hoga aur online mareezon ko WhatsApp alert jayega.
+                  OPD cabin shuru karne ke liye pehle upar <strong>"{activeDoctorShift} Shift Start"</strong> button dabayein, tabhi Pause, Shift Complete aur "Andar Gaye" buttons unlock honge.
                 </p>
               </div>
             </div>
@@ -1191,19 +1270,7 @@ export const StaffPortal: React.FC = () => {
                 type="button"
                 onClick={() => {
                   setShowAddModal(false);
-                  const todayStr = new Date().toISOString().split('T')[0];
-                  const defaultShift = isMorningShiftActiveForDoctor(todayStr, currentDoctor) ? 'Morning' : 'Evening';
-                  setWalkInForm({
-                    name: '',
-                    mobile: '',
-                    age: '',
-                    gender: 'Male',
-                    address: '',
-                    complaint: '',
-                    isEmergency: false,
-                    appointmentDate: todayStr,
-                    selectedShift: defaultShift,
-                  });
+                  setWalkInError('');
                 }}
                 className="text-white hover:opacity-75 text-xl font-bold cursor-pointer"
               >
@@ -1212,6 +1279,18 @@ export const StaffPortal: React.FC = () => {
             </div>
 
             <form onSubmit={handleAddWalkInSubmit} className="p-6 space-y-4">
+              {walkInError && (
+                <div className="rounded-xl bg-rose-50 border border-rose-200 p-2.5 text-xs font-semibold text-rose-700">
+                  ⚠️ {walkInError}
+                </div>
+              )}
+
+              {currentDoctor.status === 'LEAVE' && currentDoctor.leaveStartDate && currentDoctor.leaveEndDate && (
+                <div className="rounded-xl bg-amber-50 border border-amber-200 p-2.5 text-[11px] font-semibold text-amber-900">
+                  📅 Doctor <strong>{currentDoctor.leaveStartDate}</strong> se <strong>{currentDoctor.leaveEndDate}</strong> tak Leave par hain. Leave dates ko chhod kar hi token banega.
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -1219,7 +1298,7 @@ export const StaffPortal: React.FC = () => {
                   </label>
                   <input
                     type="date"
-                    min={new Date().toISOString().split('T')[0]}
+                    min={realTodayDate}
                     value={walkInForm.appointmentDate}
                     onChange={(e) => handleDateChange(e.target.value)}
                     className="w-full rounded-lg border border-slate-300 p-2 text-xs font-medium bg-white focus:outline-none focus:border-emerald-500"
@@ -1242,6 +1321,12 @@ export const StaffPortal: React.FC = () => {
                   </select>
                 </div>
               </div>
+
+              {isDateInLeaveRange(walkInForm.appointmentDate, currentDoctor) && (
+                <div className="rounded-xl bg-rose-50 border border-rose-300 p-2 text-xs font-bold text-rose-800">
+                  🚫 Yeh tarikh doctor ki Leave date me aati hai! Kripya {currentDoctor.leaveEndDate} ke baad ki tarikh chunein.
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -1348,7 +1433,8 @@ export const StaffPortal: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow hover:bg-emerald-700 transition cursor-pointer"
+                  disabled={isDateInLeaveRange(walkInForm.appointmentDate, currentDoctor)}
+                  className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow hover:bg-emerald-700 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Confirm (Free Token)
                 </button>
