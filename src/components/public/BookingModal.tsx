@@ -25,44 +25,23 @@ interface BookingModalProps {
 export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) => {
   const { patients, bookOnlineAppointment, triggerBotCallAlert, razorpaySettings } = useClinic();
 
-  const parseTimeToMinutes = (timeStr: string) => {
-    if (!timeStr) return 13 * 60; // 01:00 PM default cutoff
-    const cleanStr = timeStr.trim().toUpperCase();
-    const isPM = cleanStr.includes('PM');
-    const isAM = cleanStr.includes('AM');
-    const rawTime = cleanStr.replace(/[APM\s]/g, '');
-    const [hoursStr, minutesStr] = rawTime.split(':');
-    let hours = parseInt(hoursStr, 10) || 0;
-    const minutes = parseInt(minutesStr, 10) || 0;
-
-    if (isPM && hours < 12) hours += 12;
-    if (isAM && hours === 12) hours = 0;
-
-    return hours * 60 + minutes;
-  };
-
-  const isMorningShiftActiveForDoctor = (targetDate: string, doc: any) => {
-    const todayStr = new Date().toISOString().split('T')[0];
-    if (targetDate > todayStr) return true;
-
-    if (targetDate === todayStr) {
-      const now = new Date();
-      const currentMinutes = now.getHours() * 60 + now.getMinutes();
-
-      let morningEndTimeStr = doc?.morningShiftEnd || doc?.morningEnd;
-      if (!morningEndTimeStr && doc?.opdTimings && doc.opdTimings.includes('-')) {
-        morningEndTimeStr = doc.opdTimings.split('-')[1]?.trim();
-      }
-      if (!morningEndTimeStr) morningEndTimeStr = '01:00 PM';
-
-      const morningEndMinutes = parseTimeToMinutes(morningEndTimeStr);
-      return currentMinutes <= morningEndMinutes;
-    }
-
-    return false;
-  };
-
   const todayStr = new Date().toISOString().split('T')[0];
+
+  // Staff jab tak "Morning Shift Complete" click nahi karega, aaj ki Morning Shift open rahegi
+  const isMorningShiftActiveForDoctor = (targetDate: string, doc: Doctor) => {
+    if (targetDate > todayStr) return true;
+    return (doc.activeShift || 'Morning') === 'Morning';
+  };
+
+  // Check karein ki chuni gayi tarikh doctor ki Leave date range me toh nahi aati
+  const isDateOnLeave = (targetDate: string, doc: Doctor) => {
+    if (doc.status !== 'LEAVE') return false;
+    if (doc.leaveStartDate && doc.leaveEndDate) {
+      return targetDate >= doc.leaveStartDate && targetDate <= doc.leaveEndDate;
+    }
+    return targetDate === todayStr;
+  };
+
   const initialMorningActive = isMorningShiftActiveForDoctor(todayStr, doctor);
 
   const [step, setStep] = useState<'DETAILS' | 'PAYMENT' | 'SUCCESS'>('DETAILS');
@@ -72,7 +51,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
     age: '',
     gender: 'Male' as 'Male' | 'Female' | 'Other',
     appointmentDate: todayStr,
-    selectedShift: initialMorningActive ? 'Morning' : 'Evening', // Smart default based on current time
+    selectedShift: initialMorningActive ? 'Morning' : 'Evening',
     address: '',
     complaint: '',
   });
@@ -111,8 +90,16 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
     doctor.razorpayKeyId ||
     razorpaySettings.keyId;
 
+  const selectedDateBlockedByLeave = isDateOnLeave(formData.appointmentDate, doctor);
+
   const handleDetailsSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (selectedDateBlockedByLeave) {
+      setErrorMsg(
+        `Doctor ${doctor.leaveStartDate || ''} se ${doctor.leaveEndDate || ''} tak chhutti (Leave) par hain. Kripya uske baad ki date chunein.`
+      );
+      return;
+    }
     if (!formData.name.trim()) {
       setErrorMsg('Kripya mareez ka naam bharein (Enter Patient Name)');
       return;
@@ -350,6 +337,12 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                 </div>
               </div>
 
+              {selectedDateBlockedByLeave && (
+                <div className="rounded-xl bg-amber-50 border border-amber-300 p-2.5 text-xs text-amber-900 font-semibold">
+                  ⚠️ Doctor {doctor.leaveStartDate} se {doctor.leaveEndDate} tak chhutti par hain. Kripya koi aur date chunein.
+                </div>
+              )}
+
               {/* Patient Name */}
               <div>
                 <label className="block text-[11px] sm:text-xs font-semibold text-slate-700 mb-1">
@@ -367,7 +360,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
 
               {/* Mobile Number & Age/Gender */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* 2. Mobile Number (Pre-fixed +91 with 10-digit limit) */}
                 <div>
                   <label className="block text-[11px] sm:text-xs font-semibold text-slate-700 mb-1">
                     2. Mobile Number (मोबाइल नंबर) *
@@ -459,7 +451,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
               <div className="pt-2">
                 <button
                   type="submit"
-                  className="w-full rounded-2xl bg-blue-600 px-4 py-3 text-xs sm:text-sm font-bold text-white shadow-lg shadow-blue-500/25 hover:bg-blue-700 transition cursor-pointer flex items-center justify-center gap-2"
+                  disabled={selectedDateBlockedByLeave}
+                  className="w-full rounded-2xl bg-blue-600 px-4 py-3 text-xs sm:text-sm font-bold text-white shadow-lg shadow-blue-500/25 hover:bg-blue-700 transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <span>Proceed to Pay ₹20 (आगे बढ़ें)</span>
                 </button>
