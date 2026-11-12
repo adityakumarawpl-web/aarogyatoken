@@ -32,32 +32,79 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
     return `********${clean.slice(-2)}`;
   };
 
-const getLiveServingDetails = () => {
+  // Date ko readable format (e.g. 12 Nov) me convert karna
+  const formatShortDate = (dateStr?: string) => {
+    if (!dateStr) return '';
+    try {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const dt = new Date(y, m - 1, d);
+      return dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const leaveRangeLabel =
+    doctor.leaveStartDate && doctor.leaveEndDate
+      ? doctor.leaveStartDate === doctor.leaveEndDate
+        ? `${formatShortDate(doctor.leaveStartDate)}`
+        : `${formatShortDate(doctor.leaveStartDate)} - ${formatShortDate(doctor.leaveEndDate)}`
+      : '';
+
+  const doctorActiveShift = doctor.activeShift || 'Morning';
+
+  const getLiveServingDetails = () => {
     // 1. Doctor Break / Surgery / Leave States
     if (doctor.status === 'LUNCH') {
       return {
         displayText: 'Lunch Break',
-        textColor: 'text-amber-500 drop-shadow-[0_0_8px_rgba(245,158,11,0.3)]',
+        textColor: 'text-amber-500 text-2xl sm:text-3xl drop-shadow-[0_0_8px_rgba(245,158,11,0.3)]',
         label: 'Doctor abhi lunch break par hain',
+        urgencyBadge: null,
       };
     }
     if (doctor.status === 'SURGERY') {
       return {
         displayText: 'In Surgery',
-        textColor: 'text-rose-600 drop-shadow-[0_0_8px_rgba(225,29,72,0.3)]',
+        textColor: 'text-rose-600 text-2xl sm:text-3xl drop-shadow-[0_0_8px_rgba(225,29,72,0.3)]',
         label: 'Doctor OT / Surgery me vyast hain',
+        urgencyBadge: null,
       };
     }
     if (doctor.status === 'LEAVE') {
       return {
-        displayText: 'On Leave',
-        textColor: 'text-blue-600 drop-shadow-[0_0_8px_rgba(37,99,235,0.3)]',
-        label: 'Doctor aaj upalabdha nahi hain',
+        displayText: leaveRangeLabel ? `Leave (${leaveRangeLabel})` : 'On Leave',
+        textColor: 'text-blue-600 text-xl sm:text-2xl drop-shadow-[0_0_8px_rgba(37,99,235,0.3)]',
+        label:
+          doctor.leaveStartDate && doctor.leaveEndDate
+            ? `Doctor ${formatShortDate(doctor.leaveStartDate)} se ${formatShortDate(doctor.leaveEndDate)} tak chhutti par hain`
+            : 'Doctor aaj upalabdha nahi hain',
+        urgencyBadge: null,
       };
     }
 
     const todayStr = new Date().toISOString().split('T')[0];
-    const currentShift = new Date().getHours() < 14 ? 'morning' : 'evening';
+    const currentShiftLower = doctorActiveShift.toLowerCase();
+
+    // Aaj ki active shift ke sabhi patients nikaalein
+    const todaysShiftPatients = patients.filter((p) => {
+      if (p.doctorId !== doctor.id) return false;
+      const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
+      const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim().toLowerCase();
+      return pDate === todayStr && pShift === currentShiftLower;
+    });
+
+    // Active shift me bache hue total patients (IN_CABIN + WAITING)
+    const remainingCount = todaysShiftPatients.filter(
+      (p) => p.status === 'IN_CABIN' || p.status === 'WAITING'
+    ).length;
+
+    const urgencyBadge =
+      doctor.isSessionActive && remainingCount > 0 && remainingCount <= 3
+        ? remainingCount === 1
+          ? '🚨 Last Patient Left'
+          : `⚡ Last ${remainingCount} Patients Left`
+        : null;
 
     // 2. Cabin me patient chal raha hai toh hamesha token number dikhega
     const inCabinPatient = patients.find(
@@ -68,16 +115,9 @@ const getLiveServingDetails = () => {
         displayText: `#${inCabinPatient.tokenNumber}`,
         textColor: 'text-emerald-600 text-3xl sm:text-4xl drop-shadow-[0_0_10px_rgba(16,185,129,0.4)]',
         label: 'Doctor Cabin me abhi chal raha hai',
+        urgencyBadge,
       };
     }
-
-    // 3. Check karein ki aaj ki shift me kitne mareez checkup (COMPLETED) ho chuke hain aur agla WAITING kaun hai
-    const todaysShiftPatients = patients.filter((p) => {
-      if (p.doctorId !== doctor.id) return false;
-      const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
-      const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim().toLowerCase();
-      return pDate === todayStr && pShift === currentShift;
-    });
 
     const hasCompletedAny = todaysShiftPatients.some((p) => p.status === 'COMPLETED');
 
@@ -89,9 +129,8 @@ const getLiveServingDetails = () => {
         return (a.tokenNumber || 0) - (b.tokenNumber || 0);
       });
 
-    // 4. Agar Session Active hai:
+    // 3. Agar Session Active hai:
     if (doctor.isSessionActive) {
-      // Agar kam se kam ek mareez Done ho chuka hai aur agla waiting me hai -> "Waiting #5" dikhega
       if (hasCompletedAny && waitingQueue.length > 0) {
         const nextPatient = waitingQueue[0];
         return {
@@ -100,39 +139,42 @@ const getLiveServingDetails = () => {
             ? 'text-rose-600 text-2xl sm:text-3xl drop-shadow-[0_0_10px_rgba(225,29,72,0.4)]'
             : 'text-blue-600 text-2xl sm:text-3xl drop-shadow-[0_0_10px_rgba(37,99,235,0.3)]',
           label: `Agla Token #${nextPatient.tokenNumber} cabin me bulaya ja raha hai`,
+          urgencyBadge,
         };
       }
 
-      // Agar abhi OPD just start hui hai aur pehla patient abhi tak andar nahi gaya hai -> "Token Start"
       if (!hasCompletedAny && waitingQueue.length > 0) {
         return {
           displayText: 'Token Start',
           textColor: 'text-emerald-600 animate-pulse text-2xl sm:text-3xl drop-shadow-[0_0_10px_rgba(16,185,129,0.4)]',
-          label: 'Token shuru ho gaya hai • Cabin me bulaya ja raha hai',
+          label: `${doctorActiveShift} Shift shuru ho gayi hai • Cabin me bulaya ja raha hai`,
+          urgencyBadge,
         };
       }
 
-      // Agar sabhi waiting patients ka checkup poora ho gaya hai
       if (hasCompletedAny && waitingQueue.length === 0) {
         return {
           displayText: 'Queue Clear',
           textColor: 'text-emerald-600 text-2xl sm:text-3xl',
-          label: 'Abhi sabhi tokens complete ho chuke hain',
+          label: `${doctorActiveShift} Shift ke sabhi tokens complete ho chuke hain`,
+          urgencyBadge: null,
         };
       }
 
       return {
         displayText: 'Token Start',
         textColor: 'text-emerald-600 animate-pulse text-2xl sm:text-3xl drop-shadow-[0_0_10px_rgba(16,185,129,0.4)]',
-        label: 'Token shuru ho gaya hai • Cabin me bulaya ja raha hai',
+        label: `${doctorActiveShift} Shift shuru ho gayi hai • Cabin me bulaya ja raha hai`,
+        urgencyBadge: null,
       };
     }
 
-    // 5. Staff ne abhi tak "Start Token" nahi dabaya hai
+    // 4. Staff ne abhi tak Shift Start nahi dabaya hai
     return {
       displayText: 'Not Started',
       textColor: 'text-slate-500 text-2xl sm:text-3xl',
-      label: 'OPD Token session shuru nahi hua hai',
+      label: `${doctorActiveShift} Shift token session shuru nahi hua hai`,
+      urgencyBadge: null,
     };
   };
 
@@ -165,14 +207,14 @@ const getLiveServingDetails = () => {
         return (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-0.5 text-[11px] font-bold text-slate-700 border border-slate-300 shadow-2xs">
             <AlertTriangle className="h-3 w-3 text-slate-500" />
-            <span>On Leave</span>
+            <span>{leaveRangeLabel ? `On Leave (${leaveRangeLabel})` : 'On Leave'}</span>
           </span>
         );
     }
   };
 
   const todayDateStr = new Date().toISOString().split('T')[0];
-  const activeShift = new Date().getHours() < 14 ? 'morning' : 'evening';
+  const activeShiftLower = doctorActiveShift.toLowerCase();
 
   const matchedPatients = tokenSearchQuery.trim() === ''
     ? []
@@ -182,7 +224,7 @@ const getLiveServingDetails = () => {
         const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
         const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim().toLowerCase();
 
-        if (pDate !== todayDateStr || pShift !== activeShift) return false;
+        if (pDate !== todayDateStr || pShift !== activeShiftLower) return false;
 
         const q = tokenSearchQuery.toLowerCase().trim();
         const nameMatch = p.name?.toLowerCase().includes(q);
@@ -228,7 +270,7 @@ const getLiveServingDetails = () => {
               <span>Know Your Token (खोजें)</span>
             </span>
             <span className="text-[9px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.2 rounded">
-              {activeShift === 'morning' ? 'Morning Shift' : 'Evening Shift'}
+              {doctorActiveShift} Shift
             </span>
           </div>
 
@@ -359,11 +401,21 @@ const getLiveServingDetails = () => {
         {/* 6. Live Token Box */}
         <div className="rounded-xl bg-slate-100/90 border border-slate-300/80 py-2.5 px-3 text-center shadow-inner relative overflow-hidden">
           <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block">
-            Current Running Token (Live Token)
+            Current Running Token ({doctorActiveShift} Shift)
           </span>
           <div className={`my-0.5 font-mono font-black tracking-tight ${servingInfo.textColor}`}>
             {servingInfo.displayText}
           </div>
+
+          {/* Last 3 Patients Urgency Highlight */}
+          {servingInfo.urgencyBadge && (
+            <div className="my-1 flex justify-center">
+              <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 border border-rose-300 px-2.5 py-0.5 text-[10px] font-black text-rose-700 animate-pulse shadow-2xs">
+                {servingInfo.urgencyBadge}
+              </span>
+            </div>
+          )}
+
           <span className="text-[10px] font-medium text-slate-600 block">
             {servingInfo.label}
           </span>
