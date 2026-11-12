@@ -60,6 +60,7 @@ export const INITIAL_DOCTORS: Doctor[] = [
     razorpayKeySecret: 'sec_rajesh_live_98',
     razorpayAccountType: 'PLATFORM_SPLIT',
     isSessionActive: false,
+    activeShift: 'Morning',
   },
   {
     id: 'doc-2',
@@ -88,6 +89,7 @@ export const INITIAL_DOCTORS: Doctor[] = [
     razorpayKeySecret: 'sec_priya_live_77',
     razorpayAccountType: 'PLATFORM_SPLIT',
     isSessionActive: false,
+    activeShift: 'Morning',
   },
   {
     id: 'doc-3',
@@ -116,6 +118,7 @@ export const INITIAL_DOCTORS: Doctor[] = [
     razorpayKeySecret: 'sec_amit_live_44',
     razorpayAccountType: 'PLATFORM_SPLIT',
     isSessionActive: false,
+    activeShift: 'Morning',
   },
 ];
 
@@ -197,9 +200,11 @@ interface ClinicContextType {
   markNotAvailable: (patientId: string) => void;
   markEmergency: (patientId: string) => void;
   recallPatient: (patientId: string) => void;
-  updateDoctorStatus: (doctorId: string, status: DoctorStatus, note?: string) => void;
+  updateDoctorStatus: (doctorId: string, status: DoctorStatus, note?: string, leaveStart?: string, leaveEnd?: string) => void;
   startDoctorSession: (doctorId: string) => Promise<void>;
   pauseDoctorSession: (doctorId: string) => Promise<void>;
+  completeDoctorShift: (doctorId: string) => Promise<void>;
+  moveRemainingToNextShift: (doctorId: string) => Promise<{ movedCount: number; targetShift: string; targetDate: string }>;
   addNewDoctor: (doctor: Omit<Doctor, 'id' | 'status' | 'onlineTokenFee' | 'createdAt'>) => Doctor;
   staffLogin: (username: string, password: string) => { success: boolean; message: string; doctor?: Doctor };
   staffLogout: () => void;
@@ -346,7 +351,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [razorpaySettings]);
 
-  // Automated WhatsApp Turn Reminder Dispatch (Using Approved Template)
+  // Automated WhatsApp Turn Reminder Dispatch
   const sendTurnReminderWhatsApp = async (patient: Patient, doctor: Doctor | undefined, aheadCount: number) => {
     try {
       const rawDigits = String(patient.mobile || '').replace(/\D/g, '');
@@ -374,15 +379,54 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  // Shift Reschedule / Carry Forward WhatsApp Dispatch
+  const sendShiftRescheduleWhatsApp = async (
+    patient: Patient,
+    doctor: Doctor | undefined,
+    newTokenNumber: number,
+    newShift: string,
+    newDate: string,
+    reasonType: 'MOVED' | 'REORDERED'
+  ) => {
+    try {
+      const rawDigits = String(patient.mobile || '').replace(/\D/g, '');
+      const cleanPhone = rawDigits.startsWith('91') && rawDigits.length === 12
+        ? rawDigits
+        : `91${rawDigits.slice(-10)}`;
+
+      const infoNote =
+        reasonType === 'MOVED'
+          ? `${doctor?.name || 'Doctor'} (Urgent Kaam Ke Karan Shift Badli Hai)`
+          : `${doctor?.name || 'Doctor'} (Queue Update: Purani Shift Ke Mareez Upar Lage Hain)`;
+
+      const response = await fetch('/api/send-whatsapp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: cleanPhone,
+          templateName: 'opd_token_confirmation',
+          patientName: patient.name,
+          doctorName: infoNote,
+          tokenNumber: `Naya Token #${newTokenNumber} (${newShift} Shift - ${newDate})`,
+          clinicName: doctor?.clinicName || 'Aarogya Clinic',
+        }),
+      });
+
+      const resData = await response.json();
+      console.log(`WhatsApp Shift Update sent for New Token #${newTokenNumber}:`, resData);
+    } catch (err) {
+      console.error('Failed to send shift reschedule WhatsApp:', err);
+    }
+  };
+
   const checkBotAlerts = useCallback((currentPatients: Patient[]) => {
     if (!voiceBotSettings.enabled) return;
 
     let triggeredAny = false;
     let newlyAlertedPatient: Patient | null = null;
-    const threshold = voiceBotSettings.triggerThreshold || 4; // Default 4 mareez
+    const threshold = voiceBotSettings.triggerThreshold || 4;
 
     currentPatients.forEach((p) => {
-      // 1. Sirf WAITING aur ONLINE booking wale mareez ko check karein jise pehle alert nahi gaya ho
       if (p.status !== 'WAITING' || p.bookingType !== 'ONLINE' || p.botCallAlertSent) {
         return;
       }
@@ -390,7 +434,6 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
       const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim().toLowerCase();
 
-      // 2. Same Doctor, Same Date, Same Shift ke sabhi WAITING patients nikaalein (Token number ke hisaab se)
       const shiftWaitingQueue = currentPatients
         .filter((other) => {
           const otherDate = other.appointmentDate || (other.createdAt ? other.createdAt.split('T')[0] : '');
@@ -408,10 +451,8 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           return Number(a.tokenNumber) - Number(b.tokenNumber);
         });
 
-      // 3. Dekhein ki is patient (p) ke aage kitne WAITING mareez bache hain
       const aheadCount = shiftWaitingQueue.findIndex((item) => item.id === p.id);
 
-      // 4. Jaise hi aage bache hue mareez 4 (ya usse kam) hon, turant WhatsApp trigger karein!
       if (aheadCount !== -1 && aheadCount <= threshold) {
         triggeredAny = true;
         const alerted = {
@@ -424,7 +465,6 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           newlyAlertedPatient = alerted;
         }
 
-        // Firestore me save karein taaki duplicate message na jaye
         updateDoc(doc(db, 'patients', p.id), {
           botCallAlertSent: true,
           botCallAlertSentAt: alerted.botCallAlertSentAt,
@@ -440,42 +480,41 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [voiceBotSettings, doctors]);
 
-  // 🔹 Start Token Session: Staff clicks "Start Token"
-  // Top 4 me se SIRF vahi mareez message receive karega jiska bookingType 'ONLINE' hai
+  // 🔹 1. Start Shift Session: Staff clicks "Morning Shift Start" / "Evening Shift Start"
   const startDoctorSession = useCallback(async (doctorId: string) => {
+    const matchedDoc = doctors.find((d) => d.id === doctorId);
+    const currentShift = matchedDoc?.activeShift || 'Morning';
+
     setDoctors((prev) =>
-      prev.map((d) => (d.id === doctorId ? { ...d, isSessionActive: true } : d))
+      prev.map((d) => (d.id === doctorId ? { ...d, isSessionActive: true, activeShift: currentShift } : d))
     );
 
     try {
       await updateDoc(doc(db, 'doctors', doctorId), {
         isSessionActive: true,
+        activeShift: currentShift,
       });
     } catch (e) {
       console.error("Error setting isSessionActive in Firestore:", e);
     }
 
     const targetDate = new Date().toISOString().split('T')[0];
-    const currentHour = new Date().getHours();
-    const fallbackShift = currentHour >= 13 ? 'Evening' : 'Morning';
 
     const targetPatients = patients.filter((p) => {
       const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
-      const pShift = ((p as any).selectedShift || (p as any).shift || fallbackShift).trim().toLowerCase();
+      const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim().toLowerCase();
       return (
         p.doctorId === doctorId &&
         pDate === targetDate &&
-        pShift === fallbackShift.toLowerCase() &&
+        pShift === currentShift.toLowerCase() &&
         p.status === 'WAITING'
       );
     }).sort((a, b) => Number(a.tokenNumber) - Number(b.tokenNumber));
 
-    // Top 4 waiting list
+    // Top 4 waiting list me se SIRF ONLINE booking walo ko message jayega
     const topWaitingList = targetPatients.slice(0, 4);
-    const matchedDoc = doctors.find((d) => d.id === doctorId);
 
     topWaitingList.forEach((patient) => {
-      // ⚠️ STRICT FILTER: Sirf ONLINE booking wale patient ko WhatsApp bhejein
       if (patient.bookingType !== 'ONLINE' || patient.botCallAlertSent) {
         return;
       }
@@ -493,7 +532,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
   }, [doctors, patients]);
 
-  // 🔹 Pause / Reset Session
+  // 🔹 2. Pause Session
   const pauseDoctorSession = useCallback(async (doctorId: string) => {
     setDoctors((prev) =>
       prev.map((d) => (d.id === doctorId ? { ...d, isSessionActive: false } : d))
@@ -508,10 +547,171 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, []);
 
+  // 🔹 3. Complete Shift (Morning -> Evening switch, ya Evening -> Complete)
+  const completeDoctorShift = useCallback(async (doctorId: string) => {
+    const matchedDoc = doctors.find((d) => d.id === doctorId);
+    const currentShift = matchedDoc?.activeShift || 'Morning';
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    const nextShift: 'Morning' | 'Evening' = currentShift === 'Morning' ? 'Evening' : 'Morning';
+    const morningDoneDate = currentShift === 'Morning' ? todayStr : '';
+
+    setDoctors((prev) =>
+      prev.map((d) =>
+        d.id === doctorId
+          ? {
+              ...d,
+              isSessionActive: false,
+              activeShift: nextShift,
+              morningCompletedDate: morningDoneDate,
+            }
+          : d
+      )
+    );
+
+    try {
+      await updateDoc(doc(db, 'doctors', doctorId), {
+        isSessionActive: false,
+        activeShift: nextShift,
+        morningCompletedDate: morningDoneDate,
+      });
+    } catch (e) {
+      console.error("Error completing shift in Firestore:", e);
+    }
+  }, [doctors]);
+
+  // 🔹 4. Move Remaining Patients to Next Shift (Urgent Doctor Unavailability)
+  // Done ho chuke patients ko chhodkar bache hue sabhi patients agle shift ke sabse upar (#1, #2...) lag jayenge
+  // Aur agle shift ke purane patients niche series se shift ho jayenge + Online patients ko WhatsApp jayega
+  const moveRemainingToNextShift = useCallback(async (doctorId: string) => {
+    const matchedDoc = doctors.find((d) => d.id === doctorId);
+    const currentShift = matchedDoc?.activeShift || 'Morning';
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    const tomorrowObj = new Date();
+    tomorrowObj.setDate(tomorrowObj.getDate() + 1);
+    const tomorrowStr = tomorrowObj.toISOString().split('T')[0];
+
+    const targetShift: 'Morning' | 'Evening' = currentShift === 'Morning' ? 'Evening' : 'Morning';
+    const targetDate = currentShift === 'Morning' ? todayStr : tomorrowStr;
+
+    // 1. Current shift ke bache hue patients (jo COMPLETED nahi hain)
+    const remainingCurrentPatients = patients
+      .filter((p) => {
+        const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
+        const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim().toLowerCase();
+        return (
+          p.doctorId === doctorId &&
+          pDate === todayStr &&
+          pShift === currentShift.toLowerCase() &&
+          p.status !== 'COMPLETED'
+        );
+      })
+      .sort((a, b) => Number(a.tokenNumber) - Number(b.tokenNumber));
+
+    // 2. Target shift mein pehle se मौजूद patients
+    const existingTargetPatients = patients
+      .filter((p) => {
+        const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
+        const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim().toLowerCase();
+        return (
+          p.doctorId === doctorId &&
+          pDate === targetDate &&
+          pShift === targetShift.toLowerCase()
+        );
+      })
+      .sort((a, b) => Number(a.tokenNumber) - Number(b.tokenNumber));
+
+    const movedCount = remainingCurrentPatients.length;
+    const updatesMap = new Map<string, Partial<Patient>>();
+
+    // 3. Bache hue patients ko target shift ke TOP (#1, #2, ...) par rakhein
+    remainingCurrentPatients.forEach((p, index) => {
+      const newToken = index + 1;
+      updatesMap.set(p.id, {
+        tokenNumber: newToken,
+        appointmentDate: targetDate,
+        selectedShift: targetShift,
+        status: p.status === 'IN_CABIN' ? 'WAITING' : p.status,
+        botCallAlertSent: false,
+      });
+
+      // Online patient ko message bhejein ki shift badalne ke kaaran naya token mila hai
+      if (p.bookingType === 'ONLINE') {
+        sendShiftRescheduleWhatsApp(p, matchedDoc, newToken, targetShift, targetDate, 'MOVED');
+      }
+    });
+
+    // 4. Target shift ke purane patients ko series se neeche (#movedCount + 1, ...) shift karein
+    if (movedCount > 0) {
+      existingTargetPatients.forEach((p, index) => {
+        const shiftedToken = movedCount + index + 1;
+        updatesMap.set(p.id, {
+          tokenNumber: shiftedToken,
+          botCallAlertSent: false,
+        });
+
+        // Target shift ke online patients ko bhi naye token number ki jankari dein
+        if (p.bookingType === 'ONLINE') {
+          sendShiftRescheduleWhatsApp(p, matchedDoc, shiftedToken, targetShift, targetDate, 'REORDERED');
+        }
+      });
+    }
+
+    // 5. Local State aur Firestore update karein
+    if (updatesMap.size > 0) {
+      setPatients((prev) =>
+        prev.map((p) => {
+          const patch = updatesMap.get(p.id);
+          return patch ? ({ ...p, ...patch, shift: patch.selectedShift || (p as any).shift } as Patient) : p;
+        })
+      );
+
+      for (const [patientId, patch] of updatesMap.entries()) {
+        const firestorePayload: any = { ...patch };
+        if (patch.selectedShift) {
+          firestorePayload.shift = patch.selectedShift;
+        }
+        updateDoc(doc(db, 'patients', patientId), firestorePayload).catch((err) =>
+          console.error(`Error updating moved patient ${patientId}:`, err)
+        );
+      }
+    }
+
+    // 6. Doctor ki shift ko next shift par switch karein aur session pause rakhein
+    const nextDoctorShift: 'Morning' | 'Evening' = currentShift === 'Morning' ? 'Evening' : 'Morning';
+    const morningDoneDate = currentShift === 'Morning' ? todayStr : '';
+
+    setDoctors((prev) =>
+      prev.map((d) =>
+        d.id === doctorId
+          ? {
+              ...d,
+              isSessionActive: false,
+              activeShift: nextDoctorShift,
+              morningCompletedDate: morningDoneDate,
+            }
+          : d
+      )
+    );
+
+    try {
+      await updateDoc(doc(db, 'doctors', doctorId), {
+        isSessionActive: false,
+        activeShift: nextDoctorShift,
+        morningCompletedDate: morningDoneDate,
+      });
+    } catch (e) {
+      console.error("Error switching shift after carry forward:", e);
+    }
+
+    return { movedCount, targetShift, targetDate };
+  }, [doctors, patients]);
+
   const addWalkInPatient = useCallback((data: Omit<Patient, 'id' | 'tokenNumber' | 'status' | 'bookingType' | 'paymentStatus' | 'paymentAmount' | 'createdAt' | 'botCallAlertSent'>): Patient => {
+    const matchedDoctor = doctors.find((d) => d.id === data.doctorId);
     const targetDate = (data as any).appointmentDate || new Date().toISOString().split('T')[0];
-    const currentHour = new Date().getHours();
-    const fallbackShift = currentHour >= 13 ? 'Evening' : 'Morning';
+    const fallbackShift = matchedDoctor?.activeShift || 'Morning';
     const targetShift = ((data as any).selectedShift || (data as any).shift || fallbackShift).trim();
 
     const matchingPatients = patients.filter((p) => {
@@ -533,7 +733,6 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const nextToken = maxToken + 1;
     const customId = `p-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-    const matchedDoctor = doctors.find((d) => d.id === data.doctorId);
     const resolvedHospitalId = (data as any).hospitalId || matchedDoctor?.hospitalId || matchedDoctor?.staffUsername || '';
 
     const newPatient: Patient = {
@@ -563,9 +762,9 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [patients, doctors, checkBotAlerts]);
 
   const bookOnlineAppointment = useCallback((data: Omit<Patient, 'id' | 'tokenNumber' | 'status' | 'bookingType' | 'paymentStatus' | 'paymentAmount' | 'createdAt' | 'botCallAlertSent'>) => {
+    const matchedDoctor = doctors.find((d) => d.id === data.doctorId);
     const targetDate = (data as any).appointmentDate || new Date().toISOString().split('T')[0];
-    const currentHour = new Date().getHours();
-    const fallbackShift = currentHour >= 13 ? 'Evening' : 'Morning';
+    const fallbackShift = matchedDoctor?.activeShift || 'Morning';
     const targetShift = ((data as any).selectedShift || (data as any).shift || fallbackShift).trim();
 
     const matchingPatients = patients.filter((p) => {
@@ -588,7 +787,6 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const paymentId = (data as any).paymentId || `pay_rzp_${Date.now()}`;
     const customId = `p-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-    const matchedDoctor = doctors.find((d) => d.id === data.doctorId);
     const resolvedHospitalId = (data as any).hospitalId || matchedDoctor?.hospitalId || matchedDoctor?.staffUsername || '';
 
     const newPatient: Patient = {
@@ -691,26 +889,41 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setTimeout(() => checkBotAlerts(updated), 50);
   }, [patients, checkBotAlerts]);
 
-  const updateDoctorStatus = useCallback((doctorId: string, status: DoctorStatus, note?: string) => {
-    setDoctors((prev) =>
-      prev.map((docItem) => {
-        if (docItem.id === doctorId) {
-          const updatedNote = (note !== undefined ? note : (docItem.statusNote || '')) || '';
-          updateDoc(doc(db, 'doctors', doctorId), {
-            status: status,
-            statusNote: updatedNote,
-          }).catch((err) => console.error("Error updating doctor status:", err));
+  // 🔹 Update Doctor Status + Leave Start & End Dates
+  const updateDoctorStatus = useCallback(
+    (doctorId: string, status: DoctorStatus, note?: string, leaveStart?: string, leaveEnd?: string) => {
+      const todayStr = new Date().toISOString().split('T')[0];
 
-          return {
-            ...docItem,
-            status,
-            statusNote: updatedNote,
-          };
-        }
-        return docItem;
-      })
-    );
-  }, []);
+      setDoctors((prev) =>
+        prev.map((docItem) => {
+          if (docItem.id === doctorId) {
+            const updatedNote = (note !== undefined ? note : (docItem.statusNote || '')) || '';
+            const resolvedLeaveStart =
+              status === 'LEAVE' ? (leaveStart || docItem.leaveStartDate || todayStr) : '';
+            const resolvedLeaveEnd =
+              status === 'LEAVE' ? (leaveEnd || docItem.leaveEndDate || todayStr) : '';
+
+            updateDoc(doc(db, 'doctors', doctorId), {
+              status: status,
+              statusNote: updatedNote,
+              leaveStartDate: resolvedLeaveStart,
+              leaveEndDate: resolvedLeaveEnd,
+            }).catch((err) => console.error("Error updating doctor status:", err));
+
+            return {
+              ...docItem,
+              status,
+              statusNote: updatedNote,
+              leaveStartDate: resolvedLeaveStart,
+              leaveEndDate: resolvedLeaveEnd,
+            };
+          }
+          return docItem;
+        })
+      );
+    },
+    []
+  );
 
   const addNewDoctor = useCallback((data: Omit<Doctor, 'id' | 'status' | 'onlineTokenFee' | 'createdAt'>): Doctor => {
     const baseUsername = (data.staffUsername || data.name || 'doctor')
@@ -744,6 +957,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       establishmentType: (data as any).establishmentType || 'CLINIC',
       hospitalId: (data as any).hospitalId || baseUsername,
       isSessionActive: false,
+      activeShift: 'Morning',
     };
 
     const safePayload = JSON.parse(JSON.stringify(newDoc));
@@ -848,6 +1062,8 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         updateDoctorStatus,
         startDoctorSession,
         pauseDoctorSession,
+        completeDoctorShift,
+        moveRemainingToNextShift,
         addNewDoctor,
         staffLogin,
         staffLogout,
