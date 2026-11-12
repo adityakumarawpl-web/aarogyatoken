@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useClinic } from '../../context/ClinicContext';
 import { QueueCard } from './QueueCard';
 import { DoctorStatus, Patient } from '../../types';
@@ -23,6 +23,7 @@ import {
   ChevronLeft,
   PlayCircle,
   PauseCircle,
+  ArrowRightCircle,
 } from 'lucide-react';
 
 export const StaffPortal: React.FC = () => {
@@ -35,6 +36,8 @@ export const StaffPortal: React.FC = () => {
     updateDoctorStatus,
     startDoctorSession,
     pauseDoctorSession,
+    completeDoctorShift,
+    moveRemainingToNextShift,
     addWalkInPatient,
     setSelectedDoctorId,
   } = useClinic();
@@ -56,42 +59,31 @@ export const StaffPortal: React.FC = () => {
   const [selectedDateFilter, setSelectedDateFilter] = useState<string>(realTodayDate);
   const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
 
-  // Time string ko minutes mein convert karna
-  const parseTimeToMinutes = (timeStr: string) => {
-    if (!timeStr) return 13 * 60;
-    const cleanStr = timeStr.trim().toUpperCase();
-    const isPM = cleanStr.includes('PM');
-    const isAM = cleanStr.includes('AM');
-    const rawTime = cleanStr.replace(/[APM\s]/g, '');
-    const [hoursStr, minutesStr] = rawTime.split(':');
-    let hours = parseInt(hoursStr, 10) || 0;
-    const minutes = parseInt(minutesStr, 10) || 0;
+  // Leave Date Range State
+  const [leaveStartInput, setLeaveStartInput] = useState<string>(realTodayDate);
+  const [leaveEndInput, setLeaveEndInput] = useState<string>(realTodayDate);
 
-    if (isPM && hours < 12) hours += 12;
-    if (isAM && hours === 12) hours = 0;
+  // Effective current doctor
+  const activeDoctorId = (loginType === 'HOSPITAL' && selectedHospitalCabinId) ? selectedHospitalCabinId : staffDoctorId;
+  const currentDoctor = doctors.find((d) => d.id === activeDoctorId);
 
-    return hours * 60 + minutes;
-  };
+  // Sync Leave inputs when currentDoctor changes
+  useEffect(() => {
+    if (currentDoctor) {
+      setLeaveStartInput(currentDoctor.leaveStartDate || realTodayDate);
+      setLeaveEndInput(currentDoctor.leaveEndDate || realTodayDate);
+    }
+  }, [currentDoctor?.id, currentDoctor?.leaveStartDate, currentDoctor?.leaveEndDate, realTodayDate]);
+
+  // 🔹 Staff-Controlled Active Shift (Time-based auto-jump disabled until Morning Shift Complete)
+  const activeDoctorShift: 'Morning' | 'Evening' = currentDoctor?.activeShift || 'Morning';
+  const realCurrentShift = activeDoctorShift;
 
   const isMorningShiftActiveForDoctor = (targetDate: string, doctor: any) => {
     const todayStr = new Date().toISOString().split('T')[0];
     if (targetDate > todayStr) return true;
-
-    if (targetDate === todayStr) {
-      const now = new Date();
-      const currentMinutes = now.getHours() * 60 + now.getMinutes();
-
-      let morningEndTimeStr = doctor?.morningShiftEnd || doctor?.morningEnd;
-      if (!morningEndTimeStr && doctor?.opdTimings && doctor.opdTimings.includes('-')) {
-        morningEndTimeStr = doctor.opdTimings.split('-')[1]?.trim();
-      }
-      if (!morningEndTimeStr) morningEndTimeStr = '01:00 PM';
-
-      const morningEndMinutes = parseTimeToMinutes(morningEndTimeStr);
-      return currentMinutes <= morningEndMinutes;
-    }
-
-    return false;
+    // Aaj ke liye Morning tab tak active rahegi jab tak staff Morning Shift Complete na kar de
+    return (doctor?.activeShift || 'Morning') === 'Morning';
   };
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -108,32 +100,6 @@ export const StaffPortal: React.FC = () => {
   });
 
   const [reportPeriod, setReportPeriod] = useState<'day' | 'week' | 'month' | 'year'>('day');
-
-  // Effective current doctor
-  const activeDoctorId = (loginType === 'HOSPITAL' && selectedHospitalCabinId) ? selectedHospitalCabinId : staffDoctorId;
-  const currentDoctor = doctors.find((d) => d.id === activeDoctorId);
-
-  const getRealCurrentShift = () => {
-    const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
-
-    let morningEndTimeStr = currentDoctor?.morningShiftEnd || currentDoctor?.morningEnd;
-    if (!morningEndTimeStr && currentDoctor?.opdTimings && currentDoctor.opdTimings.includes('-')) {
-      morningEndTimeStr = currentDoctor.opdTimings.split('-')[1]?.trim();
-    }
-    if (!morningEndTimeStr && currentDoctor?.timings && currentDoctor.timings.includes('&')) {
-      const morningPart = currentDoctor.timings.split('&')[0];
-      if (morningPart.includes('-')) {
-        morningEndTimeStr = morningPart.split('-')[1]?.trim();
-      }
-    }
-    if (!morningEndTimeStr) morningEndTimeStr = '01:00 PM';
-
-    const morningEndMinutes = parseTimeToMinutes(morningEndTimeStr);
-    return currentMinutes <= morningEndMinutes ? 'Morning' : 'Evening';
-  };
-
-  const realCurrentShift = getRealCurrentShift();
 
   const handleDateChange = (newDate: string) => {
     const morningAllowed = isMorningShiftActiveForDoctor(newDate, currentDoctor);
@@ -413,6 +379,13 @@ export const StaffPortal: React.FC = () => {
 
   const isSessionActive = Boolean(currentDoctor.isSessionActive);
 
+  // Leave Start Date Lock Check: Agar start date aaj se pehle ki ho chuki hai toh edit disable rahega
+  const isLeaveStartLocked = Boolean(
+    currentDoctor.status === 'LEAVE' &&
+    currentDoctor.leaveStartDate &&
+    realTodayDate > currentDoctor.leaveStartDate
+  );
+
   const doctorPatients = patients.filter((p) => {
     if (p.doctorId !== currentDoctor?.id) return false;
 
@@ -420,7 +393,7 @@ export const StaffPortal: React.FC = () => {
     if (selectedDateFilter && patientDate && patientDate !== selectedDateFilter) return false;
 
     if (selectedShiftFilter && selectedShiftFilter !== 'ALL') {
-      const patientShift = (p.selectedShift || p.shift || '').trim();
+      const patientShift = (p.selectedShift || (p as any).shift || '').trim();
       if (patientShift && patientShift !== selectedShiftFilter) return false;
     }
 
@@ -457,7 +430,7 @@ export const StaffPortal: React.FC = () => {
   const summary = generateDoctorSummary(patients, currentDoctor?.id, reportPeriod);
 
   const currentActiveDate = selectedDateFilter || new Date().toISOString().split('T')[0];
-  const currentActiveShift = (selectedShiftFilter && selectedShiftFilter !== 'ALL') ? selectedShiftFilter : 'Morning';
+  const currentActiveShift = (selectedShiftFilter && selectedShiftFilter !== 'ALL') ? selectedShiftFilter : activeDoctorShift;
 
   const matchingShiftPatients = patients.filter((p) => {
     const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
@@ -545,10 +518,13 @@ export const StaffPortal: React.FC = () => {
               className="h-12 w-12 rounded-2xl object-cover border-2 border-slate-200"
             />
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-xl font-black text-slate-900">{currentDoctor.name}</h1>
                 <span className="rounded bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-0.5">
                   {currentDoctor.cabinNumber}
+                </span>
+                <span className="rounded bg-indigo-100 text-indigo-800 text-[10px] font-bold px-2 py-0.5">
+                  {activeDoctorShift} Shift
                 </span>
                 <span
                   className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
@@ -588,7 +564,18 @@ export const StaffPortal: React.FC = () => {
             <span className="text-xs font-bold text-slate-700">Status:</span>
             <select
               value={currentDoctor.status || 'AVAILABLE'}
-              onChange={(e) => updateDoctorStatus(currentDoctor.id, e.target.value as any)}
+              onChange={(e) => {
+                const newStatus = e.target.value as DoctorStatus;
+                if (newStatus === 'LEAVE') {
+                  const defaultStart = currentDoctor.leaveStartDate || realTodayDate;
+                  const defaultEnd = currentDoctor.leaveEndDate || realTodayDate;
+                  setLeaveStartInput(defaultStart);
+                  setLeaveEndInput(defaultEnd);
+                  updateDoctorStatus(currentDoctor.id, 'LEAVE', undefined, defaultStart, defaultEnd);
+                } else {
+                  updateDoctorStatus(currentDoctor.id, newStatus);
+                }
+              }}
               className={`text-xs font-bold rounded-xl px-3 py-2 border shadow-xs outline-none cursor-pointer transition ${
                 currentDoctor.status === 'AVAILABLE'
                   ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
@@ -615,59 +602,175 @@ export const StaffPortal: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* 🔹 LEAVE DATE RANGE SELECTOR BAR (Jab Doctor Status LEAVE ho) */}
+        {currentDoctor.status === 'LEAVE' && (
+          <div className="max-w-7xl mx-auto mt-4 pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+            <div className="flex items-center gap-2.5">
+              <Calendar className="h-5 w-5 text-blue-600 shrink-0" />
+              <div>
+                <span className="text-xs font-black text-slate-800 uppercase tracking-wide block">
+                  Doctor Leave Schedule (Chhutti Ki Tarikh)
+                </span>
+                <span className="text-[11px] text-slate-500">
+                  {isLeaveStartLocked
+                    ? 'Leave shuru ho chuki hai isliye Start Date lock hai. Aap End Date badha ya ghata sakte hain.'
+                    : 'Kab se kab tak doctor chhutti par rahenge, date set karein (Public OPD par dikhega).'}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-slate-500 mb-0.5">
+                  Kab Se (Start Date) {isLeaveStartLocked && '🔒'}
+                </label>
+                <input
+                  type="date"
+                  disabled={isLeaveStartLocked}
+                  value={leaveStartInput}
+                  min={realTodayDate}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setLeaveStartInput(val);
+                    const adjustedEnd = leaveEndInput < val ? val : leaveEndInput;
+                    if (leaveEndInput < val) setLeaveEndInput(val);
+                    updateDoctorStatus(currentDoctor.id, 'LEAVE', undefined, val, adjustedEnd);
+                  }}
+                  className={`rounded-xl border px-3 py-1.5 text-xs font-bold outline-none ${
+                    isLeaveStartLocked
+                      ? 'bg-slate-200 text-slate-500 border-slate-300 cursor-not-allowed'
+                      : 'bg-white text-slate-800 border-slate-300 focus:border-blue-600'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-slate-500 mb-0.5">
+                  Kab Tak (End Date)
+                </label>
+                <input
+                  type="date"
+                  value={leaveEndInput}
+                  min={leaveStartInput || realTodayDate}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setLeaveEndInput(val);
+                    updateDoctorStatus(currentDoctor.id, 'LEAVE', undefined, leaveStartInput, val);
+                  }}
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 focus:border-blue-600 outline-none"
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Main Staff Container */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
-        {/* 🔹 START TOKEN SESSION CONTROLLER BAR */}
-        <div className="rounded-2xl border-2 border-blue-200 bg-gradient-to-r from-blue-50 via-indigo-50 to-white p-4 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className={`h-11 w-11 rounded-2xl flex items-center justify-center shrink-0 ${
-              isSessionActive ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30' : 'bg-blue-600 text-white shadow-md shadow-blue-500/30'
-            }`}>
-              {isSessionActive ? <PlayCircle className="h-6 w-6" /> : <Clock className="h-6 w-6" />}
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-black uppercase tracking-wider text-slate-800">
-                  OPD Live Token Session
-                </span>
-                <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
-                  isSessionActive ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                }`}>
-                  {isSessionActive ? 'ACTIVE (Tokens Calling)' : 'NOT STARTED (Calling Locked)'}
-                </span>
+        {/* 🔹 4-BUTTON SHIFT & TOKEN SESSION CONTROLLER BAR */}
+        <div className="rounded-2xl border-2 border-blue-200 bg-gradient-to-r from-blue-50 via-indigo-50 to-white p-4 shadow-sm space-y-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className={`h-11 w-11 rounded-2xl flex items-center justify-center shrink-0 ${
+                isSessionActive ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30' : 'bg-blue-600 text-white shadow-md shadow-blue-500/30'
+              }`}>
+                {isSessionActive ? <PlayCircle className="h-6 w-6" /> : <Clock className="h-6 w-6" />}
               </div>
-              <p className="text-xs text-slate-600 mt-0.5">
-                {isSessionActive
-                  ? 'Session shuru hai. Aap cabin me mareez ko "Andar Bulayein" dabakar call kar sakte hain.'
-                  : 'OPD shuru hone se 10-15 min pehle "Start Token" dabayein. Isse online mareezon ko turant alert jayega.'}
-              </p>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-black uppercase tracking-wider text-slate-900">
+                    {activeDoctorShift} Shift Session Control
+                  </span>
+                  <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full ${
+                    isSessionActive
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                      : 'bg-amber-100 text-amber-800 border border-amber-300'
+                  }`}>
+                    {isSessionActive ? `🟢 ${activeDoctorShift} Shift Running` : `⏸️ ${activeDoctorShift} Shift Paused / Not Started`}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  {activeDoctorShift === 'Morning'
+                    ? 'Jab tak aap "Morning Shift Complete" nahi dabayenge, system Morning Shift par hi lock rahega.'
+                    : 'Evening Shift active hai. Session khatam hone par "Evening Shift Complete" dabayein.'}
+                </p>
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            {!isSessionActive ? (
-              <button
-                type="button"
-                onClick={() => startDoctorSession(currentDoctor.id)}
-                className="w-full sm:w-auto rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 text-xs font-black shadow-md shadow-emerald-500/25 transition active:scale-95 cursor-pointer flex items-center justify-center gap-2"
-              >
-                <PlayCircle className="h-4 w-4" />
-                <span>Start Token (10 Min Pehle)</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => pauseDoctorSession(currentDoctor.id)}
-                className="w-full sm:w-auto rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2.5 text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1.5"
-                title="Session ko temporary pause karein"
-              >
-                <PauseCircle className="h-4 w-4 text-slate-500" />
-                <span>Pause Session</span>
-              </button>
-            )}
+          {/* 4 Action Buttons Grid: Start | Pause | Complete | Move to Next Shift */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
+            {/* Button 1: Morning/Evening Shift Start */}
+            <button
+              type="button"
+              disabled={isSessionActive}
+              onClick={() => startDoctorSession(currentDoctor.id)}
+              className={`rounded-xl px-3.5 py-2.5 text-xs font-black transition flex items-center justify-center gap-1.5 ${
+                isSessionActive
+                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/25 cursor-pointer active:scale-95'
+              }`}
+            >
+              <PlayCircle className="h-4 w-4 shrink-0" />
+              <span>{activeDoctorShift} Shift Start</span>
+            </button>
+
+            {/* Button 2: Pause */}
+            <button
+              type="button"
+              disabled={!isSessionActive}
+              onClick={() => pauseDoctorSession(currentDoctor.id)}
+              className={`rounded-xl px-3.5 py-2.5 text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                !isSessionActive
+                  ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                  : 'bg-amber-500 hover:bg-amber-600 text-white shadow-sm cursor-pointer active:scale-95'
+              }`}
+            >
+              <PauseCircle className="h-4 w-4 shrink-0" />
+              <span>Pause</span>
+            </button>
+
+            {/* Button 3: Morning/Evening Shift Complete */}
+            <button
+              type="button"
+              onClick={() => {
+                const confirmMsg =
+                  activeDoctorShift === 'Morning'
+                    ? 'Kya aap Morning Shift complete karna chahte hain? Iske baad Evening Shift auto-select ho jayegi.'
+                    : 'Kya aap Evening Shift complete karna chahte hain?';
+                if (window.confirm(confirmMsg)) {
+                  completeDoctorShift(currentDoctor.id);
+                }
+              }}
+              className="rounded-xl bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-2.5 text-xs font-bold shadow-sm transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
+            >
+              <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+              <span>{activeDoctorShift} Shift Complete</span>
+            </button>
+
+            {/* Button 4: Move to Next Shift (Urgent Unavailability Carry-Forward) */}
+            <button
+              type="button"
+              onClick={async () => {
+                const nextShiftLabel = activeDoctorShift === 'Morning' ? 'Aaj ki Evening Shift' : 'Kal ki Morning Shift';
+                const confirmMove = window.confirm(
+                  `Urgent Shift Transfer:\n\nJo patients Done (Completed) ho chuke hain unhe chhodkar, is shift ke sabhi bache hue patients ${nextShiftLabel} ke sabse upar (#1, #2...) lag jayenge aur pehle se book patients niche shift ho jayenge.\n\nSabhi online patients ko naye token ka WhatsApp message bhi jayega. Kya aap aage badhna chahte hain?`
+                );
+                if (!confirmMove) return;
+
+                const result = await moveRemainingToNextShift(currentDoctor.id);
+                alert(
+                  `✅ Transfer Complete!\n${result.movedCount} bache hue patients ko ${result.targetShift} Shift (${result.targetDate}) ke top par shift kar diya gaya hai aur online patients ko WhatsApp bhej diya gaya hai.`
+                );
+              }}
+              className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2.5 text-xs font-bold shadow-sm transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
+              title="Urgent kaam aane par bache hue sabhi patients ko agli shift ke sabse upar transfer karein"
+            >
+              <ArrowRightCircle className="h-4 w-4 text-indigo-200 shrink-0" />
+              <span>Move to Next Shift</span>
+            </button>
           </div>
         </div>
 
@@ -832,7 +935,7 @@ export const StaffPortal: React.FC = () => {
               </div>
               <div>
                 <h4 className="text-xs font-black uppercase tracking-wider text-amber-900">
-                  Doctor Status: {currentDoctor.status === 'LUNCH' ? 'Lunch Break (लंच)' : currentDoctor.status === 'SURGERY' ? 'In Surgery (सर्जरी)' : 'On Leave (छुट्टी)'} — Patient Calling Blocked
+                  Doctor Status: {currentDoctor.status === 'LUNCH' ? 'Lunch Break (लंच)' : currentDoctor.status === 'SURGERY' ? 'In Surgery (सर्जरी)' : `On Leave (${currentDoctor.leaveStartDate || ''} se ${currentDoctor.leaveEndDate || ''})`} — Patient Calling Blocked
                 </h4>
                 <p className="text-xs text-amber-800 mt-0.5">
                   Doctor abhi mareez nahi dekh rahe hain. Cabin me bulane ke sabhi buttons band hain. Doctor ke aane par upar <strong>🟢 Available</strong> par click karein.
@@ -858,10 +961,10 @@ export const StaffPortal: React.FC = () => {
               </div>
               <div>
                 <h4 className="text-xs font-black uppercase tracking-wider text-amber-900">
-                  "Start Token" Button Dabana Zaroori Hai
+                  "{activeDoctorShift} Shift Start" Button Dabana Zaroori Hai
                 </h4>
                 <p className="text-xs text-amber-800 mt-0.5">
-                  OPD cabin shuru karne ke liye pehle upar <strong>"Start Token"</strong> button dabayein, tabhi "Andar Bulayein" button unlock hoga aur online mareezon ko SMS/WhatsApp alert jayega.
+                  OPD cabin shuru karne ke liye pehle upar <strong>"{activeDoctorShift} Shift Start"</strong> button dabayein, tabhi "Andar Gaye" button unlock hoga aur online mareezon ko WhatsApp alert jayega.
                 </p>
               </div>
             </div>
@@ -871,7 +974,7 @@ export const StaffPortal: React.FC = () => {
               className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition cursor-pointer shrink-0 flex items-center gap-1.5"
             >
               <PlayCircle className="h-4 w-4" />
-              <span>Start Token Now</span>
+              <span>{activeDoctorShift} Shift Start</span>
             </button>
           </div>
         )}
