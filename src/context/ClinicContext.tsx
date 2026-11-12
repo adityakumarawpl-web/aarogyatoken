@@ -379,12 +379,40 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     let triggeredAny = false;
     let newlyAlertedPatient: Patient | null = null;
+    const threshold = voiceBotSettings.triggerThreshold || 4; // Default 4 mareez
 
     currentPatients.forEach((p) => {
-      // Sirf ONLINE booking wale mareez ke liye check karein
-      const isOnline = p.bookingType === 'ONLINE';
+      // 1. Sirf WAITING aur ONLINE booking wale mareez ko check karein jise pehle alert nahi gaya ho
+      if (p.status !== 'WAITING' || p.bookingType !== 'ONLINE' || p.botCallAlertSent) {
+        return;
+      }
 
-      if (isOnline && shouldSendBotCallAlert(currentPatients, p, voiceBotSettings.triggerThreshold) && !p.botCallAlertSent) {
+      const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
+      const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim().toLowerCase();
+
+      // 2. Same Doctor, Same Date, Same Shift ke sabhi WAITING patients nikaalein (Token number ke hisaab se)
+      const shiftWaitingQueue = currentPatients
+        .filter((other) => {
+          const otherDate = other.appointmentDate || (other.createdAt ? other.createdAt.split('T')[0] : '');
+          const otherShift = ((other as any).selectedShift || (other as any).shift || 'Morning').trim().toLowerCase();
+          return (
+            other.doctorId === p.doctorId &&
+            otherDate === pDate &&
+            otherShift === pShift &&
+            other.status === 'WAITING'
+          );
+        })
+        .sort((a, b) => {
+          if (a.isEmergency && !b.isEmergency) return -1;
+          if (!a.isEmergency && b.isEmergency) return 1;
+          return Number(a.tokenNumber) - Number(b.tokenNumber);
+        });
+
+      // 3. Dekhein ki is patient (p) ke aage kitne WAITING mareez bache hain
+      const aheadCount = shiftWaitingQueue.findIndex((item) => item.id === p.id);
+
+      // 4. Jaise hi aage bache hue mareez 4 (ya usse kam) hon, turant WhatsApp trigger karein!
+      if (aheadCount !== -1 && aheadCount <= threshold) {
         triggeredAny = true;
         const alerted = {
           ...p,
@@ -396,28 +424,14 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           newlyAlertedPatient = alerted;
         }
 
+        // Firestore me save karein taaki duplicate message na jaye
         updateDoc(doc(db, 'patients', p.id), {
           botCallAlertSent: true,
           botCallAlertSentAt: alerted.botCallAlertSentAt,
         }).catch((err) => console.error("Error updating bot alert:", err));
 
-        const targetShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim().toLowerCase();
-        const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
-
-        const aheadCount = currentPatients.filter((other) => {
-          const otherDate = other.appointmentDate || (other.createdAt ? other.createdAt.split('T')[0] : '');
-          const otherShift = ((other as any).selectedShift || (other as any).shift || 'Morning').trim().toLowerCase();
-          return (
-            other.doctorId === p.doctorId &&
-            otherDate === pDate &&
-            otherShift === targetShift &&
-            other.status === 'WAITING' &&
-            Number(other.tokenNumber) < Number(p.tokenNumber)
-          );
-        }).length;
-
         const matchedDoc = doctors.find((d) => d.id === p.doctorId);
-        sendTurnReminderWhatsApp(p, matchedDoc, aheadCount || voiceBotSettings.triggerThreshold);
+        sendTurnReminderWhatsApp(p, matchedDoc, aheadCount);
       }
     });
 
