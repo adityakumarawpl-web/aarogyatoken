@@ -32,7 +32,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
     return `********${clean.slice(-2)}`;
   };
 
-  const getLiveServingDetails = () => {
+const getLiveServingDetails = () => {
     // 1. Doctor Break / Surgery / Leave States
     if (doctor.status === 'LUNCH') {
       return {
@@ -56,6 +56,9 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
       };
     }
 
+    const todayStr = new Date().toISOString().split('T')[0];
+    const currentShift = new Date().getHours() < 14 ? 'morning' : 'evening';
+
     // 2. Cabin me patient chal raha hai toh hamesha token number dikhega
     const inCabinPatient = patients.find(
       (p) => p.doctorId === doctor.id && p.status === 'IN_CABIN'
@@ -63,13 +66,61 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
     if (inCabinPatient) {
       return {
         displayText: `#${inCabinPatient.tokenNumber}`,
-        textColor: 'text-emerald-600 drop-shadow-[0_0_10px_rgba(16,185,129,0.4)]',
+        textColor: 'text-emerald-600 text-3xl sm:text-4xl drop-shadow-[0_0_10px_rgba(16,185,129,0.4)]',
         label: 'Doctor Cabin me abhi chal raha hai',
       };
     }
 
-    // 3. Staff ne "Start Token" dabaya hai lekin abhi andar nahi bulaya
+    // 3. Check karein ki aaj ki shift me kitne mareez checkup (COMPLETED) ho chuke hain aur agla WAITING kaun hai
+    const todaysShiftPatients = patients.filter((p) => {
+      if (p.doctorId !== doctor.id) return false;
+      const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
+      const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim().toLowerCase();
+      return pDate === todayStr && pShift === currentShift;
+    });
+
+    const hasCompletedAny = todaysShiftPatients.some((p) => p.status === 'COMPLETED');
+
+    const waitingQueue = todaysShiftPatients
+      .filter((p) => p.status === 'WAITING')
+      .sort((a, b) => {
+        if (a.isEmergency && !b.isEmergency) return -1;
+        if (!a.isEmergency && b.isEmergency) return 1;
+        return (a.tokenNumber || 0) - (b.tokenNumber || 0);
+      });
+
+    // 4. Agar Session Active hai:
     if (doctor.isSessionActive) {
+      // Agar kam se kam ek mareez Done ho chuka hai aur agla waiting me hai -> "Waiting #5" dikhega
+      if (hasCompletedAny && waitingQueue.length > 0) {
+        const nextPatient = waitingQueue[0];
+        return {
+          displayText: `Waiting #${nextPatient.tokenNumber}`,
+          textColor: nextPatient.isEmergency
+            ? 'text-rose-600 text-2xl sm:text-3xl drop-shadow-[0_0_10px_rgba(225,29,72,0.4)]'
+            : 'text-blue-600 text-2xl sm:text-3xl drop-shadow-[0_0_10px_rgba(37,99,235,0.3)]',
+          label: `Agla Token #${nextPatient.tokenNumber} cabin me bulaya ja raha hai`,
+        };
+      }
+
+      // Agar abhi OPD just start hui hai aur pehla patient abhi tak andar nahi gaya hai -> "Token Start"
+      if (!hasCompletedAny && waitingQueue.length > 0) {
+        return {
+          displayText: 'Token Start',
+          textColor: 'text-emerald-600 animate-pulse text-2xl sm:text-3xl drop-shadow-[0_0_10px_rgba(16,185,129,0.4)]',
+          label: 'Token shuru ho gaya hai • Cabin me bulaya ja raha hai',
+        };
+      }
+
+      // Agar sabhi waiting patients ka checkup poora ho gaya hai
+      if (hasCompletedAny && waitingQueue.length === 0) {
+        return {
+          displayText: 'Queue Clear',
+          textColor: 'text-emerald-600 text-2xl sm:text-3xl',
+          label: 'Abhi sabhi tokens complete ho chuke hain',
+        };
+      }
+
       return {
         displayText: 'Token Start',
         textColor: 'text-emerald-600 animate-pulse text-2xl sm:text-3xl drop-shadow-[0_0_10px_rgba(16,185,129,0.4)]',
@@ -77,7 +128,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
       };
     }
 
-    // 4. Staff ne abhi tak "Start Token" nahi dabaya hai
+    // 5. Staff ne abhi tak "Start Token" nahi dabaya hai
     return {
       displayText: 'Not Started',
       textColor: 'text-slate-500 text-2xl sm:text-3xl',
