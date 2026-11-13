@@ -62,8 +62,8 @@ export const INITIAL_DOCTORS: Doctor[] = [
     timings: '11:00 AM - 03:00 PM & 06:00 PM - 09:00 PM',
     consultationFee: 500,
     onlineTokenFee: 20,
-    status: 'LUNCH',
-    statusNote: 'Lunch break till 03:30 PM',
+    status: 'OPD_CLOSE',
+    statusNote: 'Closed',
     staffUsername: 'staff_priya',
     staffPassword: 'clinic123',
     profilePic: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=300&auto=format&fit=crop&q=80',
@@ -451,14 +451,12 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, []);
 
-  // 🔹 3. Complete Shift (Morning -> Evening switch, aur bache hue patients automatic Absent/NOT_AVAILABLE me jayenge)
+  // 🔹 3. Complete Shift (Morning -> Evening switch, aur bache hue patients automatic NOT_AVAILABLE me jayenge)
   const completeDoctorShift = useCallback(async (doctorId: string) => {
     const matchedDoc = doctors.find((d) => d.id === doctorId);
     const currentShift = matchedDoc?.activeShift || 'Morning';
     const todayStr = new Date().toISOString().split('T')[0];
 
-    // Current shift ke jo patients WAITING ya IN_CABIN me bache hain (bina Move to Next Shift dabaye),
-    // unhe automatic NOT_AVAILABLE (Absent tab) me bhej dein
     const remainingUnseenPatients = patients.filter((p) => {
       const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
       const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim().toLowerCase();
@@ -491,6 +489,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const nextShift: 'Morning' | 'Evening' = currentShift === 'Morning' ? 'Evening' : 'Morning';
     const morningDoneDate = currentShift === 'Morning' ? todayStr : '';
 
+    // Shift complete hone par status automatic 'OPD_CLOSE' ho jayega
     setDoctors((prev) =>
       prev.map((d) =>
         d.id === doctorId
@@ -499,6 +498,8 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               isSessionActive: false,
               activeShift: nextShift,
               morningCompletedDate: morningDoneDate,
+              status: 'OPD_CLOSE',
+              statusNote: `${currentShift} shift completed`,
             }
           : d
       )
@@ -509,6 +510,8 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         isSessionActive: false,
         activeShift: nextShift,
         morningCompletedDate: morningDoneDate,
+        status: 'OPD_CLOSE',
+        statusNote: `${currentShift} shift completed`,
       });
     } catch (e) {
       console.error("Error completing shift in Firestore:", e);
@@ -615,6 +618,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               isSessionActive: false,
               activeShift: nextDoctorShift,
               morningCompletedDate: morningDoneDate,
+              status: 'OPD_CLOSE',
             }
           : d
       )
@@ -625,6 +629,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         isSessionActive: false,
         activeShift: nextDoctorShift,
         morningCompletedDate: morningDoneDate,
+        status: 'OPD_CLOSE',
       });
     } catch (e) {
       console.error("Error switching shift after carry forward:", e);
@@ -713,7 +718,6 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const resolvedHospitalId = (data as any).hospitalId || matchedDoctor?.hospitalId || matchedDoctor?.staffUsername || '';
 
-    // botCallAlertSent ko true rakha hai taaki booking ke waqt turant reminder message na jaye
     const newPatient: Patient = {
       ...data,
       id: customId,
@@ -795,7 +799,6 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [patients]);
 
-  // 🔹 Recall Patient: Strictly Same-Day Valid (Keval usi din ke liye valid)
   const recallPatient = useCallback((patientId: string) => {
     const targetPatient = patients.find((p) => p.id === patientId);
     if (!targetPatient) return;
@@ -846,7 +849,6 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }).catch((err) => console.error("Error updating recallPatient:", err));
   }, [patients, doctors]);
 
-  // 🔹 Update Doctor Status + Leave Start & End Dates
   const updateDoctorStatus = useCallback(
     (doctorId: string, status: DoctorStatus, note?: string, leaveStart?: string, leaveEnd?: string) => {
       const todayStr = new Date().toISOString().split('T')[0];
