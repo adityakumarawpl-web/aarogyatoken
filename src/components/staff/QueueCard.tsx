@@ -455,20 +455,27 @@ export const QueueCard: React.FC<QueueCardProps> = ({
             </div>
           )}
 
-          {/* ABSENT STATE */}
+{/* ABSENT STATE (Recall sirf Same Day ke liye valid hai) */}
           {isAbsent && (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs font-bold text-amber-800">
                 ⚠️ Absent / Uplabdh Nahi Tha
               </span>
-              <button
-                type="button"
-                onClick={() => recallPatient(patient.id)}
-                className="rounded-xl bg-slate-900 text-white px-3 py-1.5 text-xs font-bold hover:bg-slate-800 transition cursor-pointer flex items-center gap-1"
-              >
-                <RotateCcw className="h-3 w-3" />
-                <span>Recall back to Queue</span>
-              </button>
+              {(patient.originalDate || patientDate) === todayStr ? (
+                <button
+                  type="button"
+                  onClick={() => recallPatient(patient.id)}
+                  className="rounded-xl bg-slate-900 text-white px-3 py-1.5 text-xs font-bold hover:bg-slate-800 transition cursor-pointer flex items-center gap-1"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  <span>Recall back to Queue</span>
+                </button>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-lg bg-slate-200 text-slate-600 px-2.5 py-1 text-[11px] font-bold">
+                  <Lock className="h-3 w-3" />
+                  <span>Recall Expired (Keval {formattedPatientDate} ko valid tha)</span>
+                </span>
+              )}
             </div>
           )}
 
