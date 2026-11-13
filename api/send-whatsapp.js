@@ -26,12 +26,21 @@ export default async function handler(req, res) {
       }
     }
 
-    const { phone, patientName, doctorName, tokenNumber, clinicName, templateName } = body || {};
+    const {
+      phone,
+      patientName,
+      doctorName,
+      tokenNumber,
+      clinicName,
+      patientsAhead,
+      templateName,
+    } = body || {};
 
     const rawDigits = String(phone || '').replace(/\D/g, '');
-    const cleanPhone = rawDigits.startsWith('91') && rawDigits.length === 12
-      ? rawDigits
-      : `91${rawDigits.slice(-10)}`;
+    const cleanPhone =
+      rawDigits.startsWith('91') && rawDigits.length === 12
+        ? rawDigits
+        : `91${rawDigits.slice(-10)}`;
 
     const WHATSAPP_TOKEN = process.env.META_ACCESS_TOKEN || process.env.WHATSAPP_CLOUD_API_TOKEN;
     const PHONE_NUMBER_ID = process.env.META_PHONE_NUMBER_ID || process.env.WHATSAPP_PHONE_NUMBER_ID;
@@ -43,15 +52,38 @@ export default async function handler(req, res) {
       });
     }
 
-    // Currently approved template
     const activeTemplate = templateName || 'opd_token_confirmation';
+
+    // Template ke mutabiq exact body parameters map karein
+    let bodyParameters = [];
+
+    if (activeTemplate === 'opd_turn_reminder') {
+      // opd_turn_reminder (5 variables):
+      // {{1}} = Patient Name, {{2}} = Clinic Name, {{3}} = Doctor Name, {{4}} = Token Number, {{5}} = Patients Ahead
+      bodyParameters = [
+        { type: 'text', text: String(patientName || 'Patient') },
+        { type: 'text', text: String(clinicName || 'Aarogya Clinic') },
+        { type: 'text', text: String(doctorName || 'Doctor') },
+        { type: 'text', text: String(tokenNumber || '#1') },
+        { type: 'text', text: String(patientsAhead ?? '3') },
+      ];
+    } else {
+      // opd_token_confirmation (4 variables):
+      // {{1}} = Patient Name, {{2}} = Doctor Name, {{3}} = Token Number, {{4}} = Clinic Name
+      bodyParameters = [
+        { type: 'text', text: String(patientName || 'Patient') },
+        { type: 'text', text: String(doctorName || 'Doctor') },
+        { type: 'text', text: String(tokenNumber || '#1') },
+        { type: 'text', text: String(clinicName || 'Aarogya Clinic') },
+      ];
+    }
 
     const metaUrl = `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`;
 
     const metaResponse = await fetch(metaUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${WHATSAPP_TOKEN}`,
+        Authorization: `Bearer ${WHATSAPP_TOKEN}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -64,12 +96,7 @@ export default async function handler(req, res) {
           components: [
             {
               type: 'body',
-              parameters: [
-                { type: 'text', text: patientName || 'Patient' },
-                { type: 'text', text: doctorName || 'Doctor' },
-                { type: 'text', text: String(tokenNumber || '#1') },
-                { type: 'text', text: String(clinicName || 'Clinic') },
-              ],
+              parameters: bodyParameters,
             },
           ],
         },
