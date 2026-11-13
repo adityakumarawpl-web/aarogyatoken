@@ -26,6 +26,14 @@ const formatDateDDMMYYYY = (isoDate?: string): string => {
   return `${parts[2]}/${parts[1]}/${parts[0]}`;
 };
 
+const getLocalTodayYYYYMMDD = (): string => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 export const DoctorCard: React.FC<DoctorCardProps> = ({
   doctor,
   onBookOnline,
@@ -40,7 +48,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
     return `********${clean.slice(-2)}`;
   };
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getLocalTodayYYYYMMDD();
 
   const isDoctorOnLeaveToday = Boolean(
     doctor.status === 'LEAVE' &&
@@ -66,6 +74,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
         textColor: 'text-amber-500 text-2xl sm:text-3xl drop-shadow-[0_0_8px_rgba(245,158,11,0.3)]',
         label: 'Doctor abhi lunch break par hain',
         urgencyBadge: null,
+        recalledBadge: null,
       };
     }
     if (doctor.status === 'SURGERY') {
@@ -74,6 +83,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
         textColor: 'text-rose-600 text-2xl sm:text-3xl drop-shadow-[0_0_8px_rgba(225,29,72,0.3)]',
         label: 'Doctor OT / Surgery me vyast hain',
         urgencyBadge: null,
+        recalledBadge: null,
       };
     }
     if (doctor.status === 'LEAVE') {
@@ -85,6 +95,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
             ? `Doctor ${formatDateDDMMYYYY(doctor.leaveStartDate)} se ${formatDateDDMMYYYY(doctor.leaveEndDate)} tak chhutti par hain`
             : 'Doctor aaj upalabdha nahi hain',
         urgencyBadge: null,
+        recalledBadge: null,
       };
     }
 
@@ -110,16 +121,25 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
           : `⚡ Last ${remainingCount} Patients Left`
         : null;
 
-    // 2. Cabin me patient chal raha hai toh hamesha token number dikhega
-    const inCabinPatient = patients.find(
-      (p) => p.doctorId === doctor.id && p.status === 'IN_CABIN'
-    );
+    // 2. Cabin me AAJ KI ACTIVE SHIFT ka patient chal raha hai toh uska token number + Recalled badge dikhega
+    const inCabinPatient = todaysShiftPatients.find((p) => p.status === 'IN_CABIN');
     if (inCabinPatient) {
+      const recalledSource =
+        inCabinPatient.originalShift ||
+        (inCabinPatient as any).selectedShift ||
+        (inCabinPatient as any).shift ||
+        'Morning';
+
+      const recalledBadge = inCabinPatient.isRecalled
+        ? `🔄 Recalled (${recalledSource} #${inCabinPatient.tokenNumber})`
+        : null;
+
       return {
         displayText: `#${inCabinPatient.tokenNumber}`,
         textColor: 'text-emerald-600 text-3xl sm:text-4xl drop-shadow-[0_0_10px_rgba(16,185,129,0.4)]',
         label: 'Doctor Cabin me abhi chal raha hai',
         urgencyBadge,
+        recalledBadge,
       };
     }
 
@@ -137,6 +157,16 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
     if (doctor.isSessionActive) {
       if (hasCompletedAny && waitingQueue.length > 0) {
         const nextPatient = waitingQueue[0];
+        const nextRecalledSource =
+          nextPatient.originalShift ||
+          (nextPatient as any).selectedShift ||
+          (nextPatient as any).shift ||
+          'Morning';
+
+        const nextRecalledBadge = nextPatient.isRecalled
+          ? `🔄 Recalled (${nextRecalledSource} #${nextPatient.tokenNumber})`
+          : null;
+
         return {
           displayText: `Waiting #${nextPatient.tokenNumber}`,
           textColor: nextPatient.isEmergency
@@ -144,6 +174,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
             : 'text-blue-600 text-2xl sm:text-3xl drop-shadow-[0_0_10px_rgba(37,99,235,0.3)]',
           label: `Agla Token #${nextPatient.tokenNumber} cabin me bulaya ja raha hai`,
           urgencyBadge,
+          recalledBadge: nextRecalledBadge,
         };
       }
 
@@ -153,6 +184,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
           textColor: 'text-emerald-600 animate-pulse text-2xl sm:text-3xl drop-shadow-[0_0_10px_rgba(16,185,129,0.4)]',
           label: `${doctorActiveShift} Shift shuru ho gayi hai • Cabin me bulaya ja raha hai`,
           urgencyBadge,
+          recalledBadge: null,
         };
       }
 
@@ -162,6 +194,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
           textColor: 'text-emerald-600 text-2xl sm:text-3xl',
           label: `${doctorActiveShift} Shift ke sabhi tokens complete ho chuke hain`,
           urgencyBadge: null,
+          recalledBadge: null,
         };
       }
 
@@ -170,6 +203,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
         textColor: 'text-emerald-600 animate-pulse text-2xl sm:text-3xl drop-shadow-[0_0_10px_rgba(16,185,129,0.4)]',
         label: `${doctorActiveShift} Shift shuru ho gayi hai • Cabin me bulaya ja raha hai`,
         urgencyBadge: null,
+        recalledBadge: null,
       };
     }
 
@@ -179,6 +213,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
       textColor: 'text-slate-500 text-2xl sm:text-3xl',
       label: `${doctorActiveShift} Shift token session shuru nahi hua hai`,
       urgencyBadge: null,
+      recalledBadge: null,
     };
   };
 
@@ -414,6 +449,15 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
           <div className={`my-0.5 font-mono font-black tracking-tight ${servingInfo.textColor}`}>
             {servingInfo.displayText}
           </div>
+
+          {/* Recalled Patient Indicator Badge (Token ke neeche) */}
+          {servingInfo.recalledBadge && (
+            <div className="my-1 flex justify-center">
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 border border-amber-300 px-2.5 py-0.5 text-[10px] font-black text-amber-900 shadow-2xs">
+                {servingInfo.recalledBadge}
+              </span>
+            </div>
+          )}
 
           {/* Last 3 Patients Urgency Highlight */}
           {servingInfo.urgencyBadge && (
