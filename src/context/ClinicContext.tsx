@@ -363,7 +363,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           phone: cleanPhone,
-          templateName: 'opd_token_confirmation',
+          templateName: 'opd_turn_reminder',
           patientName: patient.name,
           doctorName: `${doctor?.name || 'Doctor'} (Alert: Keval ${aheadCount} Mareez Bache Hain)`,
           tokenNumber: `#${patient.tokenNumber} - Kripya Clinic Pahunche`,
