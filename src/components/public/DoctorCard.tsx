@@ -8,7 +8,9 @@ import {
   Search, 
   X, 
   Phone, 
-  Stethoscope 
+  Stethoscope,
+  Activity,
+  AlertTriangle 
 } from 'lucide-react';
 
 interface DoctorCardProps {
@@ -65,13 +67,13 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
         : `${formatDateDDMMYYYY(doctor.leaveStartDate)} - ${formatDateDDMMYYYY(doctor.leaveEndDate)}`
       : '';
 
-  // Live Serving Details Logic
+  // Live Serving Details Logic for 4 Categories
   const getLiveServingDetails = () => {
-    if (doctor.status === 'LUNCH') {
+    if (doctor.status === 'OPD_CLOSE') {
       return {
-        displayText: 'Lunch Break',
-        textColor: 'text-amber-500 text-xl sm:text-2xl font-bold',
-        label: 'Doctor abhi lunch break par hain',
+        displayText: 'OPD Closed',
+        textColor: 'text-rose-600 text-xl sm:text-2xl font-bold',
+        label: 'Filhaal OPD band hai',
         urgencyBadge: null,
         recalledBadge: null,
       };
@@ -185,6 +187,24 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
 
   const servingInfo = getLiveServingDetails();
 
+  // Status Badge for 4 Categories
+  const getStatusBadgeText = () => {
+    switch (doctor.status) {
+      case 'AVAILABLE':
+        return { text: 'Available (OPD Open)', color: 'bg-emerald-50 text-emerald-800 border-emerald-300', dot: 'bg-emerald-500' };
+      case 'OPD_CLOSE':
+        return { text: 'OPD Close', color: 'bg-rose-50 text-rose-800 border-rose-300', dot: 'bg-rose-500' };
+      case 'SURGERY':
+        return { text: 'In Surgery', color: 'bg-purple-50 text-purple-800 border-purple-300', dot: 'bg-purple-500' };
+      case 'LEAVE':
+        return { text: leaveRangeLabel ? `On Leave (${leaveRangeLabel})` : 'On Leave', color: 'bg-slate-100 text-slate-700 border-slate-300', dot: 'bg-slate-400' };
+      default:
+        return { text: 'Available', color: 'bg-emerald-50 text-emerald-800 border-emerald-300', dot: 'bg-emerald-500' };
+    }
+  };
+
+  const statusInfo = getStatusBadgeText();
+
   return (
     <div className="group rounded-3xl bg-white border border-slate-200 shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden flex flex-col justify-between w-full">
       
@@ -212,9 +232,9 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
           <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-2.5 flex flex-col justify-center text-center">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Status & Shift</span>
             <div className="flex items-center justify-center gap-1.5 mt-1">
-              <span className={`h-2 w-2 rounded-full ${doctor.status === 'AVAILABLE' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
-              <span className="text-xs font-extrabold text-slate-800">
-                {doctor.status === 'AVAILABLE' ? 'Open' : doctor.status === 'LUNCH' ? 'Lunch' : 'Leave'}
+              <span className={`h-2 w-2 rounded-full ${statusInfo.dot} animate-pulse`}></span>
+              <span className="text-xs font-extrabold text-slate-800 truncate">
+                {statusInfo.text}
               </span>
             </div>
             <span className="text-[10px] text-blue-600 font-semibold mt-0.5">{doctorActiveShift} Shift</span>
@@ -223,7 +243,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
           {/* Book Online Token Button Box */}
           <button
             type="button"
-            disabled={isDoctorOnLeaveToday}
+            disabled={isDoctorOnLeaveToday || doctor.status === 'OPD_CLOSE'}
             onClick={() => onBookOnline(doctor)}
             className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-2xl p-2.5 flex flex-col items-center justify-center text-center shadow-sm shadow-blue-500/20 transition cursor-pointer"
           >
@@ -262,7 +282,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
             </span>
           </div>
 
-          {/* Know Your Token Button Box (Opens Popup Modal) */}
+          {/* Know Your Token Button Box */}
           <button
             type="button"
             onClick={() => setShowTokenModal(true)}
