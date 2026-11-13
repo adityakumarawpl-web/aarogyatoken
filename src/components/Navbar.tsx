@@ -3,13 +3,12 @@ import { useClinic } from '../context/ClinicContext';
 import {
   Activity,
   Users,
-  Shield,
   Stethoscope,
   RotateCcw,
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
-  const { currentView, setCurrentView, staffDoctorId, doctors, resetToDemoData } = useClinic();
+  const { currentView, staffDoctorId, doctors, resetToDemoData } = useClinic();
 
   const loggedInDoctor = doctors.find((d) => d.id === staffDoctorId);
 
@@ -71,7 +70,7 @@ export const Navbar: React.FC = () => {
           </div>
         </div>
 
-        {/* Primary Role Navigation Tabs (Ab yeh alag URLs par route karenge) */}
+        {/* Primary Role Navigation Tabs (Public OPD aur Clinic Staff sirf yahan rahenge) */}
         <nav className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 overflow-x-auto max-w-[62%] sm:max-w-none shrink-0 scrollbar-none">
           <button
             type="button"
@@ -108,22 +107,6 @@ export const Navbar: React.FC = () => {
             {loggedInDoctor && (
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 absolute -top-0.5 right-1"></span>
             )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              window.location.href = '/admin';
-            }}
-            className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
-              currentView === 'ADMIN'
-                ? 'bg-slate-900 text-white shadow-xs font-bold'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-            }`}
-          >
-            <Shield className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-amber-400 shrink-0" />
-            <span>Admin</span>
-            <span className="hidden lg:inline text-[10px] text-amber-300 font-normal">(₹20 SaaS)</span>
           </button>
         </nav>
       </div>
