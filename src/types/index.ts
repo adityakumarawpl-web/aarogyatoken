@@ -80,6 +80,7 @@ export interface Patient {
   estimatedWaitMinutes?: number;
   isRecalled?: boolean;
   originalShift?: string;
+  originalDate?: string;
 }
 
 export interface Hospital {
