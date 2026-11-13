@@ -6,7 +6,6 @@ import {
   completePatientConsultation,
   markPatientNotAvailable,
   markPatientEmergency,
-  recallPatient as recallPatientLogic,
   shouldSendBotCallAlert,
 } from '../utils/queueLogic';
 import { db } from '../firebase';
@@ -897,18 +896,54 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setTimeout(() => checkBotAlerts(updated), 50);
   }, [patients, checkBotAlerts]);
 
+  // 🔹 Recall Patient: Naya token nahi banega, purana token & original shift safe rahega aur current active shift me visible hoga
   const recallPatient = useCallback((patientId: string) => {
-    const updated = recallPatientLogic(patients, patientId);
-    const target = updated.find((p) => p.id === patientId);
+    const targetPatient = patients.find((p) => p.id === patientId);
+    if (!targetPatient) return;
+
+    const matchedDoc = doctors.find((d) => d.id === targetPatient.doctorId);
+    const todayStr = new Date().toISOString().split('T')[0];
+    const currentDoctorShift = matchedDoc?.activeShift || 'Morning';
+
+    const pDate = targetPatient.appointmentDate || (targetPatient.createdAt ? targetPatient.createdAt.split('T')[0] : todayStr);
+    const pShift = ((targetPatient as any).selectedShift || (targetPatient as any).shift || 'Morning').trim();
+    const preservedOriginalShift = targetPatient.originalShift || pShift;
+
+    const isSameCurrentShift =
+      pDate === todayStr && pShift.toLowerCase() === currentDoctorShift.toLowerCase();
+
+    const updatedDate = isSameCurrentShift ? pDate : todayStr;
+    const updatedShift = isSameCurrentShift ? pShift : currentDoctorShift;
+
+    const updated = patients.map((p) =>
+      p.id === patientId
+        ? ({
+            ...p,
+            status: 'WAITING',
+            appointmentDate: updatedDate,
+            selectedShift: updatedShift,
+            shift: updatedShift,
+            isRecalled: true,
+            originalShift: preservedOriginalShift,
+            botCallAlertSent: false,
+          } as Patient)
+        : p
+    );
+
     setPatients(updated);
 
-    if (target) {
-      updateDoc(doc(db, 'patients', patientId), {
-        status: target.status,
-      }).catch((err) => console.error("Error updating recallPatient:", err));
-    }
+    updateDoc(doc(db, 'patients', patientId), {
+      status: 'WAITING',
+      appointmentDate: updatedDate,
+      selectedShift: updatedShift,
+      shift: updatedShift,
+      isRecalled: true,
+      originalShift: preservedOriginalShift,
+      botCallAlertSent: false,
+    }).catch((err) => console.error("Error updating recallPatient:", err));
+
     setTimeout(() => checkBotAlerts(updated), 50);
-  }, [patients, checkBotAlerts]);
+  }, [patients, doctors, checkBotAlerts]);
 
   // 🔹 Update Doctor Status + Leave Start & End Dates
   const updateDoctorStatus = useCallback(
