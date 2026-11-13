@@ -52,14 +52,12 @@ export const PublicOPDView: React.FC = () => {
   // Scroll visibility listeners (Top & Bottom buttons)
   useEffect(() => {
     const handleScroll = () => {
-      // 1. Scroll-to-Top Button (> 250px neeche aane par dikhega)
       if (window.scrollY > 250) {
         setShowScrollTop(true);
       } else {
         setShowScrollTop(false);
       }
 
-      // 2. Scroll-to-Bottom Button (Page ke aakhir mein aate hi hide ho jayega)
       const currentScroll = window.innerHeight + window.scrollY;
       const totalPageHeight = document.documentElement.scrollHeight;
       if (currentScroll >= totalPageHeight - 120) {
