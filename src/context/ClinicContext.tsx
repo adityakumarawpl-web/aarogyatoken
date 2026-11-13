@@ -547,11 +547,42 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, []);
 
-  // 🔹 3. Complete Shift (Morning -> Evening switch, ya Evening -> Complete)
+  // 🔹 3. Complete Shift (Morning -> Evening switch, aur bache hue patients automatic Absent/NOT_AVAILABLE me jayenge)
   const completeDoctorShift = useCallback(async (doctorId: string) => {
     const matchedDoc = doctors.find((d) => d.id === doctorId);
     const currentShift = matchedDoc?.activeShift || 'Morning';
     const todayStr = new Date().toISOString().split('T')[0];
+
+    // Current shift ke jo patients WAITING ya IN_CABIN me bache hain (bina Move to Next Shift dabaye),
+    // unhe automatic NOT_AVAILABLE (Absent tab) me bhej dein
+    const remainingUnseenPatients = patients.filter((p) => {
+      const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
+      const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim().toLowerCase();
+      return (
+        p.doctorId === doctorId &&
+        pDate === todayStr &&
+        pShift === currentShift.toLowerCase() &&
+        (p.status === 'WAITING' || p.status === 'IN_CABIN')
+      );
+    });
+
+    if (remainingUnseenPatients.length > 0) {
+      const remainingIds = new Set(remainingUnseenPatients.map((p) => p.id));
+
+      setPatients((prev) =>
+        prev.map((p) =>
+          remainingIds.has(p.id) ? { ...p, status: 'NOT_AVAILABLE' } : p
+        )
+      );
+
+      for (const p of remainingUnseenPatients) {
+        updateDoc(doc(db, 'patients', p.id), {
+          status: 'NOT_AVAILABLE',
+        }).catch((err) =>
+          console.error(`Error auto-marking patient ${p.id} as NOT_AVAILABLE:`, err)
+        );
+      }
+    }
 
     const nextShift: 'Morning' | 'Evening' = currentShift === 'Morning' ? 'Evening' : 'Morning';
     const morningDoneDate = currentShift === 'Morning' ? todayStr : '';
@@ -578,11 +609,9 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } catch (e) {
       console.error("Error completing shift in Firestore:", e);
     }
-  }, [doctors]);
+  }, [doctors, patients]);
 
   // 🔹 4. Move Remaining Patients to Next Shift (Urgent Doctor Unavailability)
-  // Done ho chuke patients ko chhodkar bache hue sabhi patients agle shift ke sabse upar (#1, #2...) lag jayenge
-  // Aur agle shift ke purane patients niche series se shift ho jayenge + Online patients ko WhatsApp jayega
   const moveRemainingToNextShift = useCallback(async (doctorId: string) => {
     const matchedDoc = doctors.find((d) => d.id === doctorId);
     const currentShift = matchedDoc?.activeShift || 'Morning';
@@ -595,7 +624,6 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const targetShift: 'Morning' | 'Evening' = currentShift === 'Morning' ? 'Evening' : 'Morning';
     const targetDate = currentShift === 'Morning' ? todayStr : tomorrowStr;
 
-    // 1. Current shift ke bache hue patients (jo COMPLETED nahi hain)
     const remainingCurrentPatients = patients
       .filter((p) => {
         const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
@@ -609,7 +637,6 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       })
       .sort((a, b) => Number(a.tokenNumber) - Number(b.tokenNumber));
 
-    // 2. Target shift mein pehle se मौजूद patients
     const existingTargetPatients = patients
       .filter((p) => {
         const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
@@ -625,7 +652,6 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const movedCount = remainingCurrentPatients.length;
     const updatesMap = new Map<string, Partial<Patient>>();
 
-    // 3. Bache hue patients ko target shift ke TOP (#1, #2, ...) par rakhein
     remainingCurrentPatients.forEach((p, index) => {
       const newToken = index + 1;
       updatesMap.set(p.id, {
@@ -636,13 +662,11 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         botCallAlertSent: false,
       });
 
-      // Online patient ko message bhejein ki shift badalne ke kaaran naya token mila hai
       if (p.bookingType === 'ONLINE') {
         sendShiftRescheduleWhatsApp(p, matchedDoc, newToken, targetShift, targetDate, 'MOVED');
       }
     });
 
-    // 4. Target shift ke purane patients ko series se neeche (#movedCount + 1, ...) shift karein
     if (movedCount > 0) {
       existingTargetPatients.forEach((p, index) => {
         const shiftedToken = movedCount + index + 1;
@@ -651,14 +675,12 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           botCallAlertSent: false,
         });
 
-        // Target shift ke online patients ko bhi naye token number ki jankari dein
         if (p.bookingType === 'ONLINE') {
           sendShiftRescheduleWhatsApp(p, matchedDoc, shiftedToken, targetShift, targetDate, 'REORDERED');
         }
       });
     }
 
-    // 5. Local State aur Firestore update karein
     if (updatesMap.size > 0) {
       setPatients((prev) =>
         prev.map((p) => {
@@ -678,7 +700,6 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     }
 
-    // 6. Doctor ki shift ko next shift par switch karein aur session pause rakhein
     const nextDoctorShift: 'Morning' | 'Evening' = currentShift === 'Morning' ? 'Evening' : 'Morning';
     const morningDoneDate = currentShift === 'Morning' ? todayStr : '';
 
