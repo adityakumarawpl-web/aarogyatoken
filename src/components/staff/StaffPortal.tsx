@@ -26,6 +26,15 @@ import {
   ArrowRightCircle,
 } from 'lucide-react';
 
+// Universal DD/MM/YYYY Formatter
+export const formatDateDDMMYYYY = (isoDate?: string): string => {
+  if (!isoDate) return '';
+  const clean = isoDate.split('T')[0];
+  const parts = clean.split('-');
+  if (parts.length !== 3) return isoDate;
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+};
+
 export const StaffPortal: React.FC = () => {
   const {
     doctors,
@@ -41,6 +50,27 @@ export const StaffPortal: React.FC = () => {
     addWalkInPatient,
     setSelectedDoctorId,
   } = useClinic();
+
+  // Live Clock State (Updates every second)
+  const [nowDateTime, setNowDateTime] = useState<Date>(() => new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNowDateTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const liveFormattedDate = `${String(nowDateTime.getDate()).padStart(2, '0')}/${String(
+    nowDateTime.getMonth() + 1
+  ).padStart(2, '0')}/${nowDateTime.getFullYear()}`;
+
+  const liveFormattedTime = nowDateTime.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  });
 
   // Login credentials state
   const [loginType, setLoginType] = useState<'CLINIC' | 'HOSPITAL'>('CLINIC');
@@ -75,7 +105,7 @@ export const StaffPortal: React.FC = () => {
     }
   }, [currentDoctor?.id, currentDoctor?.leaveStartDate, currentDoctor?.leaveEndDate, realTodayDate]);
 
-  // 🔹 Helper: Check karein ki koi date doctor ki Leave range me padti hai ya nahi
+  // Helper: Check karein ki koi date doctor ki Leave range me padti hai ya nahi
   const isDateInLeaveRange = (targetDate: string, doctor: any) => {
     if (!doctor || doctor.status !== 'LEAVE') return false;
     if (doctor.leaveStartDate && doctor.leaveEndDate) {
@@ -84,7 +114,7 @@ export const StaffPortal: React.FC = () => {
     return targetDate === realTodayDate;
   };
 
-  // 🔹 Helper: Leave khatam hone ke agle din ki date nikaalein
+  // Helper: Leave khatam hone ke agle din ki date nikaalein
   const getNextAvailableDateAfterLeave = (doctor: any) => {
     if (doctor?.status === 'LEAVE' && doctor?.leaveEndDate && doctor.leaveEndDate >= realTodayDate) {
       const [y, m, d] = doctor.leaveEndDate.split('-').map(Number);
@@ -94,7 +124,7 @@ export const StaffPortal: React.FC = () => {
     return realTodayDate;
   };
 
-  // 🔹 Staff-Controlled Active Shift (Time-based auto-jump disabled until Morning Shift Complete)
+  // Staff-Controlled Active Shift (Time-based auto-jump disabled until Morning Shift Complete)
   const activeDoctorShift: 'Morning' | 'Evening' = currentDoctor?.activeShift || 'Morning';
   const realCurrentShift = activeDoctorShift;
 
@@ -402,17 +432,14 @@ export const StaffPortal: React.FC = () => {
   // Check karein ki aaj ki current date doctor ki fed Leave date range me aati hai ya nahi
   const isDoctorOnLeaveToday = isDateInLeaveRange(realTodayDate, currentDoctor);
 
-  // Leave Start Date Lock Check: Agar start date aaj se pehle ki ho chuki hai toh edit disable rahega
+  // Leave Start Date Lock Check
   const isLeaveStartLocked = Boolean(
     currentDoctor.status === 'LEAVE' &&
     currentDoctor.leaveStartDate &&
     realTodayDate > currentDoctor.leaveStartDate
   );
 
-  // 🔹 Button Enable/Disable Conditions:
-  // 1. Jab doctor aaj Leave par ho toh kewal Add Patient, Summary aur Move to Next Shift hi chalu rahenge
-  // 2. Jab staff Shift Start click kare tabhi Pause aur Shift Complete chalu honge
-  // 3. Move to Next Shift sabhi conditions me ON rahega
+  // Button Enable/Disable Conditions
   const canStartShift = !isDoctorOnLeaveToday && currentDoctor.status === 'AVAILABLE' && !isSessionActive;
   const canPauseOrCompleteShift = !isDoctorOnLeaveToday && currentDoctor.status === 'AVAILABLE' && isSessionActive;
   const canAccessLiveQueue = !isDoctorOnLeaveToday && currentDoctor.status === 'AVAILABLE';
@@ -457,7 +484,6 @@ export const StaffPortal: React.FC = () => {
   const completedPatients = doctorPatients.filter((p) => p.status === 'COMPLETED');
   const absentPatients = doctorPatients.filter((p) => p.status === 'NOT_AVAILABLE');
 
-  const currentlyServing = getCurrentlyServingToken(patients, currentDoctor?.id);
   const summary = generateDoctorSummary(patients, currentDoctor?.id, reportPeriod);
 
   const defaultBookingDate = getNextAvailableDateAfterLeave(currentDoctor);
@@ -482,10 +508,9 @@ export const StaffPortal: React.FC = () => {
     e.preventDefault();
     if (!walkInForm.name.trim() || !walkInForm.mobile.trim() || !currentDoctor?.id) return;
 
-    // Leave date validation: Leave date ko chhod kar hi token banega
     if (isDateInLeaveRange(walkInForm.appointmentDate, currentDoctor)) {
       setWalkInError(
-        `Doctor ${currentDoctor.leaveStartDate || realTodayDate} se ${currentDoctor.leaveEndDate || realTodayDate} tak Leave par hain. Kripya leave date ko chhod kar koi aur tarikh chunein.`
+        `Doctor ${formatDateDDMMYYYY(currentDoctor.leaveStartDate || realTodayDate)} se ${formatDateDDMMYYYY(currentDoctor.leaveEndDate || realTodayDate)} tak Leave par hain. Kripya leave date ko chhod kar koi aur tarikh chunein.`
       );
       return;
     }
@@ -539,7 +564,7 @@ export const StaffPortal: React.FC = () => {
     <div className="min-h-[calc(100vh-4rem)] bg-slate-100 pb-20">
       {/* Clinic Header Bar */}
       <div className="bg-white border-b border-slate-200 px-4 sm:px-8 py-4">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             {isHospitalMultiDoctor && (
               <button
@@ -587,8 +612,15 @@ export const StaffPortal: React.FC = () => {
             </div>
           </div>
 
-          {/* Doctor Status Dropdown, Switcher & Logout */}
-          <div className="flex flex-wrap items-center gap-2">
+          {/* Live Date/Time Clock + Doctor Status Dropdown + Switcher + Logout */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Live Date & Time Badge (Status ke left side) */}
+            <div className="flex items-center gap-2 rounded-xl bg-slate-900 text-white px-3 py-1.5 text-xs font-mono shadow-xs border border-slate-700">
+              <span className="text-blue-300 font-bold">📅 {liveFormattedDate}</span>
+              <span className="text-slate-500">|</span>
+              <span className="text-emerald-300 font-bold">🕒 {liveFormattedTime}</span>
+            </div>
+
             {isHospitalMultiDoctor && (
               <select
                 value={currentDoctor.id}
@@ -648,7 +680,7 @@ export const StaffPortal: React.FC = () => {
           </div>
         </div>
 
-        {/* 🔹 LEAVE DATE RANGE SELECTOR BAR (Jab Doctor Status LEAVE ho) */}
+        {/* LEAVE DATE RANGE SELECTOR BAR (Strictly DD/MM/YYYY display across Mobile & Laptop) */}
         {currentDoctor.status === 'LEAVE' && (
           <div className="max-w-7xl mx-auto mt-4 pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
             <div className="flex items-center gap-2.5">
@@ -665,46 +697,64 @@ export const StaffPortal: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
               <div>
                 <label className="block text-[10px] font-bold uppercase text-slate-500 mb-0.5">
-                  Kab Se (Start Date) {isLeaveStartLocked && '🔒'}
+                  Kab Se (DD/MM/YYYY) {isLeaveStartLocked && '🔒'}
                 </label>
-                <input
-                  type="date"
-                  disabled={isLeaveStartLocked}
-                  value={leaveStartInput}
-                  min={realTodayDate}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setLeaveStartInput(val);
-                    const adjustedEnd = leaveEndInput < val ? val : leaveEndInput;
-                    if (leaveEndInput < val) setLeaveEndInput(val);
-                    updateDoctorStatus(currentDoctor.id, 'LEAVE', undefined, val, adjustedEnd);
-                  }}
-                  className={`rounded-xl border px-3 py-1.5 text-xs font-bold outline-none ${
-                    isLeaveStartLocked
-                      ? 'bg-slate-200 text-slate-500 border-slate-300 cursor-not-allowed'
-                      : 'bg-white text-slate-800 border-slate-300 focus:border-blue-600'
-                  }`}
-                />
+                <div className="relative">
+                  <div
+                    className={`rounded-xl border px-3 py-1.5 text-xs font-mono font-bold flex items-center justify-between gap-2 min-w-[130px] ${
+                      isLeaveStartLocked
+                        ? 'bg-slate-200 text-slate-500 border-slate-300'
+                        : 'bg-white text-slate-800 border-slate-300'
+                    }`}
+                  >
+                    <span>{formatDateDDMMYYYY(leaveStartInput)}</span>
+                    <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                  </div>
+                  <input
+                    type="date"
+                    disabled={isLeaveStartLocked}
+                    value={leaveStartInput}
+                    min={realTodayDate}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (!val) return;
+                      setLeaveStartInput(val);
+                      const adjustedEnd = leaveEndInput < val ? val : leaveEndInput;
+                      if (leaveEndInput < val) setLeaveEndInput(val);
+                      updateDoctorStatus(currentDoctor.id, 'LEAVE', undefined, val, adjustedEnd);
+                    }}
+                    className={`absolute inset-0 opacity-0 w-full h-full ${
+                      isLeaveStartLocked ? 'cursor-not-allowed' : 'cursor-pointer'
+                    }`}
+                  />
+                </div>
               </div>
 
               <div>
                 <label className="block text-[10px] font-bold uppercase text-slate-500 mb-0.5">
-                  Kab Tak (End Date)
+                  Kab Tak (DD/MM/YYYY)
                 </label>
-                <input
-                  type="date"
-                  value={leaveEndInput}
-                  min={leaveStartInput || realTodayDate}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setLeaveEndInput(val);
-                    updateDoctorStatus(currentDoctor.id, 'LEAVE', undefined, leaveStartInput, val);
-                  }}
-                  className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 focus:border-blue-600 outline-none"
-                />
+                <div className="relative">
+                  <div className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-mono font-bold text-slate-800 flex items-center justify-between gap-2 min-w-[130px]">
+                    <span>{formatDateDDMMYYYY(leaveEndInput)}</span>
+                    <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                  </div>
+                  <input
+                    type="date"
+                    value={leaveEndInput}
+                    min={leaveStartInput || realTodayDate}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (!val) return;
+                      setLeaveEndInput(val);
+                      updateDoctorStatus(currentDoctor.id, 'LEAVE', undefined, leaveStartInput, val);
+                    }}
+                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -714,7 +764,7 @@ export const StaffPortal: React.FC = () => {
       {/* Main Staff Container */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
-        {/* 🔹 4-BUTTON SHIFT & TOKEN SESSION CONTROLLER BAR */}
+        {/* 4-BUTTON SHIFT & TOKEN SESSION CONTROLLER BAR */}
         <div className="rounded-2xl border-2 border-blue-200 bg-gradient-to-r from-blue-50 via-indigo-50 to-white p-4 shadow-sm space-y-3">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -757,7 +807,6 @@ export const StaffPortal: React.FC = () => {
 
           {/* 4 Action Buttons Grid: Start | Pause | Complete | Move to Next Shift */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
-            {/* Button 1: Morning/Evening Shift Start */}
             <button
               type="button"
               disabled={!canStartShift}
@@ -767,21 +816,11 @@ export const StaffPortal: React.FC = () => {
                   ? 'bg-slate-200 text-slate-400 border border-slate-300 cursor-not-allowed'
                   : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/25 cursor-pointer active:scale-95'
               }`}
-              title={
-                isDoctorOnLeaveToday
-                  ? 'Doctor aaj Leave par hain'
-                  : currentDoctor.status !== 'AVAILABLE'
-                  ? 'Doctor status Available karein'
-                  : isSessionActive
-                  ? 'Session pehle se chal raha hai'
-                  : `${activeDoctorShift} Shift shuru karein`
-              }
             >
               <PlayCircle className="h-4 w-4 shrink-0" />
               <span>{activeDoctorShift} Shift Start</span>
             </button>
 
-            {/* Button 2: Pause (Sirf Shift Start hone ke baad chalu hoga) */}
             <button
               type="button"
               disabled={!canPauseOrCompleteShift}
@@ -791,13 +830,11 @@ export const StaffPortal: React.FC = () => {
                   ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
                   : 'bg-amber-500 hover:bg-amber-600 text-white shadow-sm cursor-pointer active:scale-95'
               }`}
-              title={!canPauseOrCompleteShift ? `Pehle "${activeDoctorShift} Shift Start" dabayein` : 'Session ko temporary pause karein'}
             >
               <PauseCircle className="h-4 w-4 shrink-0" />
               <span>Pause</span>
             </button>
 
-            {/* Button 3: Morning/Evening Shift Complete (Sirf Shift Start hone ke baad chalu hoga) */}
             <button
               type="button"
               disabled={!canPauseOrCompleteShift}
@@ -815,13 +852,11 @@ export const StaffPortal: React.FC = () => {
                   ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
                   : 'bg-slate-900 hover:bg-slate-800 text-white shadow-sm cursor-pointer active:scale-95'
               }`}
-              title={!canPauseOrCompleteShift ? `Pehle "${activeDoctorShift} Shift Start" dabayein` : `${activeDoctorShift} Shift complete karein`}
             >
               <CheckCircle2 className={`h-4 w-4 shrink-0 ${canPauseOrCompleteShift ? 'text-emerald-400' : 'text-slate-400'}`} />
               <span>{activeDoctorShift} Shift Complete</span>
             </button>
 
-            {/* Button 4: Move to Next Shift (Sabhi condition me ON rahega) */}
             <button
               type="button"
               onClick={async () => {
@@ -833,7 +868,7 @@ export const StaffPortal: React.FC = () => {
 
                 const result = await moveRemainingToNextShift(currentDoctor.id);
                 alert(
-                  `✅ Transfer Complete!\n${result.movedCount} bache hue patients ko ${result.targetShift} Shift (${result.targetDate}) ke top par shift kar diya gaya hai aur online patients ko WhatsApp bhej diya gaya hai.`
+                  `✅ Transfer Complete!\n${result.movedCount} bache hue patients ko ${result.targetShift} Shift (${formatDateDDMMYYYY(result.targetDate)}) ke top par shift kar diya gaya hai aur online patients ko WhatsApp bhej diya gaya hai.`
                 );
               }}
               className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2.5 text-xs font-bold shadow-sm transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
@@ -847,7 +882,6 @@ export const StaffPortal: React.FC = () => {
 
         {/* 3 Main Action Buttons Strip */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {/* Button A: Add Patient (Hamesha Chalu - Leave par bhi chalu rahega) */}
           <button
             type="button"
             onClick={() => {
@@ -876,7 +910,6 @@ export const StaffPortal: React.FC = () => {
             </span>
           </button>
 
-          {/* Button B: Live OPD Queue (Leave par locked rahega) */}
           <button
             type="button"
             disabled={!canAccessLiveQueue}
@@ -890,17 +923,11 @@ export const StaffPortal: React.FC = () => {
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20 ring-2 ring-blue-400 cursor-pointer'
                 : 'bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 cursor-pointer'
             }`}
-            title={
-              !canAccessLiveQueue
-                ? 'Doctor Leave/Break par hain. Available hone par hi Live Queue khulegi.'
-                : 'Live OPD Queue View'
-            }
           >
             <span>📋 Live OPD Queue</span>
             {!canAccessLiveQueue && <span className="text-xs">🔒</span>}
           </button>
 
-          {/* Button C: Clinic Summary & Stats (Hamesha Chalu - Leave par bhi chalu rahega) */}
           <button
             type="button"
             onClick={() => setActiveTab('REPORTS')}
@@ -971,12 +998,22 @@ export const StaffPortal: React.FC = () => {
             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
               {activeTab === 'FUTURE' && (
                 <>
-                  <input
-                    type="date"
-                    value={selectedDateFilter}
-                    onChange={(e) => setSelectedDateFilter(e.target.value)}
-                    className="rounded-xl border border-blue-300 px-3 py-1.5 text-xs font-medium text-slate-800 bg-blue-50/50 shadow-xs focus:border-blue-500 focus:outline-none"
-                  />
+                  {/* Future Date Filter with DD/MM/YYYY visual display */}
+                  <div className="relative">
+                    <div className="rounded-xl border border-blue-300 px-3 py-1.5 text-xs font-mono font-bold text-slate-800 bg-blue-50/50 shadow-xs flex items-center gap-1.5">
+                      <span>{formatDateDDMMYYYY(selectedDateFilter)}</span>
+                      <Calendar className="h-3.5 w-3.5 text-blue-600" />
+                    </div>
+                    <input
+                      type="date"
+                      value={selectedDateFilter}
+                      onChange={(e) => {
+                        if (e.target.value) setSelectedDateFilter(e.target.value);
+                      }}
+                      className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                    />
+                  </div>
+
                   <select
                     value={selectedShiftFilter}
                     onChange={(e) => setSelectedShiftFilter(e.target.value)}
@@ -1012,7 +1049,7 @@ export const StaffPortal: React.FC = () => {
               </div>
               <div>
                 <h4 className="text-xs font-black uppercase tracking-wider text-amber-900">
-                  Doctor Status: {currentDoctor.status === 'LUNCH' ? 'Lunch Break (लंच)' : currentDoctor.status === 'SURGERY' ? 'In Surgery (सर्जरी)' : `On Leave (${currentDoctor.leaveStartDate || ''} se ${currentDoctor.leaveEndDate || ''})`} — Patient Calling Blocked
+                  Doctor Status: {currentDoctor.status === 'LUNCH' ? 'Lunch Break (लंच)' : currentDoctor.status === 'SURGERY' ? 'In Surgery (सर्जरी)' : `On Leave (${formatDateDDMMYYYY(currentDoctor.leaveStartDate)} se ${formatDateDDMMYYYY(currentDoctor.leaveEndDate)})`} — Patient Calling Blocked
                 </h4>
                 <p className="text-xs text-amber-800 mt-0.5">
                   {isDoctorOnLeaveToday
@@ -1031,7 +1068,7 @@ export const StaffPortal: React.FC = () => {
           </div>
         )}
 
-        {/* ⚠️ Session Inactive Warning Banner when Doctor is AVAILABLE */}
+        {/* Session Inactive Warning Banner when Doctor is AVAILABLE */}
         {currentDoctor.status === 'AVAILABLE' && !isSessionActive && (
           <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 text-amber-900 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in">
             <div className="flex items-center gap-3">
@@ -1058,7 +1095,7 @@ export const StaffPortal: React.FC = () => {
           </div>
         )}
 
-        {/* TAB 1: ACTIVE QUEUE */}
+        {/* TAB 1: ACTIVE QUEUE (Top-1 Regular + Top-1 Recalled Priority Calling) */}
         {activeTab === 'QUEUE' && (
           <div className="space-y-3">
             {(() => {
@@ -1080,18 +1117,40 @@ export const StaffPortal: React.FC = () => {
                 );
               }
 
-              return liveShiftWaiting.map((patient, index) => (
-                <QueueCard
-                  key={patient.id}
-                  patient={patient}
-                  isFirstWaiting={index === 0 && patient.status === 'WAITING'}
-                  isDoctorAvailable={currentDoctor.status === 'AVAILABLE'}
-                  isSessionActive={isSessionActive}
-                  doctorStatus={currentDoctor.status}
-                  currentActiveDate={realTodayDate}
-                  currentActiveShift={realCurrentShift}
-                />
-              ));
+              // Check karein ki koi patient pehle se IN_CABIN hai ya nahi
+              const hasPatientInCabin = liveShiftWaiting.some((p) => p.status === 'IN_CABIN');
+
+              // 1. Regular (Non-Recalled) Waiting Patients me se sabse top 1 patient
+              const regularWaitingList = liveShiftWaiting.filter(
+                (p) => p.status === 'WAITING' && !p.isRecalled
+              );
+              const firstRegularWaitingId = regularWaitingList[0]?.id || null;
+
+              // 2. Recalled Waiting Patients me se sabse top 1 patient (Token number ke series se)
+              const recalledWaitingList = liveShiftWaiting
+                .filter((p) => p.status === 'WAITING' && Boolean(p.isRecalled))
+                .sort((a, b) => Number(a.tokenNumber) - Number(b.tokenNumber));
+              const firstRecalledWaitingId = recalledWaitingList[0]?.id || null;
+
+              return liveShiftWaiting.map((patient) => {
+                const isEligibleToCall =
+                  !hasPatientInCabin &&
+                  patient.status === 'WAITING' &&
+                  (patient.id === firstRegularWaitingId || patient.id === firstRecalledWaitingId);
+
+                return (
+                  <QueueCard
+                    key={patient.id}
+                    patient={patient}
+                    isFirstWaiting={isEligibleToCall}
+                    isDoctorAvailable={currentDoctor.status === 'AVAILABLE'}
+                    isSessionActive={isSessionActive}
+                    doctorStatus={currentDoctor.status}
+                    currentActiveDate={realTodayDate}
+                    currentActiveShift={realCurrentShift}
+                  />
+                );
+              });
             })()}
           </div>
         )}
@@ -1147,7 +1206,7 @@ export const StaffPortal: React.FC = () => {
                 <div>
                   <span className="font-extrabold uppercase tracking-wide">Advance & Future Date Inspector</span>
                   <p className="text-[11px] text-blue-700 mt-0.5">
-                    Aane wale dino ya dusri shift ke tokens check karne ke liye upar Date aur Shift filter ka prayog karein.
+                    Aane wale dino ya dusri shift ke tokens check karne ke liye upar Date ({formatDateDDMMYYYY(selectedDateFilter)}) aur Shift filter ka prayog karein.
                   </p>
                 </div>
               </div>
@@ -1287,23 +1346,31 @@ export const StaffPortal: React.FC = () => {
 
               {currentDoctor.status === 'LEAVE' && currentDoctor.leaveStartDate && currentDoctor.leaveEndDate && (
                 <div className="rounded-xl bg-amber-50 border border-amber-200 p-2.5 text-[11px] font-semibold text-amber-900">
-                  📅 Doctor <strong>{currentDoctor.leaveStartDate}</strong> se <strong>{currentDoctor.leaveEndDate}</strong> tak Leave par hain. Leave dates ko chhod kar hi token banega.
+                  📅 Doctor <strong>{formatDateDDMMYYYY(currentDoctor.leaveStartDate)}</strong> se <strong>{formatDateDDMMYYYY(currentDoctor.leaveEndDate)}</strong> tak Leave par hain. Leave dates ko chhod kar hi token banega.
                 </div>
               )}
 
               <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Appointment Date
+                    Appointment Date (DD/MM/YYYY)
                   </label>
-                  <input
-                    type="date"
-                    min={realTodayDate}
-                    value={walkInForm.appointmentDate}
-                    onChange={(e) => handleDateChange(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 p-2 text-xs font-medium bg-white focus:outline-none focus:border-emerald-500"
-                    required
-                  />
+                  <div className="relative">
+                    <div className="w-full rounded-lg border border-slate-300 p-2 text-xs font-mono font-bold bg-white flex items-center justify-between">
+                      <span>{formatDateDDMMYYYY(walkInForm.appointmentDate)}</span>
+                      <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                    </div>
+                    <input
+                      type="date"
+                      min={realTodayDate}
+                      value={walkInForm.appointmentDate}
+                      onChange={(e) => {
+                        if (e.target.value) handleDateChange(e.target.value);
+                      }}
+                      className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                      required
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -1324,7 +1391,7 @@ export const StaffPortal: React.FC = () => {
 
               {isDateInLeaveRange(walkInForm.appointmentDate, currentDoctor) && (
                 <div className="rounded-xl bg-rose-50 border border-rose-300 p-2 text-xs font-bold text-rose-800">
-                  🚫 Yeh tarikh doctor ki Leave date me aati hai! Kripya {currentDoctor.leaveEndDate} ke baad ki tarikh chunein.
+                  🚫 Yeh tarikh doctor ki Leave date me aati hai! Kripya {formatDateDDMMYYYY(currentDoctor.leaveEndDate)} ke baad ki tarikh chunein.
                 </div>
               )}
 
