@@ -57,12 +57,11 @@ export default async function handler(req, res) {
     // Template ke mutabiq exact body parameters map karein
     let bodyParameters = [];
 
-    if (activeTemplate === 'opd_turn_reminder') {
-      // opd_turn_reminder (5 variables):
-      // {{1}} = Patient Name, {{2}} = Clinic Name, {{3}} = Doctor Name, {{4}} = Token Number, {{5}} = Patients Ahead
+if (activeTemplate === 'opd_turn_reminder') {
+      // opd_turn_reminder (4 variables matching your template):
+      // {{1}} = Patient Name, {{2}} = Doctor Name, {{3}} = Token Number, {{4}} = Patients Ahead
       bodyParameters = [
         { type: 'text', text: String(patientName || 'Patient') },
-        { type: 'text', text: String(clinicName || 'Aarogya Clinic') },
         { type: 'text', text: String(doctorName || 'Doctor') },
         { type: 'text', text: String(tokenNumber || '#1') },
         { type: 'text', text: String(patientsAhead ?? '3') },
