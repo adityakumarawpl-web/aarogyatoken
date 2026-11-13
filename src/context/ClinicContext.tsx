@@ -384,61 +384,6 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  const checkBotAlerts = useCallback((currentPatients: Patient[]) => {
-    let triggeredAny = false;
-    let newlyAlertedPatient: Patient | null = null;
-    const threshold = 4;
-
-    currentPatients.forEach((p) => {
-      if (p.status !== 'WAITING' || p.bookingType !== 'ONLINE' || p.botCallAlertSent) {
-        return;
-      }
-
-      const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
-      const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim().toLowerCase();
-
-      const shiftWaitingQueue = currentPatients
-        .filter((other) => {
-          const otherDate = other.appointmentDate || (other.createdAt ? other.createdAt.split('T')[0] : '');
-          const otherShift = ((other as any).selectedShift || (other as any).shift || 'Morning').trim().toLowerCase();
-          return (
-            other.doctorId === p.doctorId &&
-            otherDate === pDate &&
-            otherShift === pShift &&
-            other.status === 'WAITING'
-          );
-        })
-        .sort((a, b) => {
-          if (a.isEmergency && !b.isEmergency) return -1;
-          if (!a.isEmergency && b.isEmergency) return 1;
-          return Number(a.tokenNumber) - Number(b.tokenNumber);
-        });
-
-      const aheadCount = shiftWaitingQueue.findIndex((item) => item.id === p.id);
-
-      if (aheadCount !== -1 && aheadCount <= threshold) {
-        triggeredAny = true;
-        const alerted = {
-          ...p,
-          botCallAlertSent: true,
-          botCallAlertSentAt: new Date().toISOString(),
-        };
-
-        if (!newlyAlertedPatient) {
-          newlyAlertedPatient = alerted;
-        }
-
-        updateDoc(doc(db, 'patients', p.id), {
-          botCallAlertSent: true,
-          botCallAlertSentAt: alerted.botCallAlertSentAt,
-        }).catch((err) => console.error("Error updating bot alert:", err));
-
-        const matchedDoc = doctors.find((d) => d.id === p.doctorId);
-        sendTurnReminderWhatsApp(p, matchedDoc, aheadCount);
-      }
-    });
-  }, [doctors]);
-
   // 🔹 1. Start Shift Session: Staff clicks "Morning Shift Start" / "Evening Shift Start"
   const startDoctorSession = useCallback(async (doctorId: string) => {
     const matchedDoc = doctors.find((d) => d.id === doctorId);
@@ -470,7 +415,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       );
     }).sort((a, b) => Number(a.tokenNumber) - Number(b.tokenNumber));
 
-    // Top 4 waiting list me se SIRF ONLINE booking walo ko message jayega
+    // Shift start hote hi top 4 waiting online patients ko pehli baar reminder jayega
     const topWaitingList = targetPatients.slice(0, 4);
 
     topWaitingList.forEach((patient) => {
@@ -737,9 +682,8 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     setPatients((prev) => [...prev, newPatient]);
     setLastGeneratedTokenPatient(newPatient);
-    setTimeout(() => checkBotAlerts([...patients, newPatient]), 50);
     return newPatient;
-  }, [patients, doctors, checkBotAlerts]);
+  }, [patients, doctors]);
 
   const bookOnlineAppointment = useCallback((data: Omit<Patient, 'id' | 'tokenNumber' | 'status' | 'bookingType' | 'paymentStatus' | 'paymentAmount' | 'createdAt' | 'botCallAlertSent'>) => {
     const matchedDoctor = doctors.find((d) => d.id === data.doctorId);
@@ -769,6 +713,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const resolvedHospitalId = (data as any).hospitalId || matchedDoctor?.hospitalId || matchedDoctor?.staffUsername || '';
 
+    // botCallAlertSent ko true rakha hai taaki booking ke waqt turant reminder message na jaye
     const newPatient: Patient = {
       ...data,
       id: customId,
@@ -783,7 +728,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       paymentAmount: 20,
       paymentId,
       createdAt: new Date().toISOString(),
-      botCallAlertSent: false,
+      botCallAlertSent: true,
     } as any;
 
     setDoc(doc(db, 'patients', customId), newPatient).catch((err) => {
@@ -792,9 +737,8 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     setPatients((prev) => [...prev, newPatient]);
     setLastGeneratedTokenPatient(newPatient);
-    setTimeout(() => checkBotAlerts([...patients, newPatient]), 50);
     return { patient: newPatient, paymentId };
-  }, [patients, doctors, checkBotAlerts]);
+  }, [patients, doctors]);
 
   const callPatient = useCallback((patientId: string) => {
     const updated = callPatientInCabin(patients, patientId);
@@ -807,8 +751,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         calledInAt: target.calledInAt,
       }).catch((err) => console.error("Error updating callPatient:", err));
     }
-    setTimeout(() => checkBotAlerts(updated), 50);
-  }, [patients, checkBotAlerts]);
+  }, [patients]);
 
   const completePatient = useCallback((patientId: string) => {
     const updated = completePatientConsultation(patients, patientId);
@@ -821,8 +764,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         completedAt: target.completedAt,
       }).catch((err) => console.error("Error updating completePatient:", err));
     }
-    setTimeout(() => checkBotAlerts(updated), 50);
-  }, [patients, checkBotAlerts]);
+  }, [patients]);
 
   const markNotAvailable = useCallback((patientId: string) => {
     const updated = markPatientNotAvailable(patients, patientId);
@@ -834,8 +776,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         status: target.status,
       }).catch((err) => console.error("Error updating markNotAvailable:", err));
     }
-    setTimeout(() => checkBotAlerts(updated), 50);
-  }, [patients, checkBotAlerts]);
+  }, [patients]);
 
   const markEmergency = useCallback((patientId: string) => {
     const updated = patients.map((p) =>
@@ -852,9 +793,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } catch (e) {
       console.error("Emergency update exception:", e);
     }
-
-    setTimeout(() => checkBotAlerts(updated), 50);
-  }, [patients, checkBotAlerts]);
+  }, [patients]);
 
   // 🔹 Recall Patient: Strictly Same-Day Valid (Keval usi din ke liye valid)
   const recallPatient = useCallback((patientId: string) => {
@@ -905,9 +844,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       originalDate: patientOriginalDate,
       botCallAlertSent: false,
     }).catch((err) => console.error("Error updating recallPatient:", err));
-
-    setTimeout(() => checkBotAlerts(updated), 50);
-  }, [patients, doctors, checkBotAlerts]);
+  }, [patients, doctors]);
 
   // 🔹 Update Doctor Status + Leave Start & End Dates
   const updateDoctorStatus = useCallback(
