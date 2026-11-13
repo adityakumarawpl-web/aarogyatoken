@@ -78,6 +78,8 @@ export interface Patient {
   botCallAlertSent: boolean;
   botCallAlertSentAt?: string;
   estimatedWaitMinutes?: number;
+  isRecalled?: boolean;
+  originalShift?: string;
 }
 
 export interface Hospital {
