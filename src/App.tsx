@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ClinicProvider, useClinic } from './context/ClinicContext';
 import { Navbar } from './components/Navbar';
 import { PublicOPDView } from './components/public/PublicOPDView';
@@ -7,7 +7,28 @@ import { SuperAdminDashboard } from './components/admin/SuperAdminDashboard';
 import { BotCallModal } from './components/common/BotCallModal';
 
 const AppContent: React.FC = () => {
-  const { currentView } = useClinic();
+  const { currentView, setCurrentView } = useClinic();
+  const [routePath, setRoutePath] = useState(window.location.pathname);
+
+  // URL Path change detect karne ke liye listener
+  useEffect(() => {
+    const handlePopState = () => {
+      setRoutePath(window.location.pathname);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // URL ke hisaab se automatic view set karna
+  useEffect(() => {
+    if (routePath === '/staff') {
+      setCurrentView('STAFF');
+    } else if (routePath === '/admin') {
+      setCurrentView('ADMIN');
+    } else {
+      setCurrentView('PUBLIC');
+    }
+  }, [routePath, setCurrentView]);
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 font-sans text-slate-900 selection:bg-blue-600 selection:text-white">
@@ -28,7 +49,7 @@ const AppContent: React.FC = () => {
           <div className="flex items-center gap-1 font-semibold text-slate-700">
             <span>AarogyaToken OPD Platform</span>
             <span>•</span>
-            <span className="text-emerald-600">Live Queue & Smart Voice Bot Alert</span>
+            <span className="text-emerald-600">Live Queue & Smart WhatsApp Alert</span>
           </div>
           <div className="text-slate-400 text-[11px]">
             Designed for Multi-Clinic Doctors & Walk-in / Online Patients
