@@ -46,7 +46,13 @@ export const Navbar: React.FC = () => {
       {/* Main Bar: Mobile Friendly Full Responsive */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-2 w-full">
         {/* Logo & Platform Name */}
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        <div 
+          onClick={() => {
+            window.location.href = '/';
+          }}
+          className="flex items-center gap-2 sm:gap-3 shrink-0 cursor-pointer"
+          title="Go to Public OPD Home"
+        >
           <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 shrink-0">
             <Activity className="h-5 w-5 sm:h-6 sm:w-6 stroke-[2.2]" />
           </div>
@@ -65,11 +71,13 @@ export const Navbar: React.FC = () => {
           </div>
         </div>
 
-        {/* Primary Role Navigation Tabs (Scrollable on small mobile screens without breaking page width) */}
+        {/* Primary Role Navigation Tabs (Ab yeh alag URLs par route karenge) */}
         <nav className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 overflow-x-auto max-w-[62%] sm:max-w-none shrink-0 scrollbar-none">
           <button
             type="button"
-            onClick={() => setCurrentView('PUBLIC')}
+            onClick={() => {
+              window.location.href = '/';
+            }}
             className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
               currentView === 'PUBLIC'
                 ? 'bg-white text-blue-700 shadow-xs border border-slate-200/80 font-bold'
@@ -83,7 +91,9 @@ export const Navbar: React.FC = () => {
 
           <button
             type="button"
-            onClick={() => setCurrentView('STAFF')}
+            onClick={() => {
+              window.location.href = '/staff';
+            }}
             className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold transition cursor-pointer relative whitespace-nowrap ${
               currentView === 'STAFF'
                 ? 'bg-white text-emerald-700 shadow-xs border border-slate-200/80 font-bold'
@@ -102,7 +112,9 @@ export const Navbar: React.FC = () => {
 
           <button
             type="button"
-            onClick={() => setCurrentView('ADMIN')}
+            onClick={() => {
+              window.location.href = '/admin';
+            }}
             className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
               currentView === 'ADMIN'
                 ? 'bg-slate-900 text-white shadow-xs font-bold'
