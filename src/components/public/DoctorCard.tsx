@@ -18,6 +18,14 @@ interface DoctorCardProps {
   onBookOnline: (doctor: Doctor) => void;
 }
 
+const formatDateDDMMYYYY = (isoDate?: string): string => {
+  if (!isoDate) return '';
+  const clean = isoDate.split('T')[0];
+  const parts = clean.split('-');
+  if (parts.length !== 3) return isoDate;
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+};
+
 export const DoctorCard: React.FC<DoctorCardProps> = ({
   doctor,
   onBookOnline,
@@ -32,23 +40,20 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
     return `********${clean.slice(-2)}`;
   };
 
-  // Date ko readable format (e.g. 12 Nov) me convert karna
-  const formatShortDate = (dateStr?: string) => {
-    if (!dateStr) return '';
-    try {
-      const [y, m, d] = dateStr.split('-').map(Number);
-      const dt = new Date(y, m - 1, d);
-      return dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-    } catch {
-      return dateStr;
-    }
-  };
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const isDoctorOnLeaveToday = Boolean(
+    doctor.status === 'LEAVE' &&
+      (!doctor.leaveStartDate ||
+        !doctor.leaveEndDate ||
+        (todayStr >= doctor.leaveStartDate && todayStr <= doctor.leaveEndDate))
+  );
 
   const leaveRangeLabel =
     doctor.leaveStartDate && doctor.leaveEndDate
       ? doctor.leaveStartDate === doctor.leaveEndDate
-        ? `${formatShortDate(doctor.leaveStartDate)}`
-        : `${formatShortDate(doctor.leaveStartDate)} - ${formatShortDate(doctor.leaveEndDate)}`
+        ? `${formatDateDDMMYYYY(doctor.leaveStartDate)}`
+        : `${formatDateDDMMYYYY(doctor.leaveStartDate)} - ${formatDateDDMMYYYY(doctor.leaveEndDate)}`
       : '';
 
   const doctorActiveShift = doctor.activeShift || 'Morning';
@@ -74,16 +79,15 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
     if (doctor.status === 'LEAVE') {
       return {
         displayText: leaveRangeLabel ? `Leave (${leaveRangeLabel})` : 'On Leave',
-        textColor: 'text-blue-600 text-xl sm:text-2xl drop-shadow-[0_0_8px_rgba(37,99,235,0.3)]',
+        textColor: 'text-blue-600 text-lg sm:text-xl font-mono drop-shadow-[0_0_8px_rgba(37,99,235,0.3)]',
         label:
           doctor.leaveStartDate && doctor.leaveEndDate
-            ? `Doctor ${formatShortDate(doctor.leaveStartDate)} se ${formatShortDate(doctor.leaveEndDate)} tak chhutti par hain`
+            ? `Doctor ${formatDateDDMMYYYY(doctor.leaveStartDate)} se ${formatDateDDMMYYYY(doctor.leaveEndDate)} tak chhutti par hain`
             : 'Doctor aaj upalabdha nahi hain',
         urgencyBadge: null,
       };
     }
 
-    const todayStr = new Date().toISOString().split('T')[0];
     const currentShiftLower = doctorActiveShift.toLowerCase();
 
     // Aaj ki active shift ke sabhi patients nikaalein
@@ -205,7 +209,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
         );
       case 'LEAVE':
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-0.5 text-[11px] font-bold text-slate-700 border border-slate-300 shadow-2xs">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-0.5 text-[11px] font-mono font-bold text-slate-700 border border-slate-300 shadow-2xs">
             <AlertTriangle className="h-3 w-3 text-slate-500" />
             <span>{leaveRangeLabel ? `On Leave (${leaveRangeLabel})` : 'On Leave'}</span>
           </span>
@@ -213,7 +217,6 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
     }
   };
 
-  const todayDateStr = new Date().toISOString().split('T')[0];
   const activeShiftLower = doctorActiveShift.toLowerCase();
 
   const matchedPatients = tokenSearchQuery.trim() === ''
@@ -224,7 +227,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
         const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
         const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim().toLowerCase();
 
-        if (pDate !== todayDateStr || pShift !== activeShiftLower) return false;
+        if (pDate !== todayStr || pShift !== activeShiftLower) return false;
 
         const q = tokenSearchQuery.toLowerCase().trim();
         const nameMatch = p.name?.toLowerCase().includes(q);
@@ -319,6 +322,11 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
                         <span className="font-extrabold text-xs text-slate-900 break-words leading-tight">
                           {p.name}
                         </span>
+                        {p.isRecalled && (
+                          <span className="text-[9px] font-bold bg-amber-100 text-amber-900 px-1.5 py-0.2 rounded">
+                            🔄 Recalled
+                          </span>
+                        )}
                       </div>
 
                       <span
@@ -426,7 +434,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
       <div className="p-3 bg-slate-50/90 border-t border-slate-100">
         <button
           type="button"
-          disabled={doctor.status === 'LEAVE'}
+          disabled={isDoctorOnLeaveToday}
           onClick={() => onBookOnline(doctor)}
           className="w-full rounded-xl bg-blue-600 px-3 py-2.5 text-xs sm:text-sm font-bold text-white shadow-md shadow-blue-500/20 hover:bg-blue-700 transition cursor-pointer flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.99]"
         >
