@@ -15,12 +15,21 @@ import {
   AlertCircle,
   Sparkles,
   Lock,
+  Calendar,
 } from 'lucide-react';
 
 interface BookingModalProps {
   doctor: Doctor;
   onClose: () => void;
 }
+
+const formatDateDDMMYYYY = (isoDate?: string): string => {
+  if (!isoDate) return '';
+  const clean = isoDate.split('T')[0];
+  const parts = clean.split('-');
+  if (parts.length !== 3) return isoDate;
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+};
 
 export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) => {
   const { patients, bookOnlineAppointment, triggerBotCallAlert, razorpaySettings } = useClinic();
@@ -57,6 +66,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
   });
 
   const handleDateChange = (newDate: string) => {
+    if (!newDate) return;
     const morningAllowed = isMorningShiftActiveForDoctor(newDate, doctor);
     setFormData((prev) => ({
       ...prev,
@@ -96,7 +106,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
     e.preventDefault();
     if (selectedDateBlockedByLeave) {
       setErrorMsg(
-        `Doctor ${doctor.leaveStartDate || ''} se ${doctor.leaveEndDate || ''} tak chhutti (Leave) par hain. Kripya uske baad ki date chunein.`
+        `Doctor ${formatDateDDMMYYYY(doctor.leaveStartDate)} se ${formatDateDDMMYYYY(doctor.leaveEndDate)} tak chhutti (Leave) par hain. Kripya uske baad ki date chunein.`
       );
       return;
     }
@@ -305,20 +315,26 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                 </div>
               </div>
 
-              {/* Date & Shift Selection */}
+              {/* Date & Shift Selection (Strictly DD/MM/YYYY visual display across Desktop & Mobile) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 bg-slate-50 p-2.5 sm:p-3 rounded-xl border border-slate-200">
                 <div>
                   <label className="block text-[11px] sm:text-xs font-semibold text-slate-700 mb-1">
-                    Appointment Date
+                    Appointment Date (DD/MM/YYYY)
                   </label>
-                  <input
-                    type="date"
-                    min={todayStr}
-                    value={formData.appointmentDate}
-                    onChange={(e) => handleDateChange(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 p-2 text-xs font-medium bg-white focus:outline-none focus:border-blue-500"
-                    required
-                  />
+                  <div className="relative">
+                    <div className="w-full rounded-lg border border-slate-300 p-2 text-xs font-mono font-bold bg-white text-slate-800 flex items-center justify-between">
+                      <span>{formatDateDDMMYYYY(formData.appointmentDate)}</span>
+                      <Calendar className="h-3.5 w-3.5 text-blue-600" />
+                    </div>
+                    <input
+                      type="date"
+                      min={todayStr}
+                      value={formData.appointmentDate}
+                      onChange={(e) => handleDateChange(e.target.value)}
+                      className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                      required
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className="block text-[11px] sm:text-xs font-semibold text-slate-700 mb-1">
@@ -339,7 +355,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
 
               {selectedDateBlockedByLeave && (
                 <div className="rounded-xl bg-amber-50 border border-amber-300 p-2.5 text-xs text-amber-900 font-semibold">
-                  ⚠️ Doctor {doctor.leaveStartDate} se {doctor.leaveEndDate} tak chhutti par hain. Kripya koi aur date chunein.
+                  ⚠️ Doctor {formatDateDDMMYYYY(doctor.leaveStartDate)} se {formatDateDDMMYYYY(doctor.leaveEndDate)} tak chhutti par hain. Kripya koi aur date chunein.
                 </div>
               )}
 
@@ -490,7 +506,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                     <span className="text-xs text-blue-200 font-bold block">
                       Token #{nextEstimatedToken}
                     </span>
-                    <span className="text-[10px] text-slate-400">For {formData.name}</span>
+                    <span className="text-[10px] text-slate-400">
+                      For {formData.name} ({formatDateDDMMYYYY(formData.appointmentDate)})
+                    </span>
                   </div>
                 </div>
               </div>
@@ -588,7 +606,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                     {confirmedPatient.name} ({confirmedPatient.gender}, {confirmedPatient.age} yrs)
                   </div>
                   <div className="mt-1 text-[11px] font-semibold text-slate-600">
-                    Shift: <span className="text-blue-700">{confirmedPatient.selectedShift || (confirmedPatient as any).shift}</span>
+                    Date: <span className="font-mono text-slate-800">{formatDateDDMMYYYY(confirmedPatient.appointmentDate)}</span> • Shift: <span className="text-blue-700">{confirmedPatient.selectedShift || (confirmedPatient as any).shift}</span>
                   </div>
                 </div>
 
@@ -651,7 +669,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                 <button
                   type="button"
                   onClick={() => {
-                    const text = `AarogyaToken Pass - Dr. ${doctor.name}, Token #${confirmedPatient.tokenNumber}. Clinic: ${doctor.clinicName}.`;
+                    const text = `AarogyaToken Pass - Dr. ${doctor.name}, Token #${confirmedPatient.tokenNumber} (${formatDateDDMMYYYY(confirmedPatient.appointmentDate)}). Clinic: ${doctor.clinicName}.`;
                     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
                   }}
                   className="flex-1 rounded-xl bg-emerald-600 px-2.5 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition cursor-pointer flex items-center justify-center gap-1"
