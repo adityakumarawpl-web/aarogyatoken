@@ -896,35 +896,39 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setTimeout(() => checkBotAlerts(updated), 50);
   }, [patients, checkBotAlerts]);
 
-  // 🔹 Recall Patient: Naya token nahi banega, purana token & original shift safe rahega aur current active shift me visible hoga
+// 🔹 Recall Patient: Strictly Same-Day Valid (Keval usi din ke liye valid)
   const recallPatient = useCallback((patientId: string) => {
     const targetPatient = patients.find((p) => p.id === patientId);
     if (!targetPatient) return;
 
-    const matchedDoc = doctors.find((d) => d.id === targetPatient.doctorId);
     const todayStr = new Date().toISOString().split('T')[0];
-    const currentDoctorShift = matchedDoc?.activeShift || 'Morning';
+    const patientOriginalDate =
+      targetPatient.originalDate ||
+      targetPatient.appointmentDate ||
+      (targetPatient.createdAt ? targetPatient.createdAt.split('T')[0] : todayStr);
 
-    const pDate = targetPatient.appointmentDate || (targetPatient.createdAt ? targetPatient.createdAt.split('T')[0] : todayStr);
+    // Strict Same-Day Rule: Purani date ke token ko dusre din recall nahi kiya ja sakta
+    if (patientOriginalDate !== todayStr) {
+      alert('⚠️ Recall keval usi din (Same Day) ke liye valid hai! Purani date ke token ko dusre din recall nahi kiya ja sakta.');
+      return;
+    }
+
+    const matchedDoc = doctors.find((d) => d.id === targetPatient.doctorId);
+    const currentDoctorShift = matchedDoc?.activeShift || 'Morning';
     const pShift = ((targetPatient as any).selectedShift || (targetPatient as any).shift || 'Morning').trim();
     const preservedOriginalShift = targetPatient.originalShift || pShift;
-
-    const isSameCurrentShift =
-      pDate === todayStr && pShift.toLowerCase() === currentDoctorShift.toLowerCase();
-
-    const updatedDate = isSameCurrentShift ? pDate : todayStr;
-    const updatedShift = isSameCurrentShift ? pShift : currentDoctorShift;
 
     const updated = patients.map((p) =>
       p.id === patientId
         ? ({
             ...p,
             status: 'WAITING',
-            appointmentDate: updatedDate,
-            selectedShift: updatedShift,
-            shift: updatedShift,
+            appointmentDate: todayStr,
+            selectedShift: currentDoctorShift,
+            shift: currentDoctorShift,
             isRecalled: true,
             originalShift: preservedOriginalShift,
+            originalDate: patientOriginalDate,
             botCallAlertSent: false,
           } as Patient)
         : p
@@ -934,11 +938,12 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     updateDoc(doc(db, 'patients', patientId), {
       status: 'WAITING',
-      appointmentDate: updatedDate,
-      selectedShift: updatedShift,
-      shift: updatedShift,
+      appointmentDate: todayStr,
+      selectedShift: currentDoctorShift,
+      shift: currentDoctorShift,
       isRecalled: true,
       originalShift: preservedOriginalShift,
+      originalDate: patientOriginalDate,
       botCallAlertSent: false,
     }).catch((err) => console.error("Error updating recallPatient:", err));
 
