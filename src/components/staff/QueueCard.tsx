@@ -9,7 +9,6 @@ import {
   Flame,
   Lock,
   Calendar,
-  PlayCircle,
 } from 'lucide-react';
 
 interface QueueCardProps {
@@ -21,6 +20,14 @@ interface QueueCardProps {
   currentActiveDate?: string;
   currentActiveShift?: string;
 }
+
+const formatDateDDMMYYYY = (isoDate?: string): string => {
+  if (!isoDate) return '';
+  const clean = isoDate.split('T')[0];
+  const parts = clean.split('-');
+  if (parts.length !== 3) return isoDate;
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+};
 
 export const QueueCard: React.FC<QueueCardProps> = ({
   patient,
@@ -47,21 +54,26 @@ export const QueueCard: React.FC<QueueCardProps> = ({
   const todayStr = new Date().toISOString().split('T')[0];
   const activeDate = currentActiveDate || todayStr;
   const patientDate = patient.appointmentDate || (patient.createdAt ? patient.createdAt.split('T')[0] : todayStr);
+  const formattedPatientDate = formatDateDDMMYYYY(patientDate);
   const isDateMatched = patientDate === activeDate;
 
   // 2. SHIFT VALIDATION
   const patientShift = (patient.selectedShift || (patient as any).shift || 'Morning').trim();
-  const isShiftMatched = !currentActiveShift || currentActiveShift === 'ALL' || patientShift.toLowerCase() === currentActiveShift.toLowerCase();
+  const isShiftMatched =
+    !currentActiveShift ||
+    currentActiveShift === 'ALL' ||
+    patientShift.toLowerCase() === currentActiveShift.toLowerCase();
 
   // Rule: Action tabhi valid hoga jab:
   // - Emergency ho (Emergency hamesha bypass karegi)
   // YA
-  // - Doctor Available ho + Session Active ("Start Token" dabaya gaya ho) + Sahi Date ho + Sahi Shift ho + (Turn pehle ho ya cabin me ho)
+  // - Doctor Available ho + Session Active ho + Sahi Date ho + Sahi Shift ho + (Top-1 Regular ya Top-1 Recalled ya Cabin me ho)
   const isScheduledNow = isDateMatched && isShiftMatched;
-  const canActOnPatient = isDoctorAvailable && (
-    patient.isEmergency || 
-    (isSessionActive && isScheduledNow && (isFirstWaiting || isInCabin))
-  );
+  const canActOnPatient =
+    isDoctorAvailable &&
+    (patient.isEmergency || (isSessionActive && isScheduledNow && (isFirstWaiting || isInCabin)));
+
+  const recalledSourceShift = patient.originalShift || patientShift;
 
   const getCardStyle = () => {
     switch (patient.status) {
@@ -78,6 +90,9 @@ export const QueueCard: React.FC<QueueCardProps> = ({
         }
         if (!isScheduledNow) {
           return 'bg-slate-50 text-slate-500 border border-slate-200 opacity-75';
+        }
+        if (patient.isRecalled && isFirstWaiting && isSessionActive) {
+          return 'bg-amber-50/40 text-slate-900 border-2 border-amber-400 shadow-md ring-2 ring-amber-100';
         }
         return isFirstWaiting && isSessionActive
           ? 'bg-white text-slate-900 border-2 border-emerald-400 shadow-md ring-2 ring-emerald-100'
@@ -118,17 +133,17 @@ export const QueueCard: React.FC<QueueCardProps> = ({
                 <span>OPD Token Session Shuru Nahi Hua — Calling Locked</span>
               </span>
               <span className="text-[10px] text-amber-800 font-medium">
-                (Upar <strong>"Start Token"</strong> dabane par hi ye button unlock hoga)
+                (Upar <strong>"Shift Start"</strong> dabane par hi ye button unlock hoga)
               </span>
             </div>
           ) : !isDateMatched && !patient.isEmergency ? (
             <div className="flex items-center justify-between text-[11px] font-bold p-2 rounded-xl bg-slate-100 border border-slate-300 text-slate-700">
               <span className="flex items-center gap-1.5">
                 <Calendar className="h-3.5 w-3.5 text-slate-500" />
-                <span>Future / Other Date Token: <strong>{patientDate}</strong> ({patientShift} Shift)</span>
+                <span>Future / Other Date Token: <strong>{formattedPatientDate}</strong> ({patientShift} Shift)</span>
               </span>
               <span className="text-[10px] text-slate-500 font-medium">
-                (Buttons sirf {patientDate} ko active honge)
+                (Buttons sirf {formattedPatientDate} ko active honge)
               </span>
             </div>
           ) : !isShiftMatched && !patient.isEmergency ? (
@@ -142,12 +157,30 @@ export const QueueCard: React.FC<QueueCardProps> = ({
               </span>
             </div>
           ) : isFirstWaiting || patient.isEmergency ? (
-            <div className="flex items-center justify-between text-[11px] font-bold pb-2 border-b border-emerald-100 text-emerald-700">
-              <span className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping"></span>
-                <span>Current Turn: Next Patient to Call</span>
+            <div
+              className={`flex items-center justify-between text-[11px] font-bold pb-2 border-b ${
+                patient.isRecalled
+                  ? 'border-amber-200 text-amber-800'
+                  : 'border-emerald-100 text-emerald-700'
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <span
+                  className={`h-2 w-2 rounded-full animate-ping ${
+                    patient.isRecalled ? 'bg-amber-500' : 'bg-emerald-500'
+                  }`}
+                ></span>
+                <span>
+                  {patient.isRecalled
+                    ? `🔄 Recalled Priority (${recalledSourceShift} #${patient.tokenNumber}): Ready to Call`
+                    : 'Current Turn: Next Patient to Call'}
+                </span>
               </span>
-              <span className="text-[10px] text-emerald-600 font-medium">
+              <span
+                className={`text-[10px] font-medium ${
+                  patient.isRecalled ? 'text-amber-700' : 'text-emerald-600'
+                }`}
+              >
                 ('Andar Gaye' dabakar cabin me bhejein)
               </span>
             </div>
@@ -155,7 +188,11 @@ export const QueueCard: React.FC<QueueCardProps> = ({
             <div className="flex items-center justify-between text-[11px] font-medium pb-1.5 border-b border-slate-100 text-slate-500">
               <span className="flex items-center gap-1">
                 <Lock className="h-3 w-3 text-slate-400" />
-                <span>Waiting in Queue — Series Token Locked</span>
+                <span>
+                  {patient.isRecalled
+                    ? `Waiting in Recalled Queue (${recalledSourceShift} #${patient.tokenNumber}) — Locked`
+                    : 'Waiting in Queue — Series Token Locked'}
+                </span>
               </span>
               <span className="text-[10px] text-slate-400">
                 (Pehle aage wale token ka checkup hoga)
@@ -179,6 +216,8 @@ export const QueueCard: React.FC<QueueCardProps> = ({
                 ? 'bg-amber-200 text-amber-900'
                 : patient.isEmergency
                 ? 'bg-rose-600 text-white'
+                : patient.isRecalled && isFirstWaiting && isSessionActive
+                ? 'bg-amber-500 text-white shadow-amber-200 shadow-md'
                 : isFirstWaiting && isScheduledNow && isSessionActive
                 ? 'bg-emerald-600 text-white shadow-emerald-200 shadow-md'
                 : 'bg-slate-700 text-white'
@@ -193,6 +232,19 @@ export const QueueCard: React.FC<QueueCardProps> = ({
               <h4 className={`text-base font-bold ${isInCabin ? 'text-white' : 'text-slate-900'}`}>
                 {patient.name}
               </h4>
+
+              {/* Recalled Indicator Badge */}
+              {patient.isRecalled && (
+                <span
+                  className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-extrabold ${
+                    isInCabin
+                      ? 'bg-amber-300 text-amber-950'
+                      : 'bg-amber-100 text-amber-900 border border-amber-300'
+                  }`}
+                >
+                  🔄 Recalled ({recalledSourceShift} #{patient.tokenNumber})
+                </span>
+              )}
 
               <span
                 className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
@@ -218,9 +270,9 @@ export const QueueCard: React.FC<QueueCardProps> = ({
                 {patient.bookingType === 'ONLINE' ? 'Online Book' : 'Staff Walk-in (Free)'}
               </span>
 
-              {/* Appointment Date Badge */}
+              {/* Appointment Date Badge (DD/MM/YYYY) */}
               <span
-                className={`text-[11px] px-2 py-0.5 rounded-md font-bold ${
+                className={`text-[11px] px-2 py-0.5 rounded-md font-mono font-bold ${
                   isInCabin
                     ? 'bg-blue-800 text-white'
                     : !isDateMatched
@@ -228,7 +280,7 @@ export const QueueCard: React.FC<QueueCardProps> = ({
                     : 'bg-slate-100 text-slate-800 border border-slate-300'
                 }`}
               >
-                📅 {patientDate}
+                📅 {formattedPatientDate}
               </span>
 
               {/* Shift Badge */}
@@ -314,9 +366,9 @@ export const QueueCard: React.FC<QueueCardProps> = ({
                   !isDoctorAvailable
                     ? 'Doctor abhi available nahi hain'
                     : !isSessionActive && !patient.isEmergency
-                    ? 'Pehle upar "Start Token" button dabayein'
+                    ? 'Pehle upar "Shift Start" button dabayein'
                     : !isDateMatched && !patient.isEmergency
-                    ? `Token date ${patientDate} hai. Aaj attend nahi kiya ja sakta.`
+                    ? `Token date ${formattedPatientDate} hai. Aaj attend nahi kiya ja sakta.`
                     : !isShiftMatched && !patient.isEmergency
                     ? `Token ${patientShift} shift ka hai.`
                     : !canActOnPatient
@@ -357,15 +409,6 @@ export const QueueCard: React.FC<QueueCardProps> = ({
                     ? 'border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 cursor-pointer'
                     : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-50'
                 }`}
-                title={
-                  !isSessionActive && !patient.isEmergency
-                    ? 'Session chalu nahi hai'
-                    : !isScheduledNow && !patient.isEmergency
-                    ? `Date (${patientDate}) ya Shift (${patientShift}) mismatch`
-                    : !canActOnPatient
-                    ? 'Turn aane par hi absent mark kar sakte hain'
-                    : 'Patient absent right now'
-                }
               >
                 Uplabdh Nahi
               </button>
@@ -385,7 +428,6 @@ export const QueueCard: React.FC<QueueCardProps> = ({
                       ? 'border border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100 cursor-pointer'
                       : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-50'
                   }`}
-                  title="Emergency case: Kisi bhi date ya shift ke token ko turant emergency priority par bulayein"
                 >
                   <Flame className="h-3.5 w-3.5 text-rose-500" />
                   <span>Emergency</span>
