@@ -11,7 +11,6 @@ import {
   Clock,
   Printer,
   Share2,
-  PhoneCall,
   AlertCircle,
   Sparkles,
   Lock,
@@ -32,7 +31,7 @@ const formatDateDDMMYYYY = (isoDate?: string): string => {
 };
 
 export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) => {
-  const { patients, bookOnlineAppointment, triggerBotCallAlert, razorpaySettings } = useClinic();
+  const { patients, bookOnlineAppointment, razorpaySettings } = useClinic();
 
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -310,12 +309,12 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                 <div>
                   <span className="font-bold text-blue-950">Next Available Token: #{nextEstimatedToken}</span>
                   <p className="text-blue-800 text-[11px] mt-0.5 leading-relaxed">
-                    Online token fee is ₹20. Clinic walk-in is free. Live tracking & call alert included!
+                    Online token fee is ₹20. Clinic walk-in is free. Live tracking & WhatsApp update included!
                   </p>
                 </div>
               </div>
 
-              {/* Date & Shift Selection (Strictly DD/MM/YYYY visual display across Desktop & Mobile) */}
+              {/* Date & Shift Selection */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 bg-slate-50 p-2.5 sm:p-3 rounded-xl border border-slate-200">
                 <div>
                   <label className="block text-[11px] sm:text-xs font-semibold text-slate-700 mb-1">
@@ -403,7 +402,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                     />
                   </div>
                   <span className="text-[10px] text-slate-500 block mt-0.5">
-                    Alert Bot isi number par WhatsApp aur Call alert bhejega
+                    WhatsApp par token aur turn alert isi number par aayega
                   </span>
                 </div>
 
@@ -634,25 +633,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                     </span>
                   </div>
                 </div>
-              </div>
-
-              {/* Bot Call Reminder Notice */}
-              <div className="rounded-2xl bg-gradient-to-r from-amber-500/10 to-blue-500/10 border border-blue-200 p-3 text-xs text-slate-800 space-y-2">
-                <div className="flex items-center gap-1.5 font-bold text-blue-900">
-                  <PhoneCall className="h-3.5 w-3.5 text-blue-600 animate-pulse" />
-                  <span>Automatic Voice Bot Call Reminder Active!</span>
-                </div>
-                <p className="text-slate-600 text-[10px] leading-relaxed">
-                  Jaise hi 3 se 4 mareez bachenge, <span className="font-bold text-slate-900">+91 {confirmedPatient.mobile}</span> par IVR call aayegi.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => triggerBotCallAlert(confirmedPatient)}
-                  className="w-full rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white hover:bg-blue-700 transition cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <PhoneCall className="h-3.5 w-3.5" />
-                  <span>Test Automated Bot Call (सुनकर देखें)</span>
-                </button>
               </div>
 
               {/* Action Buttons */}
