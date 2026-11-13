@@ -1,26 +1,14 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { Doctor, Patient, DoctorStatus, VoiceBotSettings, GlobalRazorpaySettings } from '../types';
+import { Doctor, Patient, DoctorStatus, GlobalRazorpaySettings } from '../types';
 import {
   getNextTokenNumber,
   callPatientInCabin,
   completePatientConsultation,
   markPatientNotAvailable,
   markPatientEmergency,
-  shouldSendBotCallAlert,
 } from '../utils/queueLogic';
 import { db } from '../firebase';
 import { collection, onSnapshot, setDoc, updateDoc, doc } from 'firebase/firestore';
-
-export const DEFAULT_VOICE_BOT_SETTINGS: VoiceBotSettings = {
-  enabled: true,
-  triggerThreshold: 4,
-  telephonyProvider: 'IN_APP_VOICE',
-  apiKey: 'ex_live_7891238910',
-  callerId: '+91 80 4719 3200',
-  messageTemplate: 'Namaste {patient_name} ji! Dr. {doctor_name} ke cabin me aapka Token #{token_number} aane wala hai. Aapke aage keval {patients_ahead} mareez bache hain. Kripya clinic pahunche! Dhanyawad.',
-  autoRetryFailed: true,
-  maxRetries: 2,
-};
 
 export const DEFAULT_RAZORPAY_SETTINGS: GlobalRazorpaySettings = {
   enabled: true,
@@ -208,9 +196,6 @@ interface ClinicContextType {
   staffLogin: (username: string, password: string) => { success: boolean; message: string; doctor?: Doctor };
   staffLogout: () => void;
   resetToDemoData: () => void;
-  activeBotCallPatient: Patient | null;
-  triggerBotCallAlert: (patient: Patient) => void;
-  closeBotCallModal: () => void;
   lastGeneratedTokenPatient: Patient | null;
   setLastGeneratedTokenPatient: (p: Patient | null) => void;
   adminAuthenticated: boolean;
@@ -218,8 +203,6 @@ interface ClinicContextType {
   adminLogin: (username: string, password: string) => { success: boolean; message: string };
   adminVerify2FA: (pin: string) => { success: boolean; message: string };
   adminLogout: () => void;
-  voiceBotSettings: VoiceBotSettings;
-  updateVoiceBotSettings: (settings: VoiceBotSettings) => void;
   razorpaySettings: GlobalRazorpaySettings;
   updateRazorpaySettings: (settings: GlobalRazorpaySettings) => void;
 }
@@ -292,15 +275,6 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   });
 
-  const [voiceBotSettings, setVoiceBotSettings] = useState<VoiceBotSettings>(() => {
-    try {
-      const saved = localStorage.getItem('opd_voice_bot_settings');
-      return saved ? JSON.parse(saved) : DEFAULT_VOICE_BOT_SETTINGS;
-    } catch {
-      return DEFAULT_VOICE_BOT_SETTINGS;
-    }
-  });
-
   const [razorpaySettings, setRazorpaySettings] = useState<GlobalRazorpaySettings>(() => {
     try {
       const saved = localStorage.getItem('opd_razorpay_settings');
@@ -310,7 +284,6 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   });
 
-  const [activeBotCallPatient, setActiveBotCallPatient] = useState<Patient | null>(null);
   const [lastGeneratedTokenPatient, setLastGeneratedTokenPatient] = useState<Patient | null>(null);
 
   useEffect(() => {
@@ -336,21 +309,13 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   useEffect(() => {
     try {
-      localStorage.setItem('opd_voice_bot_settings', JSON.stringify(voiceBotSettings));
-    } catch (e) {
-      console.error('Failed to sync voice bot settings', e);
-    }
-  }, [voiceBotSettings]);
-
-  useEffect(() => {
-    try {
       localStorage.setItem('opd_razorpay_settings', JSON.stringify(razorpaySettings));
     } catch (e) {
       console.error('Failed to sync razorpay settings', e);
     }
   }, [razorpaySettings]);
 
-  // Automated WhatsApp Turn Reminder Dispatch
+  // Automated WhatsApp Turn Reminder Dispatch (Approved 'opd_turn_reminder' Template)
   const sendTurnReminderWhatsApp = async (patient: Patient, doctor: Doctor | undefined, aheadCount: number) => {
     try {
       const rawDigits = String(patient.mobile || '').replace(/\D/g, '');
@@ -365,14 +330,15 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           phone: cleanPhone,
           templateName: 'opd_turn_reminder',
           patientName: patient.name,
-          doctorName: `${doctor?.name || 'Doctor'} (Alert: Keval ${aheadCount} Mareez Bache Hain)`,
-          tokenNumber: `#${patient.tokenNumber} - Kripya Clinic Pahunche`,
           clinicName: doctor?.clinicName || 'Aarogya Clinic',
+          doctorName: doctor?.name || 'Doctor',
+          tokenNumber: `#${patient.tokenNumber}`,
+          patientsAhead: `${aheadCount}`,
         }),
       });
 
       const resData = await response.json();
-      console.log(`WhatsApp Turn Alert sent for Token #${patient.tokenNumber}:`, resData);
+      console.log(`WhatsApp Turn Reminder sent for Token #${patient.tokenNumber}:`, resData);
     } catch (err) {
       console.error('Failed to send turn reminder WhatsApp:', err);
     }
@@ -419,11 +385,9 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const checkBotAlerts = useCallback((currentPatients: Patient[]) => {
-    if (!voiceBotSettings.enabled) return;
-
     let triggeredAny = false;
     let newlyAlertedPatient: Patient | null = null;
-    const threshold = voiceBotSettings.triggerThreshold || 4;
+    const threshold = 4;
 
     currentPatients.forEach((p) => {
       if (p.status !== 'WAITING' || p.bookingType !== 'ONLINE' || p.botCallAlertSent) {
@@ -473,11 +437,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         sendTurnReminderWhatsApp(p, matchedDoc, aheadCount);
       }
     });
-
-    if (triggeredAny && newlyAlertedPatient) {
-      setActiveBotCallPatient(newlyAlertedPatient);
-    }
-  }, [voiceBotSettings, doctors]);
+  }, [doctors]);
 
   // 🔹 1. Start Shift Session: Staff clicks "Morning Shift Start" / "Evening Shift Start"
   const startDoctorSession = useCallback(async (doctorId: string) => {
@@ -896,7 +856,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setTimeout(() => checkBotAlerts(updated), 50);
   }, [patients, checkBotAlerts]);
 
-// 🔹 Recall Patient: Strictly Same-Day Valid (Keval usi din ke liye valid)
+  // 🔹 Recall Patient: Strictly Same-Day Valid (Keval usi din ke liye valid)
   const recallPatient = useCallback((patientId: string) => {
     const targetPatient = patients.find((p) => p.id === patientId);
     if (!targetPatient) return;
@@ -907,7 +867,6 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       targetPatient.appointmentDate ||
       (targetPatient.createdAt ? targetPatient.createdAt.split('T')[0] : todayStr);
 
-    // Strict Same-Day Rule: Purani date ke token ko dusre din recall nahi kiya ja sakta
     if (patientOriginalDate !== todayStr) {
       alert('⚠️ Recall keval usi din (Same Day) ke liye valid hai! Purani date ke token ko dusre din recall nahi kiya ja sakta.');
       return;
@@ -1073,10 +1032,6 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setAdminTwoFactorVerified(false);
   }, []);
 
-  const updateVoiceBotSettings = useCallback((newSettings: VoiceBotSettings) => {
-    setVoiceBotSettings(newSettings);
-  }, []);
-
   const updateRazorpaySettings = useCallback((newSettings: GlobalRazorpaySettings) => {
     setRazorpaySettings(newSettings);
   }, []);
@@ -1085,22 +1040,12 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setStaffDoctorId(null);
     setAdminAuthenticated(false);
     setAdminTwoFactorVerified(false);
-    setVoiceBotSettings(DEFAULT_VOICE_BOT_SETTINGS);
     setRazorpaySettings(DEFAULT_RAZORPAY_SETTINGS);
     setSelectedDoctorId('doc-1');
     localStorage.removeItem('opd_staff_session');
     localStorage.removeItem('opd_admin_auth');
     localStorage.removeItem('opd_admin_2fa');
-    localStorage.removeItem('opd_voice_bot_settings');
     localStorage.removeItem('opd_razorpay_settings');
-  }, []);
-
-  const triggerBotCallAlert = useCallback((patient: Patient) => {
-    setActiveBotCallPatient(patient);
-  }, []);
-
-  const closeBotCallModal = useCallback(() => {
-    setActiveBotCallPatient(null);
   }, []);
 
   return (
@@ -1129,9 +1074,6 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         staffLogin,
         staffLogout,
         resetToDemoData,
-        activeBotCallPatient,
-        triggerBotCallAlert,
-        closeBotCallModal,
         lastGeneratedTokenPatient,
         setLastGeneratedTokenPatient,
         adminAuthenticated,
@@ -1139,8 +1081,6 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         adminLogin,
         adminVerify2FA,
         adminLogout,
-        voiceBotSettings,
-        updateVoiceBotSettings,
         razorpaySettings,
         updateRazorpaySettings,
       }}
