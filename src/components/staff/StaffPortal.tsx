@@ -22,11 +22,15 @@ import {
   Building2,
   ChevronLeft,
   PlayCircle,
-  PauseCircle,
   ArrowRightCircle,
+  SlidersHorizontal,
 } from 'lucide-react';
 
-// Universal DD/MM/YYYY Formatter
+// Universal Short Date Formatter (e.g., 28 Nov)
+export const formatShortDate = (dateObj: Date): string => {
+  return dateObj.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+};
+
 export const formatDateDDMMYYYY = (isoDate?: string): string => {
   if (!isoDate) return '';
   const clean = isoDate.split('T')[0];
@@ -44,14 +48,13 @@ export const StaffPortal: React.FC = () => {
     staffLogout,
     updateDoctorStatus,
     startDoctorSession,
-    pauseDoctorSession,
     completeDoctorShift,
     moveRemainingToNextShift,
     addWalkInPatient,
     setSelectedDoctorId,
   } = useClinic();
 
-  // Live Clock State (Updates every second)
+  // Live Clock State (Updates every second - Short Format Hour:Minute)
   const [nowDateTime, setNowDateTime] = useState<Date>(() => new Date());
 
   useEffect(() => {
@@ -61,14 +64,10 @@ export const StaffPortal: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
-  const liveFormattedDate = `${String(nowDateTime.getDate()).padStart(2, '0')}/${String(
-    nowDateTime.getMonth() + 1
-  ).padStart(2, '0')}/${nowDateTime.getFullYear()}`;
-
-  const liveFormattedTime = nowDateTime.toLocaleTimeString('en-US', {
+  const shortFormattedDate = formatShortDate(nowDateTime);
+  const shortFormattedTime = nowDateTime.toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit',
     hour12: true,
   });
 
@@ -105,7 +104,6 @@ export const StaffPortal: React.FC = () => {
     }
   }, [currentDoctor?.id, currentDoctor?.leaveStartDate, currentDoctor?.leaveEndDate, realTodayDate]);
 
-  // Helper: Check karein ki koi date doctor ki Leave range me padti hai ya nahi
   const isDateInLeaveRange = (targetDate: string, doctor: any) => {
     if (!doctor || doctor.status !== 'LEAVE') return false;
     if (doctor.leaveStartDate && doctor.leaveEndDate) {
@@ -114,7 +112,6 @@ export const StaffPortal: React.FC = () => {
     return targetDate === realTodayDate;
   };
 
-  // Helper: Leave khatam hone ke agle din ki date nikaalein
   const getNextAvailableDateAfterLeave = (doctor: any) => {
     if (doctor?.status === 'LEAVE' && doctor?.leaveEndDate && doctor.leaveEndDate >= realTodayDate) {
       const [y, m, d] = doctor.leaveEndDate.split('-').map(Number);
@@ -124,7 +121,6 @@ export const StaffPortal: React.FC = () => {
     return realTodayDate;
   };
 
-  // Staff-Controlled Active Shift
   const activeDoctorShift: 'Morning' | 'Evening' = currentDoctor?.activeShift || 'Morning';
   const realCurrentShift = activeDoctorShift;
 
@@ -528,12 +524,13 @@ export const StaffPortal: React.FC = () => {
             </div>
           </div>
 
-          {/* Live Date/Time Clock + 4-Category Status Dropdown */}
+          {/* Short Date/Time Badge + Status Dropdown + Shift Controller Dropdown */}
           <div className="flex flex-wrap items-center gap-2.5">
+            {/* Short Form Date & Time (jaise: 28 Nov, 03:33 PM) */}
             <div className="flex items-center gap-2 rounded-xl bg-slate-900 text-white px-3 py-1.5 text-xs font-mono shadow-xs border border-slate-700">
-              <span className="text-blue-300 font-bold">📅 {liveFormattedDate}</span>
+              <span className="text-blue-300 font-bold">📅 {shortFormattedDate}</span>
               <span className="text-slate-500">|</span>
-              <span className="text-emerald-300 font-bold">🕒 {liveFormattedTime}</span>
+              <span className="text-emerald-300 font-bold">🕒 {shortFormattedTime}</span>
             </div>
 
             <span className="text-xs font-bold text-slate-700">Status:</span>
@@ -567,10 +564,39 @@ export const StaffPortal: React.FC = () => {
               <option value="LEAVE">⚪ Leave</option>
             </select>
 
+            {/* Shift Controller Dropdown (Status ke theek right side) */}
+            <div className="relative">
+              <select
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === 'START') {
+                    startDoctorSession(currentDoctor.id);
+                  } else if (val === 'COMPLETE') {
+                    if (window.confirm(`Kya aap ${activeDoctorShift} Shift complete karna chahte hain? Status automatic OPD Close ho jayega.`)) {
+                      completeDoctorShift(currentDoctor.id);
+                    }
+                  } else if (val === 'MOVE') {
+                    moveRemainingToNextShift(currentDoctor.id).then((result) => {
+                      alert(`✅ Transfer Complete! ${result.movedCount} patients moved.`);
+                    });
+                  }
+                  e.target.value = ''; // Reset selection
+                }}
+                defaultValue=""
+                className="text-xs font-bold rounded-xl px-3 py-2 border border-indigo-300 bg-indigo-50 text-indigo-900 shadow-xs outline-none cursor-pointer"
+              >
+                <option value="" disabled>⚙️ Shift Controller</option>
+                <option value="START" disabled={!canStartShift}>▶️ {activeDoctorShift} Shift Start</option>
+                <option value="COMPLETE" disabled={!canPauseOrCompleteShift}>✅ {activeDoctorShift} Shift Complete</option>
+                <option value="MOVE">⏩ Move to Next Shift</option>
+              </select>
+            </div>
+
             <button
               type="button"
               onClick={staffLogout}
               className="ml-1 rounded-xl border border-slate-200 bg-white p-2 text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition cursor-pointer"
+              title="Staff Logout"
             >
               <LogOut className="h-4 w-4" />
             </button>
@@ -643,89 +669,6 @@ export const StaffPortal: React.FC = () => {
 
       {/* Main Container */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-
-        {/* SHIFT & TOKEN SESSION CONTROLLER BAR */}
-        <div className="rounded-2xl border-2 border-blue-200 bg-gradient-to-r from-blue-50 via-indigo-50 to-white p-4 shadow-sm space-y-3">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className={`h-11 w-11 rounded-2xl flex items-center justify-center shrink-0 ${
-                isSessionActive && !isDoctorOnLeaveToday
-                  ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30'
-                  : 'bg-blue-600 text-white shadow-md shadow-blue-500/30'
-              }`}>
-                {isSessionActive && !isDoctorOnLeaveToday ? <PlayCircle className="h-6 w-6" /> : <Clock className="h-6 w-6" />}
-              </div>
-              <div>
-                <span className="text-xs font-black uppercase tracking-wider text-slate-900 block">
-                  {activeDoctorShift} Shift Session Control
-                </span>
-                <p className="text-xs text-slate-600 mt-0.5">
-                  {isSessionActive ? 'Session active hai.' : 'Pehle Shift Start dabayein.'}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
-            <button
-              type="button"
-              disabled={!canStartShift}
-              onClick={() => startDoctorSession(currentDoctor.id)}
-              className={`rounded-xl px-3.5 py-2.5 text-xs font-black transition flex items-center justify-center gap-1.5 ${
-                !canStartShift
-                  ? 'bg-slate-200 text-slate-400 border border-slate-300 cursor-not-allowed'
-                  : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md cursor-pointer'
-              }`}
-            >
-              <PlayCircle className="h-4 w-4 shrink-0" />
-              <span>{activeDoctorShift} Shift Start</span>
-            </button>
-
-            <button
-              type="button"
-              disabled={!canPauseOrCompleteShift}
-              onClick={() => pauseDoctorSession(currentDoctor.id)}
-              className={`rounded-xl px-3.5 py-2.5 text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-                !canPauseOrCompleteShift
-                  ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
-                  : 'bg-amber-500 hover:bg-amber-600 text-white shadow-sm cursor-pointer'
-              }`}
-            >
-              <PauseCircle className="h-4 w-4 shrink-0" />
-              <span>Pause</span>
-            </button>
-
-            <button
-              type="button"
-              disabled={!canPauseOrCompleteShift}
-              onClick={() => {
-                if (window.confirm('Kya aap Shift complete karna chahte hain? Status automatic OPD Close ho jayega.')) {
-                  completeDoctorShift(currentDoctor.id);
-                }
-              }}
-              className={`rounded-xl px-3.5 py-2.5 text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-                !canPauseOrCompleteShift
-                  ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
-                  : 'bg-slate-900 hover:bg-slate-800 text-white shadow-sm cursor-pointer'
-              }`}
-            >
-              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
-              <span>{activeDoctorShift} Shift Complete</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={async () => {
-                const result = await moveRemainingToNextShift(currentDoctor.id);
-                alert(`✅ Transfer Complete! ${result.movedCount} patients moved.`);
-              }}
-              className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2.5 text-xs font-bold shadow-sm transition cursor-pointer flex items-center justify-center gap-1.5"
-            >
-              <ArrowRightCircle className="h-4 w-4 text-indigo-200 shrink-0" />
-              <span>Move to Next Shift</span>
-            </button>
-          </div>
-        </div>
 
         {/* 3 Main Action Buttons Strip */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
