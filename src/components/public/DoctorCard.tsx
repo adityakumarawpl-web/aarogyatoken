@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Doctor, Patient } from '../../types';
+import { Doctor } from '../../types';
 import { useClinic } from '../../context/ClinicContext';
 import { 
   MapPin, 
@@ -8,9 +8,7 @@ import {
   Search, 
   X, 
   Phone, 
-  Stethoscope,
-  Activity,
-  AlertTriangle 
+  Stethoscope 
 } from 'lucide-react';
 
 interface DoctorCardProps {
@@ -52,13 +50,6 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
   const todayStr = getLocalTodayYYYYMMDD();
   const doctorActiveShift = doctor.activeShift || 'Morning';
   const activeShiftLower = doctorActiveShift.toLowerCase();
-
-  const isDoctorOnLeaveToday = Boolean(
-    doctor.status === 'LEAVE' &&
-      (!doctor.leaveStartDate ||
-        !doctor.leaveEndDate ||
-        (todayStr >= doctor.leaveStartDate && todayStr <= doctor.leaveEndDate))
-  );
 
   const leaveRangeLabel =
     doctor.leaveStartDate && doctor.leaveEndDate
@@ -226,7 +217,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
           </div>
         </div>
 
-        {/* 2. ROW 1: Left Box (Status & Shift) | Right Box (Book Online Token) */}
+        {/* 2. ROW 1: Left Box (Status & Shift) | Right Box (Book Online Token - Hamesha Active) */}
         <div className="grid grid-cols-2 gap-2.5">
           {/* Status & Shift Box */}
           <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-2.5 flex flex-col justify-center text-center">
@@ -240,12 +231,11 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
             <span className="text-[10px] text-blue-600 font-semibold mt-0.5">{doctorActiveShift} Shift</span>
           </div>
 
-          {/* Book Online Token Button Box */}
+          {/* Book Online Token Button Box (Hamesha Active) */}
           <button
             type="button"
-            disabled={isDoctorOnLeaveToday || doctor.status === 'OPD_CLOSE'}
             onClick={() => onBookOnline(doctor)}
-            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-2xl p-2.5 flex flex-col items-center justify-center text-center shadow-sm shadow-blue-500/20 transition cursor-pointer"
+            className="bg-blue-600 hover:bg-blue-700 text-white rounded-2xl p-2.5 flex flex-col items-center justify-center text-center shadow-sm shadow-blue-500/20 transition cursor-pointer active:scale-95"
           >
             <Sparkles className="h-4 w-4 text-blue-200 mb-0.5" />
             <span className="text-xs font-bold leading-tight">Book Online</span>
