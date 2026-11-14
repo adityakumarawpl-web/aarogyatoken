@@ -34,12 +34,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
   const { patients, bookOnlineAppointment, razorpaySettings } = useClinic();
 
   const todayStr = new Date().toISOString().split('T')[0];
-
-  // Staff jab tak "Morning Shift Complete" click nahi karega, aaj ki Morning Shift open rahegi
-  const isMorningShiftActiveForDoctor = (targetDate: string, doc: Doctor) => {
-    if (targetDate > todayStr) return true;
-    return (doc.activeShift || 'Morning') === 'Morning';
-  };
+  const tomorrowObj = new Date();
+  tomorrowObj.setDate(tomorrowObj.getDate() + 1);
+  const tomorrowStr = tomorrowObj.toISOString().split('T')[0];
 
   // Check karein ki chuni gayi tarikh doctor ki Leave date range me toh nahi aati
   const isDateOnLeave = (targetDate: string, doc: Doctor) => {
@@ -50,7 +47,28 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
     return targetDate === todayStr;
   };
 
-  const initialMorningActive = isMorningShiftActiveForDoctor(todayStr, doctor);
+  // Agar OPD_CLOSE hai aur Evening shift bhi khatam ho chuki hai (activeShift === 'Morning'),
+  // toh aaj ki saari shifts close ho chuki hain -> Default date kal (tomorrow) rakhenge
+  const isTodayFullyClosed = doctor.status === 'OPD_CLOSE' && (doctor.activeShift || 'Morning') === 'Morning';
+
+  const isMorningShiftActiveForDoctor = (targetDate: string, doc: Doctor) => {
+    if (targetDate > todayStr) return true;
+    if (doc.status === 'OPD_CLOSE') return false;
+    return (doc.activeShift || 'Morning') === 'Morning';
+  };
+
+  const getInitialDate = () => {
+    if (isTodayFullyClosed) return tomorrowStr;
+    if (isDateOnLeave(todayStr, doctor) && doctor.leaveEndDate) {
+      const [y, m, d] = doctor.leaveEndDate.split('-').map(Number);
+      const nextDay = new Date(y, m - 1, d + 1);
+      return nextDay.toISOString().split('T')[0];
+    }
+    return todayStr;
+  };
+
+  const initialDate = getInitialDate();
+  const initialMorningActive = isMorningShiftActiveForDoctor(initialDate, doctor);
 
   const [step, setStep] = useState<'DETAILS' | 'PAYMENT' | 'SUCCESS'>('DETAILS');
   const [formData, setFormData] = useState({
@@ -58,14 +76,19 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
     mobile: '',
     age: '',
     gender: 'Male' as 'Male' | 'Female' | 'Other',
-    appointmentDate: todayStr,
+    appointmentDate: initialDate,
     selectedShift: initialMorningActive ? 'Morning' : 'Evening',
     address: '',
     complaint: '',
   });
 
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [confirmedPatient, setConfirmedPatient] = useState<Patient | null>(null);
+  const [errorMsg, setErrorMsg] = useState('');
+
   const handleDateChange = (newDate: string) => {
     if (!newDate) return;
+    setErrorMsg('');
     const morningAllowed = isMorningShiftActiveForDoctor(newDate, doctor);
     setFormData((prev) => ({
       ...prev,
@@ -73,10 +96,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
       selectedShift: (!morningAllowed && prev.selectedShift === 'Morning') ? 'Evening' : prev.selectedShift,
     }));
   };
-
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  const [confirmedPatient, setConfirmedPatient] = useState<Patient | null>(null);
-  const [errorMsg, setErrorMsg] = useState('');
 
   const matchingShiftPatients = patients.filter((p) => {
     const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
@@ -93,19 +112,25 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
     return num > max ? num : max;
   }, 0) + 1;
 
-  // PRIORITY 1: Central Vercel Key, PRIORITY 2: Doctor Key, PRIORITY 3: Razorpay Settings
   const activeRazorpayKey =
     (import.meta as any).env?.VITE_RAZORPAY_KEY_ID ||
     doctor.razorpayKeyId ||
     razorpaySettings.keyId;
 
   const selectedDateBlockedByLeave = isDateOnLeave(formData.appointmentDate, doctor);
+  const selectedDateBlockedByClosedToday = formData.appointmentDate === todayStr && isTodayFullyClosed;
 
   const handleDetailsSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedDateBlockedByLeave) {
       setErrorMsg(
-        `Doctor ${formatDateDDMMYYYY(doctor.leaveStartDate)} se ${formatDateDDMMYYYY(doctor.leaveEndDate)} tak chhutti (Leave) par hain. Kripya uske baad ki date chunein.`
+        `Doctor ${formatDateDDMMYYYY(doctor.leaveStartDate)} se ${formatDateDDMMYYYY(doctor.leaveEndDate)} tak chhutti (Leave) par hain. Kripya in dates ko chhod kar koi aur tarikh chunein.`
+      );
+      return;
+    }
+    if (selectedDateBlockedByClosedToday) {
+      setErrorMsg(
+        'Aaj ki sabhi OPD shifts close ho chuki hain. Kripya agli shift ke liye kal (Next Date) ki tarikh chunein.'
       );
       return;
     }
@@ -304,6 +329,18 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
           {/* STEP 1: PATIENT DETAILS */}
           {step === 'DETAILS' && (
             <form onSubmit={handleDetailsSubmit} className="space-y-3.5 sm:space-y-4">
+              {doctor.status === 'OPD_CLOSE' && (
+                <div className="rounded-xl bg-amber-50 border border-amber-300 p-2.5 text-xs text-amber-900 font-semibold">
+                  ℹ️ Abhi OPD close hai. Aap <strong>{formData.selectedShift} Shift ({formatDateDDMMYYYY(formData.appointmentDate)})</strong> ya aage ki date ke liye advance token book kar sakte hain.
+                </div>
+              )}
+
+              {doctor.status === 'LEAVE' && doctor.leaveStartDate && doctor.leaveEndDate && (
+                <div className="rounded-xl bg-blue-50 border border-blue-200 p-2.5 text-xs text-blue-900 font-semibold">
+                  📅 Doctor <strong>{formatDateDDMMYYYY(doctor.leaveStartDate)}</strong> se <strong>{formatDateDDMMYYYY(doctor.leaveEndDate)}</strong> tak Leave par hain. Leave dates chhod kar advance booking chalu hai.
+                </div>
+              )}
+
               <div className="rounded-2xl bg-blue-50/80 border border-blue-200 p-3 text-xs text-blue-900 flex items-start gap-2.5">
                 <Sparkles className="h-4 w-4 shrink-0 text-blue-600 mt-0.5" />
                 <div>
@@ -353,8 +390,14 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
               </div>
 
               {selectedDateBlockedByLeave && (
-                <div className="rounded-xl bg-amber-50 border border-amber-300 p-2.5 text-xs text-amber-900 font-semibold">
-                  ⚠️ Doctor {formatDateDDMMYYYY(doctor.leaveStartDate)} se {formatDateDDMMYYYY(doctor.leaveEndDate)} tak chhutti par hain. Kripya koi aur date chunein.
+                <div className="rounded-xl bg-rose-50 border border-rose-300 p-2.5 text-xs text-rose-800 font-bold">
+                  🚫 Yeh tarikh doctor ki Leave date ({formatDateDDMMYYYY(doctor.leaveStartDate)} - {formatDateDDMMYYYY(doctor.leaveEndDate)}) me aati hai! Kripya is tarikh ko chhod kar koi aur date chunein.
+                </div>
+              )}
+
+              {selectedDateBlockedByClosedToday && (
+                <div className="rounded-xl bg-rose-50 border border-rose-300 p-2.5 text-xs text-rose-800 font-bold">
+                  🚫 Aaj ki sabhi OPD shifts close ho chuki hain! Kripya kal ya aage ki tarikh chunein.
                 </div>
               )}
 
@@ -466,7 +509,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
               <div className="pt-2">
                 <button
                   type="submit"
-                  disabled={selectedDateBlockedByLeave}
+                  disabled={selectedDateBlockedByLeave || selectedDateBlockedByClosedToday}
                   className="w-full rounded-2xl bg-blue-600 px-4 py-3 text-xs sm:text-sm font-bold text-white shadow-lg shadow-blue-500/25 hover:bg-blue-700 transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <span>Proceed to Pay ₹20 (आगे बढ़ें)</span>
