@@ -843,18 +843,22 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }).catch((err) => console.error("Error updating recallPatient:", err));
   }, [patients, doctors]);
 
+  // 🔹 Update Doctor Status + Leave Start & End Dates + Auto Shift Tokens if Leave Extended
   const updateDoctorStatus = useCallback(
     (doctorId: string, status: DoctorStatus, note?: string, leaveStart?: string, leaveEnd?: string) => {
       const todayStr = new Date().toISOString().split('T')[0];
+      const matchedDoc = doctors.find((d) => d.id === doctorId);
 
+      const resolvedLeaveStart =
+        status === 'LEAVE' ? (leaveStart || matchedDoc?.leaveStartDate || todayStr) : '';
+      const resolvedLeaveEnd =
+        status === 'LEAVE' ? (leaveEnd || matchedDoc?.leaveEndDate || todayStr) : '';
+
+      // 1. Doctor Status & Leave Dates Update
       setDoctors((prev) =>
         prev.map((docItem) => {
           if (docItem.id === doctorId) {
             const updatedNote = (note !== undefined ? note : (docItem.statusNote || '')) || '';
-            const resolvedLeaveStart =
-              status === 'LEAVE' ? (leaveStart || docItem.leaveStartDate || todayStr) : '';
-            const resolvedLeaveEnd =
-              status === 'LEAVE' ? (leaveEnd || docItem.leaveEndDate || todayStr) : '';
 
             updateDoc(doc(db, 'doctors', doctorId), {
               status: status,
@@ -874,8 +878,96 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           return docItem;
         })
       );
+
+      // 2. Agar Leave extend hui hai aur koi token ab nayi Leave range me aa gaya hai,
+      // toh unhe automatic Leave End Date ke just agle din (next day) shift aur rearrange karein
+      if (status === 'LEAVE' && resolvedLeaveStart && resolvedLeaveEnd) {
+        const affectedPatients = patients.filter((p) => {
+          if (p.doctorId !== doctorId || p.status === 'COMPLETED') return false;
+          const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
+          return pDate >= resolvedLeaveStart && pDate <= resolvedLeaveEnd;
+        });
+
+        if (affectedPatients.length > 0) {
+          const [y, m, d] = resolvedLeaveEnd.split('-').map(Number);
+          const nextDayObj = new Date(y, m - 1, d + 1);
+          const targetDateStr = `${nextDayObj.getFullYear()}-${String(nextDayObj.getMonth() + 1).padStart(2, '0')}-${String(nextDayObj.getDate()).padStart(2, '0')}`;
+
+          const updatesMap = new Map<string, Partial<Patient>>();
+
+          (['Morning', 'Evening'] as const).forEach((shiftName) => {
+            const shiftLower = shiftName.toLowerCase();
+
+            const affectedInShift = affectedPatients
+              .filter((p) => ((p as any).selectedShift || (p as any).shift || 'Morning').trim().toLowerCase() === shiftLower)
+              .sort((a, b) => {
+                const dateA = a.appointmentDate || '';
+                const dateB = b.appointmentDate || '';
+                if (dateA !== dateB) return dateA.localeCompare(dateB);
+                return Number(a.tokenNumber) - Number(b.tokenNumber);
+              });
+
+            if (affectedInShift.length === 0) return;
+
+            const existingTargetInShift = patients
+              .filter((p) => {
+                const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
+                const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim().toLowerCase();
+                return p.doctorId === doctorId && pDate === targetDateStr && pShift === shiftLower;
+              })
+              .sort((a, b) => Number(a.tokenNumber) - Number(b.tokenNumber));
+
+            affectedInShift.forEach((p, idx) => {
+              const newToken = idx + 1;
+              updatesMap.set(p.id, {
+                tokenNumber: newToken,
+                appointmentDate: targetDateStr,
+                selectedShift: shiftName,
+                status: p.status === 'IN_CABIN' ? 'WAITING' : p.status,
+                botCallAlertSent: false,
+              });
+
+              if (p.bookingType === 'ONLINE') {
+                sendShiftRescheduleWhatsApp(p, matchedDoc, newToken, shiftName, targetDateStr, 'MOVED');
+              }
+            });
+
+            const offset = affectedInShift.length;
+            existingTargetInShift.forEach((p, idx) => {
+              const shiftedToken = offset + idx + 1;
+              updatesMap.set(p.id, {
+                tokenNumber: shiftedToken,
+                botCallAlertSent: false,
+              });
+
+              if (p.bookingType === 'ONLINE') {
+                sendShiftRescheduleWhatsApp(p, matchedDoc, shiftedToken, shiftName, targetDateStr, 'REORDERED');
+              }
+            });
+          });
+
+          if (updatesMap.size > 0) {
+            setPatients((prev) =>
+              prev.map((p) => {
+                const patch = updatesMap.get(p.id);
+                return patch ? ({ ...p, ...patch, shift: patch.selectedShift || (p as any).shift } as Patient) : p;
+              })
+            );
+
+            for (const [patientId, patch] of updatesMap.entries()) {
+              const firestorePayload: any = { ...patch };
+              if (patch.selectedShift) {
+                firestorePayload.shift = patch.selectedShift;
+              }
+              updateDoc(doc(db, 'patients', patientId), firestorePayload).catch((err) =>
+                console.error(`Error auto-shifting leave patient ${patientId}:`, err)
+              );
+            }
+          }
+        }
+      }
     },
-    []
+    [doctors, patients]
   );
 
   const addNewDoctor = useCallback((data: Omit<Doctor, 'id' | 'status' | 'onlineTokenFee' | 'createdAt'>): Doctor => {
