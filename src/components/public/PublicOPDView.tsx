@@ -27,6 +27,10 @@ export const PublicOPDView: React.FC = () => {
   const [showScrollBottom, setShowScrollBottom] = useState(true);
   const chipsScrollRef = useRef<HTMLDivElement>(null);
 
+  // Pagination State (10 doctors per page limit)
+  const [currentPage, setCurrentPage] = useState(1);
+  const doctorsPerPage = 10;
+
   // Dynamic Unique Specialty Chips
   const specialtyList = useMemo(() => {
     const list: string[] = [];
@@ -103,6 +107,17 @@ export const PublicOPDView: React.FC = () => {
       doc.city?.toLowerCase().includes(query)
     );
   });
+
+  // Reset to page 1 whenever search query or specialty filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedSpecialty]);
+
+  // Pagination slicing calculations
+  const indexOfLastDoctor = currentPage * doctorsPerPage;
+  const indexOfFirstDoctor = indexOfLastDoctor - doctorsPerPage;
+  const currentDoctors = filteredDoctors.slice(indexOfFirstDoctor, indexOfLastDoctor);
+  const totalPages = Math.ceil(filteredDoctors.length / doctorsPerPage);
 
   return (
     <div
@@ -248,16 +263,44 @@ export const PublicOPDView: React.FC = () => {
             <p className="text-xs text-slate-500 mt-0.5">Kripya doosra naam ya specialty filter chunein</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {filteredDoctors.map((doc) => (
-              <DoctorCard
-                key={doc.id}
-                doctor={doc}
-                patients={patients}
-                onBookOnline={(d) => setActiveDoctorForBooking(d)}
-              />
-            ))}
-          </div>
+          <>
+            {/* Paginated Doctors Grid (Max 10 per page) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              {currentDoctors.map((doc) => (
+                <DoctorCard
+                  key={doc.id}
+                  doctor={doc}
+                  onBookOnline={(d) => setActiveDoctorForBooking(d)}
+                />
+              ))}
+            </div>
+
+            {/* Pagination Controls (1, 2, 3...) */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-1.5 mt-8 pb-4">
+                {Array.from({ length: totalPages }, (_, index) => {
+                  const pageNum = index + 1;
+                  return (
+                    <button
+                      key={pageNum}
+                      type="button"
+                      onClick={() => {
+                        setCurrentPage(pageNum);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className={`h-9 w-9 rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center shadow-xs ${
+                        currentPage === pageNum
+                          ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25 ring-2 ring-blue-400'
+                          : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </>
         )}
 
         {/* Feature Highlights Banner */}
