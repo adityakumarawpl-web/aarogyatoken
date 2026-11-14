@@ -70,33 +70,27 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
         : `${formatShortDate(doctor.leaveStartDate)} - ${formatShortDate(doctor.leaveEndDate)}`
       : 'On Leave';
 
-  // Live Serving Details Logic for 4 Categories
+  // Live Serving Details Logic (Single line text formatting)
   const getLiveServingDetails = () => {
     if (effectiveStatusToday === 'OPD_CLOSE') {
       return {
         displayText: 'OPD Closed',
-        textColor: 'text-rose-600 text-xl sm:text-2xl font-bold',
+        textColor: 'text-rose-600 text-sm sm:text-base font-extrabold whitespace-nowrap',
         label: '',
-        urgencyBadge: null,
-        recalledBadge: null,
       };
     }
     if (effectiveStatusToday === 'SURGERY') {
       return {
         displayText: 'In Surgery',
-        textColor: 'text-rose-600 text-xl sm:text-2xl font-bold',
+        textColor: 'text-purple-600 text-sm sm:text-base font-extrabold whitespace-nowrap',
         label: '',
-        urgencyBadge: null,
-        recalledBadge: null,
       };
     }
     if (isLeaveActiveToday) {
       return {
         displayText: leaveRangeLabel,
-        textColor: 'text-blue-600 text-base sm:text-lg font-bold',
+        textColor: 'text-blue-600 text-xs sm:text-sm font-bold whitespace-nowrap',
         label: '',
-        urgencyBadge: null,
-        recalledBadge: null,
       };
     }
 
@@ -107,26 +101,12 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
       return pDate === todayStr && pShift === activeShiftLower;
     });
 
-    const remainingCount = todaysShiftPatients.filter(
-      (p) => p.status === 'IN_CABIN' || p.status === 'WAITING'
-    ).length;
-
-    const urgencyBadge =
-      doctor.isSessionActive && remainingCount > 0 && remainingCount <= 3
-        ? remainingCount === 1 ? '🚨 Last Patient' : `⚡ Last ${remainingCount} Left`
-        : null;
-
     const inCabinPatient = todaysShiftPatients.find((p) => p.status === 'IN_CABIN');
     if (inCabinPatient) {
-      const recalledSource = inCabinPatient.originalShift || (inCabinPatient as any).selectedShift || (inCabinPatient as any).shift || 'Morning';
-      const recalledBadge = inCabinPatient.isRecalled ? `🔄 Recalled (${recalledSource} #${inCabinPatient.tokenNumber})` : null;
-
       return {
         displayText: `#${inCabinPatient.tokenNumber}`,
-        textColor: 'text-emerald-600 text-2xl sm:text-3xl font-black',
+        textColor: 'text-emerald-600 text-xl sm:text-2xl font-black whitespace-nowrap',
         label: inCabinPatient.name,
-        urgencyBadge,
-        recalledBadge,
       };
     }
 
@@ -144,73 +124,44 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
         const nextPatient = waitingQueue[0];
         return {
           displayText: `Waiting #${nextPatient.tokenNumber}`,
-          textColor: 'text-blue-600 text-xl sm:text-2xl font-bold',
+          textColor: 'text-blue-600 text-xs sm:text-sm font-bold whitespace-nowrap',
           label: '',
-          urgencyBadge,
-          recalledBadge: null,
         };
       }
       if (!hasCompletedAny && waitingQueue.length > 0) {
         return {
           displayText: 'Token Start',
-          textColor: 'text-emerald-600 animate-pulse text-xl sm:text-2xl font-bold',
+          textColor: 'text-emerald-600 animate-pulse text-sm sm:text-base font-bold whitespace-nowrap',
           label: '',
-          urgencyBadge,
-          recalledBadge: null,
         };
       }
       if (hasCompletedAny && waitingQueue.length === 0) {
         return {
           displayText: 'Queue Clear',
-          textColor: 'text-emerald-600 text-xl sm:text-2xl font-bold',
+          textColor: 'text-emerald-600 text-sm sm:text-base font-bold whitespace-nowrap',
           label: '',
-          urgencyBadge: null,
-          recalledBadge: null,
         };
       }
       return {
         displayText: 'Token Start',
-        textColor: 'text-emerald-600 animate-pulse text-xl sm:text-2xl font-bold',
+        textColor: 'text-emerald-600 animate-pulse text-sm sm:text-base font-bold whitespace-nowrap',
         label: '',
-        urgencyBadge,
-        recalledBadge: null,
       };
     }
 
     return {
       displayText: 'Not Started',
-      textColor: 'text-slate-500 text-xl sm:text-2xl font-bold',
+      textColor: 'text-slate-500 text-sm sm:text-base font-bold whitespace-nowrap',
       label: '',
-      urgencyBadge: null,
-      recalledBadge: null,
     };
   };
 
   const servingInfo = getLiveServingDetails();
 
-  // Status Badge for 4 Categories
-  const getStatusBadgeText = () => {
-    if (isLeaveActiveToday) {
-      return { text: 'On Leave', color: 'bg-slate-100 text-slate-700 border-slate-300', dot: 'bg-slate-400' };
-    }
-    switch (effectiveStatusToday) {
-      case 'AVAILABLE':
-        return { text: 'Available (OPD Open)', color: 'bg-emerald-50 text-emerald-800 border-emerald-300', dot: 'bg-emerald-500' };
-      case 'OPD_CLOSE':
-        return { text: 'OPD Close', color: 'bg-rose-50 text-rose-800 border-rose-300', dot: 'bg-rose-500' };
-      case 'SURGERY':
-        return { text: 'In Surgery', color: 'bg-purple-50 text-purple-800 border-purple-300', dot: 'bg-purple-500' };
-      default:
-        return { text: 'Available', color: 'bg-emerald-50 text-emerald-800 border-emerald-300', dot: 'bg-emerald-500' };
-    }
-  };
-
-  const statusInfo = getStatusBadgeText();
-
   return (
     <div className="group rounded-3xl bg-white border border-slate-200 shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden flex flex-col justify-between w-full">
       
-      <div className="p-4 sm:p-5 space-y-4">
+      <div className="p-4 sm:p-5 space-y-3.5">
         
         {/* 1. TOP SECTION: Doctor DP, Name, Degree, Speciality */}
         <div className="flex items-start gap-3.5 pb-3 border-b border-slate-100">
@@ -228,21 +179,21 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
           </div>
         </div>
 
-        {/* 2. ROW 1: Left Box (Status & Shift) | Right Box (Book Online Token - Hamesha Active) */}
-        <div className="grid grid-cols-2 gap-2.5">
+        {/* 2. ROW 1: Left Box (Status & Shift - Uniform compact size like Leave) | Right Box (Book Online Token) */}
+        <div className="grid grid-cols-2 gap-2">
           {/* Status & Shift Box */}
-          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-2.5 flex flex-col justify-center text-center">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl py-2 px-2 flex flex-col justify-center text-center">
+            <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
               {isLeaveActiveToday ? 'Status' : 'Status & Shift'}
             </span>
-            <div className="flex items-center justify-center gap-1.5 mt-1">
-              <span className={`h-2 w-2 rounded-full ${statusInfo.dot} ${!isLeaveActiveToday ? 'animate-pulse' : ''}`}></span>
-              <span className="text-xs font-extrabold text-slate-800 leading-tight">
-                {statusInfo.text}
+            <div className="flex items-center justify-center gap-1 mt-0.5">
+              <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${isLeaveActiveToday ? 'bg-slate-400' : 'bg-emerald-500 animate-pulse'}`}></span>
+              <span className="text-xs font-extrabold text-slate-800 truncate">
+                {isLeaveActiveToday ? 'On Leave' : 'OPD Open'}
               </span>
             </div>
             {!isLeaveActiveToday && (
-              <span className="text-[10px] text-blue-600 font-semibold mt-0.5">{doctorActiveShift} Shift</span>
+              <span className="text-[10px] text-blue-600 font-semibold leading-none mt-0.5">{doctorActiveShift} Shift</span>
             )}
           </div>
 
@@ -250,16 +201,16 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
           <button
             type="button"
             onClick={() => onBookOnline(doctor)}
-            className="bg-blue-600 hover:bg-blue-700 text-white rounded-2xl p-2.5 flex flex-col items-center justify-center text-center shadow-sm shadow-blue-500/20 transition cursor-pointer active:scale-95"
+            className="bg-blue-600 hover:bg-blue-700 text-white rounded-2xl py-2 px-2 flex flex-col items-center justify-center text-center shadow-sm shadow-blue-500/20 transition cursor-pointer active:scale-95"
           >
-            <Sparkles className="h-4 w-4 text-blue-200 mb-0.5" />
+            <Sparkles className="h-3.5 w-3.5 text-blue-200 mb-0.5" />
             <span className="text-xs font-bold leading-tight">Book Online</span>
-            <span className="text-[10px] text-blue-100 font-medium">₹20 (Instant)</span>
+            <span className="text-[9px] text-blue-100 font-medium">₹20 (Instant)</span>
           </button>
         </div>
 
         {/* 3. CLINIC NAME & ADDRESS */}
-        <div className="bg-slate-50/70 border border-slate-100 rounded-2xl p-3 space-y-1.5 text-xs">
+        <div className="bg-slate-50/70 border border-slate-100 rounded-2xl p-2.5 space-y-1 text-xs">
           <div className="flex items-center gap-1.5 font-bold text-slate-800 truncate">
             <Stethoscope className="h-3.5 w-3.5 text-blue-600 shrink-0" />
             <span className="truncate">{doctor.clinicName} • {doctor.cabinNumber}</span>
@@ -274,37 +225,37 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
           </div>
         </div>
 
-        {/* 4. ROW 2: Left Box (Running Token) | Right Box (Know Your Token Button) */}
-        <div className="grid grid-cols-2 gap-2.5">
-          {/* Running Token Box */}
-          <div className="bg-emerald-50/60 border border-emerald-200/80 rounded-2xl p-2.5 text-center flex flex-col justify-center">
-            <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Running Token</span>
-            <div className={`my-0.5 font-mono tracking-tight leading-snug ${servingInfo.textColor}`}>
+        {/* 4. ROW 2: Running Token Box (Width Badha Diya [7fr]) | Know Your Token Box (Width Kam Kar Diya [5fr]) */}
+        <div className="grid grid-cols-12 gap-2">
+          {/* Running Token Box (7 columns - Wider & Shorter Length) */}
+          <div className="col-span-7 bg-emerald-50/60 border border-emerald-200/80 rounded-2xl py-2 px-2 text-center flex flex-col justify-center">
+            <span className="text-[9px] font-bold text-emerald-800 uppercase tracking-wider">Running Token</span>
+            <div className={`my-0.5 font-mono tracking-tight leading-none ${servingInfo.textColor}`}>
               {servingInfo.displayText}
             </div>
             {servingInfo.label && (
-              <span className="text-[10px] text-emerald-600 font-medium leading-tight">
+              <span className="text-[9px] text-emerald-600 font-medium truncate mt-0.5">
                 {servingInfo.label}
               </span>
             )}
           </div>
 
-          {/* Know Your Token Button Box */}
+          {/* Know Your Token Button Box (5 columns - Smaller Width & Compact Length) */}
           <button
             type="button"
             disabled={isLeaveActiveToday}
             onClick={() => {
               if (!isLeaveActiveToday) setShowTokenModal(true);
             }}
-            className={`rounded-2xl p-2.5 text-center flex flex-col items-center justify-center transition shadow-2xs ${
+            className={`col-span-5 rounded-2xl py-2 px-1 text-center flex flex-col items-center justify-center transition shadow-2xs ${
               isLeaveActiveToday
                 ? 'bg-slate-100 border-2 border-dashed border-slate-300 text-slate-400 cursor-not-allowed opacity-60'
                 : 'bg-white border-2 border-dashed border-blue-300 hover:border-blue-500 hover:bg-blue-50/50 text-blue-700 cursor-pointer'
             }`}
           >
-            <Search className={`h-4 w-4 mb-1 ${isLeaveActiveToday ? 'text-slate-400' : 'text-blue-600'}`} />
-            <span className="text-xs font-bold leading-tight">Know Token</span>
-            <span className="text-[10px] text-slate-500 font-medium">खोजें (Search)</span>
+            <Search className={`h-3.5 w-3.5 mb-0.5 ${isLeaveActiveToday ? 'text-slate-400' : 'text-blue-600'}`} />
+            <span className="text-[11px] font-bold leading-tight">Know Token</span>
+            <span className="text-[9px] text-slate-500 font-medium">खोजें</span>
           </button>
         </div>
 
@@ -318,7 +269,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
 
           return (
             <div>
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
                 Clinic Photos
               </span>
               <div className="grid grid-cols-2 gap-2">
@@ -327,7 +278,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
                     key={index}
                     src={imgUrl}
                     alt={`Clinic ${index + 1}`}
-                    className="w-full h-20 object-cover rounded-xl border border-slate-200 shadow-2xs"
+                    className="w-full h-16 object-cover rounded-xl border border-slate-200 shadow-2xs"
                   />
                 ))}
               </div>
