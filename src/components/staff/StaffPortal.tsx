@@ -1,15 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useClinic } from '../../context/ClinicContext';
 import { QueueCard } from './QueueCard';
-import { DoctorStatus, Patient } from '../../types';
+import { DoctorStatus } from '../../types';
 import { generateDoctorSummary } from '../../utils/queueLogic';
 import {
-  UserPlus,
   Stethoscope,
   Clock,
-  Activity,
   CheckCircle2,
-  AlertTriangle,
   FileText,
   Search,
   Lock,
@@ -17,12 +14,8 @@ import {
   Flame,
   Printer,
   Calendar,
-  Sparkles,
-  Users,
   Building2,
   ChevronLeft,
-  PlayCircle,
-  ArrowRightCircle,
 } from 'lucide-react';
 
 // Universal Short Date Formatter (e.g., 14 Nov)
@@ -368,6 +361,17 @@ export const StaffPortal: React.FC = () => {
                     </div>
                   </div>
 
+                  <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-center">
+                    <div>
+                      <span className="text-[9px] font-bold uppercase text-slate-400 block">Waiting</span>
+                      <span className="text-sm font-black text-blue-700">{docWaitingPatients.length} Patients</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] font-bold uppercase text-slate-400 block">Done Today</span>
+                      <span className="text-sm font-black text-emerald-700">{docCompletedPatients.length} Seen</span>
+                    </div>
+                  </div>
+
                   <button
                     type="button"
                     onClick={() => {
@@ -419,7 +423,8 @@ export const StaffPortal: React.FC = () => {
     return (
       (p.tokenNumber ? p.tokenNumber.toString() : '').includes(term) ||
       (p.name ? p.name.toLowerCase() : '').includes(term) ||
-      (p.mobile || p.phone || '').includes(term)
+      (p.mobile || p.phone || '').includes(term) ||
+      (p.complaint ? p.complaint.toLowerCase() : '').includes(term)
     );
   });
 
@@ -460,12 +465,13 @@ export const StaffPortal: React.FC = () => {
 
     if (isDateInLeaveRange(walkInForm.appointmentDate, currentDoctor)) {
       setWalkInError(
-        `Doctor ${formatDateDDMMYYYY(currentDoctor.leaveStartDate || realTodayDate)} se ${formatDateDDMMYYYY(currentDoctor.leaveEndDate || realTodayDate)} tak Leave par hain.`
+        `Doctor ${formatDateDDMMYYYY(currentDoctor.leaveStartDate || realTodayDate)} se ${formatDateDDMMYYYY(currentDoctor.leaveEndDate || realTodayDate)} tak Leave par hain. Kripya leave date ko chhod kar koi aur tarikh chunein.`
       );
       return;
     }
 
     setWalkInError('');
+
     addWalkInPatient({
       doctorId: currentDoctor.id,
       name: walkInForm.name.trim(),
@@ -478,6 +484,33 @@ export const StaffPortal: React.FC = () => {
       selectedShift: walkInForm.selectedShift,
       appointmentDate: walkInForm.appointmentDate,
     } as any);
+
+    fetch('/api/send-whatsapp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phone: '91' + walkInForm.mobile.trim(),
+        patientName: walkInForm.name.trim(),
+        doctorName: currentDoctor.name,
+      }),
+    })
+      .then((res) => res.json())
+      .catch((err) => console.error('WhatsApp trigger error:', err));
+
+    const nextValidDate = getNextAvailableDateAfterLeave(currentDoctor);
+    const defaultShift = isMorningShiftActiveForDoctor(nextValidDate, currentDoctor) ? 'Morning' : 'Evening';
+
+    setWalkInForm({
+      name: '',
+      mobile: '',
+      age: '',
+      gender: 'Male',
+      address: '',
+      complaint: '',
+      isEmergency: false,
+      appointmentDate: nextValidDate,
+      selectedShift: defaultShift,
+    });
 
     setShowAddModal(false);
   };
@@ -552,7 +585,7 @@ export const StaffPortal: React.FC = () => {
                 <option value="LEAVE">⚪ Leave</option>
               </select>
 
-              {/* Shift Controller Dropdown (Short Terms & Active Status with real actions) */}
+              {/* Shift Controller Dropdown */}
               <select
                 onChange={(e) => {
                   const val = e.target.value;
@@ -563,11 +596,14 @@ export const StaffPortal: React.FC = () => {
                       completeDoctorShift(currentDoctor.id);
                     }
                   } else if (val === 'MOVE') {
-                    moveRemainingToNextShift(currentDoctor.id).then((result) => {
-                      alert(`✅ Transfer Complete! ${result.movedCount} patients moved.`);
-                    });
+                    const nextShiftLabel = activeDoctorShift === 'Morning' ? 'Aaj ki Evening Shift' : 'Kal ki Morning Shift';
+                    if (window.confirm(`Bache hue sabhi patients ko ${nextShiftLabel} ke sabse upar transfer karein?`)) {
+                      moveRemainingToNextShift(currentDoctor.id).then((result) => {
+                        alert(`✅ Transfer Complete! ${result.movedCount} patients ko ${result.targetShift} Shift (${formatDateDDMMYYYY(result.targetDate)}) me shift kar diya gaya hai.`);
+                      });
+                    }
                   }
-                  e.target.value = ''; // Reset selection
+                  e.target.value = '';
                 }}
                 defaultValue=""
                 className={`text-[11px] font-bold rounded-lg px-2.5 py-1.5 border shadow-2xs outline-none cursor-pointer transition ${
@@ -621,14 +657,27 @@ export const StaffPortal: React.FC = () => {
                 <span className="text-xs font-black text-slate-800 uppercase tracking-wide block">
                   Doctor Leave Schedule (Chhutti Ki Tarikh)
                 </span>
+                <span className="text-[11px] text-slate-500">
+                  {isLeaveStartLocked
+                    ? 'Leave shuru ho chuki hai isliye Start Date lock hai. Aap End Date badha ya ghata sakte hain.'
+                    : 'Kab se kab tak doctor chhutti par rahenge, date set karein (Public OPD par dikhega).'}
+                </span>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
               <div>
-                <label className="block text-[10px] font-bold uppercase text-slate-500 mb-0.5">Kab Se (DD/MM/YYYY)</label>
+                <label className="block text-[10px] font-bold uppercase text-slate-500 mb-0.5">
+                  Kab Se (DD/MM/YYYY) {isLeaveStartLocked && '🔒'}
+                </label>
                 <div className="relative">
-                  <div className="rounded-xl border px-3 py-1.5 text-xs font-mono font-bold flex items-center justify-between gap-2 bg-white border-slate-300">
+                  <div
+                    className={`rounded-xl border px-3 py-1.5 text-xs font-mono font-bold flex items-center justify-between gap-2 min-w-[130px] ${
+                      isLeaveStartLocked
+                        ? 'bg-slate-200 text-slate-500 border-slate-300'
+                        : 'bg-white text-slate-800 border-slate-300'
+                    }`}
+                  >
                     <span>{formatDateDDMMYYYY(leaveStartInput)}</span>
                     <Calendar className="h-3.5 w-3.5 text-slate-400" />
                   </div>
@@ -645,7 +694,9 @@ export const StaffPortal: React.FC = () => {
                       if (leaveEndInput < val) setLeaveEndInput(val);
                       updateDoctorStatus(currentDoctor.id, 'LEAVE', undefined, val, adjustedEnd);
                     }}
-                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                    className={`absolute inset-0 opacity-0 w-full h-full ${
+                      isLeaveStartLocked ? 'cursor-not-allowed' : 'cursor-pointer'
+                    }`}
                   />
                 </div>
               </div>
@@ -653,7 +704,7 @@ export const StaffPortal: React.FC = () => {
               <div>
                 <label className="block text-[10px] font-bold uppercase text-slate-500 mb-0.5">Kab Tak (DD/MM/YYYY)</label>
                 <div className="relative">
-                  <div className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-mono font-bold text-slate-800 flex items-center justify-between gap-2">
+                  <div className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-mono font-bold text-slate-800 flex items-center justify-between gap-2 min-w-[130px]">
                     <span>{formatDateDDMMYYYY(leaveEndInput)}</span>
                     <Calendar className="h-3.5 w-3.5 text-slate-400" />
                   </div>
@@ -880,48 +931,81 @@ export const StaffPortal: React.FC = () => {
         {/* TAB 2: COMPLETED */}
         {activeTab === 'COMPLETED' && (
           <div className="space-y-3">
-            {completedPatients.map((patient) => (
-              <QueueCard
-                key={patient.id}
-                patient={patient}
-                isDoctorAvailable={currentDoctor.status === 'AVAILABLE'}
-                isSessionActive={isSessionActive}
-                doctorStatus={currentDoctor.status}
-              />
-            ))}
+            {completedPatients.length === 0 ? (
+              <div className="rounded-2xl bg-white border border-slate-200 p-8 text-center text-xs text-slate-500">
+                No completed patients yet today.
+              </div>
+            ) : (
+              completedPatients.map((patient) => (
+                <QueueCard
+                  key={patient.id}
+                  patient={patient}
+                  isDoctorAvailable={currentDoctor.status === 'AVAILABLE'}
+                  isSessionActive={isSessionActive}
+                  doctorStatus={currentDoctor.status}
+                />
+              ))
+            )}
           </div>
         )}
 
         {/* TAB 3: ABSENT */}
         {activeTab === 'ABSENT' && (
           <div className="space-y-3">
-            {absentPatients.map((patient) => (
-              <QueueCard
-                key={patient.id}
-                patient={patient}
-                isDoctorAvailable={currentDoctor.status === 'AVAILABLE'}
-                isSessionActive={isSessionActive}
-                doctorStatus={currentDoctor.status}
-              />
-            ))}
+            {absentPatients.length === 0 ? (
+              <div className="rounded-2xl bg-white border border-slate-200 p-8 text-center text-xs text-slate-500">
+                Koi bhi mareez absent/skipped nahi hai.
+              </div>
+            ) : (
+              absentPatients.map((patient) => (
+                <QueueCard
+                  key={patient.id}
+                  patient={patient}
+                  isDoctorAvailable={currentDoctor.status === 'AVAILABLE'}
+                  isSessionActive={isSessionActive}
+                  doctorStatus={currentDoctor.status}
+                />
+              ))
+            )}
           </div>
         )}
 
         {/* TAB 4: FUTURE */}
         {activeTab === 'FUTURE' && (
           <div className="space-y-4">
-            {doctorPatients.map((patient) => (
-              <QueueCard
-                key={patient.id}
-                patient={patient}
-                isFirstWaiting={false}
-                isDoctorAvailable={currentDoctor.status === 'AVAILABLE'}
-                isSessionActive={isSessionActive}
-                doctorStatus={currentDoctor.status}
-                currentActiveDate={realTodayDate}
-                currentActiveShift={realCurrentShift}
-              />
-            ))}
+            <div className="rounded-2xl bg-blue-50 border border-blue-200 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-blue-900">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-blue-600 shrink-0" />
+                <div>
+                  <span className="font-extrabold uppercase tracking-wide">Advance & Future Date Inspector</span>
+                  <p className="text-[11px] text-blue-700 mt-0.5">
+                    Aane wale dino ya dusri shift ke tokens check karne ke liye upar Date ({formatDateDDMMYYYY(selectedDateFilter)}) aur Shift filter ka prayog karein.
+                  </p>
+                </div>
+              </div>
+              <span className="font-bold bg-white px-3 py-1.5 rounded-xl border border-blue-200 shadow-xs shrink-0">
+                Found: {doctorPatients.length} Tokens
+              </span>
+            </div>
+
+            {doctorPatients.length === 0 ? (
+              <div className="rounded-2xl bg-white border border-slate-200 p-10 text-center text-xs text-slate-500">
+                Is chuni gayi date/shift ke liye koi token book nahi hai.
+              </div>
+            ) : (
+              doctorPatients.map((patient) => (
+                <QueueCard
+                  key={patient.id}
+                  patient={patient}
+                  isFirstWaiting={false}
+                  isDoctorAvailable={currentDoctor.status === 'AVAILABLE'}
+                  isSessionActive={isSessionActive}
+                  doctorStatus={currentDoctor.status}
+                  currentActiveDate={realTodayDate}
+                  currentActiveShift={realCurrentShift}
+                />
+              ))
+            )}
           </div>
         )}
 
@@ -929,10 +1013,15 @@ export const StaffPortal: React.FC = () => {
         {activeTab === 'REPORTS' && (
           <div className="rounded-3xl bg-white border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
-              <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
-                <FileText className="h-5 w-5 text-blue-600" />
-                <span>OPD Visit Summary & Analytics ({currentDoctor.name})</span>
-              </h3>
+              <div>
+                <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-blue-600" />
+                  <span>OPD Visit Summary & Analytics ({currentDoctor.name})</span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Daily, Weekly, Monthly, and Annual visit report generation
+                </p>
+              </div>
 
               <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
                 {(['day', 'week', 'month', 'year'] as const).map((p) => (
@@ -944,7 +1033,7 @@ export const StaffPortal: React.FC = () => {
                       reportPeriod === p ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    {p}
+                    {p === 'day' ? 'Din (Day)' : p === 'week' ? 'Week (Weekly)' : p === 'month' ? 'Month (Monthly)' : 'Year (Yearly)'}
                   </button>
                 ))}
               </div>
@@ -956,15 +1045,15 @@ export const StaffPortal: React.FC = () => {
                 <div className="text-2xl font-black text-slate-900 mt-1">{summary.totalRegistered}</div>
               </div>
               <div className="rounded-2xl bg-emerald-50 p-4 border border-emerald-200 text-center">
-                <span className="text-[10px] font-bold uppercase text-emerald-700">Completed</span>
+                <span className="text-[10px] font-bold uppercase text-emerald-700">Completed (Seen)</span>
                 <div className="text-2xl font-black text-emerald-800 mt-1">{summary.totalCompleted}</div>
               </div>
               <div className="rounded-2xl bg-blue-50 p-4 border border-blue-200 text-center">
-                <span className="text-[10px] font-bold uppercase text-blue-700">Walk-In</span>
+                <span className="text-[10px] font-bold uppercase text-blue-700">Staff Walk-In (Free)</span>
                 <div className="text-2xl font-black text-blue-800 mt-1">{summary.totalWalkIn}</div>
               </div>
               <div className="rounded-2xl bg-purple-50 p-4 border border-purple-200 text-center">
-                <span className="text-[10px] font-bold uppercase text-purple-700">Online</span>
+                <span className="text-[10px] font-bold uppercase text-purple-700">Online Bookings</span>
                 <div className="text-2xl font-black text-purple-800 mt-1">{summary.totalOnline}</div>
               </div>
               <div className="rounded-2xl bg-rose-50 p-4 border border-rose-200 text-center">
@@ -976,17 +1065,42 @@ export const StaffPortal: React.FC = () => {
                 <div className="text-2xl font-black text-amber-800 mt-1">{summary.totalNotAvailable}</div>
               </div>
             </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-800 transition cursor-pointer flex items-center gap-2"
+              >
+                <Printer className="h-4 w-4" />
+                <span>Print Official OPD Report</span>
+              </button>
+            </div>
           </div>
         )}
       </div>
 
-      {/* ADD WALK-IN MODAL */}
+      {/* ADD WALK-IN PATIENT MODAL (FULL COMPLETE FORM) */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-in fade-in">
           <div className="w-full max-w-md rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
             <div className="bg-emerald-600 text-white px-6 py-4 flex items-center justify-between">
-              <h3 className="text-base font-bold">Add Walk-In Patient (FREE)</h3>
-              <button onClick={() => setShowAddModal(false)} className="text-white font-bold cursor-pointer">✕</button>
+              <div>
+                <span className="rounded bg-white/20 px-2 py-0.5 text-[10px] font-bold uppercase">
+                  Staff Registration Desk
+                </span>
+                <h3 className="text-base font-bold mt-1">Add Walk-In Patient (FREE)</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddModal(false);
+                  setWalkInError('');
+                }}
+                className="text-white hover:opacity-75 text-xl font-bold cursor-pointer"
+              >
+                ✕
+              </button>
             </div>
 
             <form onSubmit={handleAddWalkInSubmit} className="p-6 space-y-4">
@@ -996,28 +1110,149 @@ export const StaffPortal: React.FC = () => {
                 </div>
               )}
 
+              {currentDoctor.status === 'LEAVE' && currentDoctor.leaveStartDate && currentDoctor.leaveEndDate && (
+                <div className="rounded-xl bg-amber-50 border border-amber-200 p-2.5 text-[11px] font-semibold text-amber-900">
+                  📅 Doctor <strong>{formatDateDDMMYYYY(currentDoctor.leaveStartDate)}</strong> se <strong>{formatDateDDMMYYYY(currentDoctor.leaveEndDate)}</strong> tak Leave par hain. Leave dates ko chhod kar hi token banega.
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Appointment Date (DD/MM/YYYY)
+                  </label>
+                  <div className="relative">
+                    <div className="w-full rounded-lg border border-slate-300 p-2 text-xs font-mono font-bold bg-white flex items-center justify-between">
+                      <span>{formatDateDDMMYYYY(walkInForm.appointmentDate)}</span>
+                      <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                    </div>
+                    <input
+                      type="date"
+                      min={realTodayDate}
+                      value={walkInForm.appointmentDate}
+                      onChange={(e) => {
+                        if (e.target.value) handleDateChange(e.target.value);
+                      }}
+                      className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                      required
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Shift
+                  </label>
+                  <select
+                    value={walkInForm.selectedShift}
+                    onChange={(e) => setWalkInForm({ ...walkInForm, selectedShift: e.target.value })}
+                    className="w-full rounded-lg border border-slate-300 p-2 text-xs font-medium bg-white focus:outline-none focus:border-emerald-500"
+                  >
+                    {isMorningShiftActiveForDoctor(walkInForm.appointmentDate, currentDoctor) && (
+                      <option value="Morning">Morning Shift</option>
+                    )}
+                    <option value="Evening">Evening Shift</option>
+                  </select>
+                </div>
+              </div>
+
+              {isDateInLeaveRange(walkInForm.appointmentDate, currentDoctor) && (
+                <div className="rounded-xl bg-rose-50 border border-rose-300 p-2 text-xs font-bold text-rose-800">
+                  🚫 Yeh tarikh doctor ki Leave date me aati hai! Kripya {formatDateDDMMYYYY(currentDoctor.leaveEndDate)} ke baad ki tarikh chunein.
+                </div>
+              )}
+
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Patient Full Name *</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Patient Full Name *
+                </label>
                 <input
                   type="text"
                   required
                   value={walkInForm.name}
                   onChange={(e) => setWalkInForm({ ...walkInForm, name: e.target.value })}
                   placeholder="e.g. Ram Kumar"
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:outline-none"
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Mobile Number *
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    maxLength={10}
+                    value={walkInForm.mobile}
+                    onChange={(e) => setWalkInForm({ ...walkInForm, mobile: e.target.value.replace(/\D/g, '') })}
+                    placeholder="10-digit phone"
+                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Age & Gender *
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      value={walkInForm.age}
+                      onChange={(e) => setWalkInForm({ ...walkInForm, age: e.target.value })}
+                      placeholder="Age"
+                      className="w-16 rounded-xl border border-slate-300 px-2 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                    />
+                    <select
+                      value={walkInForm.gender}
+                      onChange={(e) => setWalkInForm({ ...walkInForm, gender: e.target.value as any })}
+                      className="flex-1 rounded-xl border border-slate-300 px-2 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                    >
+                      <option value="Male">M</option>
+                      <option value="Female">F</option>
+                      <option value="Other">O</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Address / Locality
+                </label>
+                <input
+                  type="text"
+                  value={walkInForm.address}
+                  onChange={(e) => setWalkInForm({ ...walkInForm, address: e.target.value })}
+                  placeholder="e.g. Civil Lines"
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Mobile Number *</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Complaint / Reason
+                </label>
                 <input
-                  type="tel"
-                  required
-                  maxLength={10}
-                  value={walkInForm.mobile}
-                  onChange={(e) => setWalkInForm({ ...walkInForm, mobile: e.target.value.replace(/\D/g, '') })}
-                  placeholder="10-digit phone"
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:outline-none"
+                  type="text"
+                  value={walkInForm.complaint}
+                  onChange={(e) => setWalkInForm({ ...walkInForm, complaint: e.target.value })}
+                  placeholder="e.g. Chest pain, Fever, Regular checkup"
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Flame className="h-4 w-4 text-rose-600" />
+                  <span className="text-xs font-bold text-rose-800">
+                    Emergency Case? (आपातकालीन प्राथमिकता)
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={walkInForm.isEmergency}
+                  onChange={(e) => setWalkInForm({ ...walkInForm, isEmergency: e.target.checked })}
+                  className="h-4 w-4 text-rose-600 rounded"
                 />
               </div>
 
@@ -1025,13 +1260,14 @@ export const StaffPortal: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="flex-1 rounded-xl border border-slate-300 py-2.5 text-xs font-bold text-slate-700 cursor-pointer"
+                  className="flex-1 rounded-xl border border-slate-300 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100 transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow hover:bg-emerald-700 cursor-pointer"
+                  disabled={isDateInLeaveRange(walkInForm.appointmentDate, currentDoctor)}
+                  className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow hover:bg-emerald-700 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Confirm (Free Token)
                 </button>
