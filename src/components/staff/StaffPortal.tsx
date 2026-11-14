@@ -101,11 +101,28 @@ export const StaffPortal: React.FC = () => {
     if (doctor.leaveStartDate && doctor.leaveEndDate) {
       return targetDate >= doctor.leaveStartDate && targetDate <= doctor.leaveEndDate;
     }
-    return targetDate === realTodayDate;
+    return false;
   };
 
+  // Check karein ki AAJ ki date fed Leave range me aati hai ya nahi
+  const isDoctorOnLeaveToday = Boolean(
+    currentDoctor &&
+      currentDoctor.status === 'LEAVE' &&
+      currentDoctor.leaveStartDate &&
+      currentDoctor.leaveEndDate &&
+      realTodayDate >= currentDoctor.leaveStartDate &&
+      realTodayDate <= currentDoctor.leaveEndDate
+  );
+
+  // Jab aaj Leave active ho toh automatic Future Tokens tab khol dein
+  useEffect(() => {
+    if (isDoctorOnLeaveToday && (activeTab === 'QUEUE' || activeTab === 'COMPLETED' || activeTab === 'ABSENT')) {
+      setActiveTab('FUTURE');
+    }
+  }, [isDoctorOnLeaveToday, activeTab]);
+
   const getNextAvailableDateAfterLeave = (doctor: any) => {
-    if (doctor?.status === 'LEAVE' && doctor?.leaveEndDate && doctor.leaveEndDate >= realTodayDate) {
+    if (doctor?.status === 'LEAVE' && doctor?.leaveEndDate && doctor.leaveEndDate >= realTodayDate && isDateInLeaveRange(realTodayDate, doctor)) {
       const [y, m, d] = doctor.leaveEndDate.split('-').map(Number);
       const nextDay = new Date(y, m - 1, d + 1);
       return nextDay.toISOString().split('T')[0];
@@ -398,16 +415,20 @@ export const StaffPortal: React.FC = () => {
   if (!currentDoctor) return null;
 
   const isSessionActive = Boolean(currentDoctor.isSessionActive);
-  const isDoctorOnLeaveToday = isDateInLeaveRange(realTodayDate, currentDoctor);
   const isLeaveStartLocked = Boolean(
     currentDoctor.status === 'LEAVE' &&
     currentDoctor.leaveStartDate &&
     realTodayDate > currentDoctor.leaveStartDate
   );
 
-  const canStartShift = !isDoctorOnLeaveToday && currentDoctor.status === 'AVAILABLE' && !isSessionActive;
-  const canPauseOrCompleteShift = !isDoctorOnLeaveToday && currentDoctor.status === 'AVAILABLE' && isSessionActive;
-  const canAccessLiveQueue = !isDoctorOnLeaveToday && currentDoctor.status === 'AVAILABLE';
+  // Agar future leave feed hai (aaj se baad ki), toh aaj ke liye effective status AVAILABLE rahega
+  const effectiveDoctorStatusToday =
+    currentDoctor.status === 'LEAVE' && !isDoctorOnLeaveToday ? 'AVAILABLE' : currentDoctor.status;
+
+  // Button Enable/Disable Conditions (Sirf aaj Leave range me hone par lock honge)
+  const canStartShift = !isDoctorOnLeaveToday && effectiveDoctorStatusToday === 'AVAILABLE' && !isSessionActive;
+  const canPauseOrCompleteShift = !isDoctorOnLeaveToday && effectiveDoctorStatusToday === 'AVAILABLE' && isSessionActive;
+  const canAccessLiveQueue = !isDoctorOnLeaveToday && effectiveDoctorStatusToday === 'AVAILABLE';
 
   const doctorPatients = patients.filter((p) => {
     if (p.doctorId !== currentDoctor?.id) return false;
@@ -587,6 +608,7 @@ export const StaffPortal: React.FC = () => {
 
               {/* Shift Controller Dropdown */}
               <select
+                disabled={isDoctorOnLeaveToday}
                 onChange={(e) => {
                   const val = e.target.value;
                   if (val === 'START') {
@@ -606,20 +628,24 @@ export const StaffPortal: React.FC = () => {
                   e.target.value = '';
                 }}
                 defaultValue=""
-                className={`text-[11px] font-bold rounded-lg px-2.5 py-1.5 border shadow-2xs outline-none cursor-pointer transition ${
-                  isSessionActive && !isDoctorOnLeaveToday
-                    ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
-                    : 'bg-indigo-50 text-indigo-900 border-indigo-300'
+                className={`text-[11px] font-bold rounded-lg px-2.5 py-1.5 border shadow-2xs outline-none transition ${
+                  isDoctorOnLeaveToday
+                    ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-60'
+                    : isSessionActive
+                    ? 'bg-emerald-50 text-emerald-900 border-emerald-300 cursor-pointer'
+                    : 'bg-indigo-50 text-indigo-900 border-indigo-300 cursor-pointer'
                 }`}
               >
                 <option value="" disabled>
-                  {isSessionActive && !isDoctorOnLeaveToday
+                  {isDoctorOnLeaveToday
+                    ? '⚪ Leave Locked'
+                    : isSessionActive
                     ? `🟢 ${shiftShortCode} Running`
                     : `⚙️ ${shiftShortCode} Control`}
                 </option>
                 <option value="START" disabled={!canStartShift}>▶️ {shiftShortCode} Start</option>
                 <option value="COMPLETE" disabled={!canPauseOrCompleteShift}>✅ {shiftShortCode} Complete</option>
-                <option value="MOVE">⏩ Move Next</option>
+                <option value="MOVE" disabled={isDoctorOnLeaveToday}>⏩ Move Next</option>
               </select>
 
             </div>
@@ -796,9 +822,16 @@ export const StaffPortal: React.FC = () => {
             <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl w-full sm:w-auto overflow-x-auto">
               <button
                 type="button"
-                onClick={() => setActiveTab('QUEUE')}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${
-                  activeTab === 'QUEUE' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                disabled={isDoctorOnLeaveToday}
+                onClick={() => {
+                  if (!isDoctorOnLeaveToday) setActiveTab('QUEUE');
+                }}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition shrink-0 ${
+                  isDoctorOnLeaveToday
+                    ? 'text-slate-400 cursor-not-allowed opacity-50'
+                    : activeTab === 'QUEUE'
+                    ? 'bg-white text-blue-700 shadow-xs cursor-pointer'
+                    : 'text-slate-600 hover:text-slate-900 cursor-pointer'
                 }`}
               >
                 Active Queue ({waitingPatients.length})
@@ -806,9 +839,16 @@ export const StaffPortal: React.FC = () => {
 
               <button
                 type="button"
-                onClick={() => setActiveTab('COMPLETED')}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${
-                  activeTab === 'COMPLETED' ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                disabled={isDoctorOnLeaveToday}
+                onClick={() => {
+                  if (!isDoctorOnLeaveToday) setActiveTab('COMPLETED');
+                }}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition shrink-0 ${
+                  isDoctorOnLeaveToday
+                    ? 'text-slate-400 cursor-not-allowed opacity-50'
+                    : activeTab === 'COMPLETED'
+                    ? 'bg-white text-emerald-700 shadow-xs cursor-pointer'
+                    : 'text-slate-600 hover:text-slate-900 cursor-pointer'
                 }`}
               >
                 Completed ({completedPatients.length})
@@ -816,9 +856,16 @@ export const StaffPortal: React.FC = () => {
 
               <button
                 type="button"
-                onClick={() => setActiveTab('ABSENT')}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${
-                  activeTab === 'ABSENT' ? 'bg-white text-amber-800 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                disabled={isDoctorOnLeaveToday}
+                onClick={() => {
+                  if (!isDoctorOnLeaveToday) setActiveTab('ABSENT');
+                }}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition shrink-0 ${
+                  isDoctorOnLeaveToday
+                    ? 'text-slate-400 cursor-not-allowed opacity-50'
+                    : activeTab === 'ABSENT'
+                    ? 'bg-white text-amber-800 shadow-xs cursor-pointer'
+                    : 'text-slate-600 hover:text-slate-900 cursor-pointer'
                 }`}
               >
                 Not Available / Absent ({absentPatients.length})
@@ -881,7 +928,7 @@ export const StaffPortal: React.FC = () => {
         )}
 
         {/* TAB 1: ACTIVE QUEUE */}
-        {activeTab === 'QUEUE' && (
+        {activeTab === 'QUEUE' && !isDoctorOnLeaveToday && (
           <div className="space-y-3">
             {(() => {
               const liveShiftWaiting = sortedWaitingPatients.filter((p) => {
@@ -916,9 +963,9 @@ export const StaffPortal: React.FC = () => {
                     key={patient.id}
                     patient={patient}
                     isFirstWaiting={isEligibleToCall}
-                    isDoctorAvailable={currentDoctor.status === 'AVAILABLE'}
+                    isDoctorAvailable={effectiveDoctorStatusToday === 'AVAILABLE'}
                     isSessionActive={isSessionActive}
-                    doctorStatus={currentDoctor.status}
+                    doctorStatus={effectiveDoctorStatusToday}
                     currentActiveDate={realTodayDate}
                     currentActiveShift={realCurrentShift}
                   />
@@ -929,7 +976,7 @@ export const StaffPortal: React.FC = () => {
         )}
 
         {/* TAB 2: COMPLETED */}
-        {activeTab === 'COMPLETED' && (
+        {activeTab === 'COMPLETED' && !isDoctorOnLeaveToday && (
           <div className="space-y-3">
             {completedPatients.length === 0 ? (
               <div className="rounded-2xl bg-white border border-slate-200 p-8 text-center text-xs text-slate-500">
@@ -940,9 +987,9 @@ export const StaffPortal: React.FC = () => {
                 <QueueCard
                   key={patient.id}
                   patient={patient}
-                  isDoctorAvailable={currentDoctor.status === 'AVAILABLE'}
+                  isDoctorAvailable={effectiveDoctorStatusToday === 'AVAILABLE'}
                   isSessionActive={isSessionActive}
-                  doctorStatus={currentDoctor.status}
+                  doctorStatus={effectiveDoctorStatusToday}
                 />
               ))
             )}
@@ -950,7 +997,7 @@ export const StaffPortal: React.FC = () => {
         )}
 
         {/* TAB 3: ABSENT */}
-        {activeTab === 'ABSENT' && (
+        {activeTab === 'ABSENT' && !isDoctorOnLeaveToday && (
           <div className="space-y-3">
             {absentPatients.length === 0 ? (
               <div className="rounded-2xl bg-white border border-slate-200 p-8 text-center text-xs text-slate-500">
@@ -961,9 +1008,9 @@ export const StaffPortal: React.FC = () => {
                 <QueueCard
                   key={patient.id}
                   patient={patient}
-                  isDoctorAvailable={currentDoctor.status === 'AVAILABLE'}
+                  isDoctorAvailable={effectiveDoctorStatusToday === 'AVAILABLE'}
                   isSessionActive={isSessionActive}
-                  doctorStatus={currentDoctor.status}
+                  doctorStatus={effectiveDoctorStatusToday}
                 />
               ))
             )}
@@ -998,9 +1045,9 @@ export const StaffPortal: React.FC = () => {
                   key={patient.id}
                   patient={patient}
                   isFirstWaiting={false}
-                  isDoctorAvailable={currentDoctor.status === 'AVAILABLE'}
+                  isDoctorAvailable={effectiveDoctorStatusToday === 'AVAILABLE'}
                   isSessionActive={isSessionActive}
-                  doctorStatus={currentDoctor.status}
+                  doctorStatus={effectiveDoctorStatusToday}
                   currentActiveDate={realTodayDate}
                   currentActiveShift={realCurrentShift}
                 />
