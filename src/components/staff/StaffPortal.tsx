@@ -23,10 +23,9 @@ import {
   ChevronLeft,
   PlayCircle,
   ArrowRightCircle,
-  SlidersHorizontal,
 } from 'lucide-react';
 
-// Universal Short Date Formatter (e.g., 28 Nov)
+// Universal Short Date Formatter (e.g., 14 Nov)
 export const formatShortDate = (dateObj: Date): string => {
   return dateObj.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 };
@@ -54,7 +53,7 @@ export const StaffPortal: React.FC = () => {
     setSelectedDoctorId,
   } = useClinic();
 
-  // Live Clock State (Updates every second - Short Format Hour:Minute)
+  // Live Clock State (Updates every second)
   const [nowDateTime, setNowDateTime] = useState<Date>(() => new Date());
 
   useEffect(() => {
@@ -123,6 +122,7 @@ export const StaffPortal: React.FC = () => {
 
   const activeDoctorShift: 'Morning' | 'Evening' = currentDoctor?.activeShift || 'Morning';
   const realCurrentShift = activeDoctorShift;
+  const shiftShortCode = activeDoctorShift === 'Morning' ? 'M. S.' : 'E. S.';
 
   const isMorningShiftActiveForDoctor = (targetDate: string, doctor: any) => {
     const todayStr = new Date().toISOString().split('T')[0];
@@ -171,9 +171,7 @@ export const StaffPortal: React.FC = () => {
             <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1.5 rounded-2xl mb-5 border border-slate-200">
               <label
                 className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold cursor-pointer transition ${
-                  loginType === 'CLINIC'
-                    ? 'bg-white text-blue-700 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                  loginType === 'CLINIC' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 <input
@@ -194,9 +192,7 @@ export const StaffPortal: React.FC = () => {
 
               <label
                 className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold cursor-pointer transition ${
-                  loginType === 'HOSPITAL'
-                    ? 'bg-white text-blue-700 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                  loginType === 'HOSPITAL' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 <input
@@ -489,83 +485,74 @@ export const StaffPortal: React.FC = () => {
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-slate-100 pb-20">
       {/* Clinic Header Bar */}
-      <div className="bg-white border-b border-slate-200 px-4 sm:px-8 py-4">
-        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            {isHospitalMultiDoctor && (
-              <button
-                type="button"
-                onClick={() => setSelectedHospitalCabinId(null)}
-                className="rounded-xl bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 px-3 py-2 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                <span>All Cabins</span>
-              </button>
-            )}
+      <div className="bg-white border-b border-slate-200 px-3 sm:px-8 py-3">
+        <div className="max-w-7xl mx-auto flex flex-col gap-2.5">
+          
+          {/* Top Row: Doctor Photo, Name, Clinic Name & Cabin/Chamber */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5 min-w-0">
+              {isHospitalMultiDoctor && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedHospitalCabinId(null)}
+                  className="rounded-xl bg-slate-100 hover:bg-blue-50 text-slate-700 border border-slate-200 p-2 text-xs font-bold transition flex items-center justify-center shrink-0 cursor-pointer"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+              )}
 
-            <img
-              src={currentDoctor.profilePic || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=300'}
-              alt={currentDoctor.name}
-              className="h-12 w-12 rounded-2xl object-cover border-2 border-slate-200"
-            />
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl font-black text-slate-900">{currentDoctor.name}</h1>
-                <span className="rounded bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-0.5">
-                  {currentDoctor.cabinNumber}
-                </span>
-                <span className="rounded bg-indigo-100 text-indigo-800 text-[10px] font-bold px-2 py-0.5">
-                  {activeDoctorShift} Shift
-                </span>
+              <img
+                src={currentDoctor.profilePic || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=300'}
+                alt={currentDoctor.name}
+                className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl object-cover border-2 border-slate-200 shrink-0"
+              />
+              <div className="min-w-0 leading-tight">
+                <h1 className="text-sm sm:text-base font-black text-slate-900 truncate">{currentDoctor.name}</h1>
+                <p className="text-[11px] font-semibold text-slate-600 truncate mt-0.5">
+                  {currentDoctor.clinicName} • <span className="text-blue-600">{currentDoctor.cabinNumber}</span>
+                </p>
               </div>
-              <p className="text-xs text-slate-500">
-                {currentDoctor.clinicName} • Operator Desk
-              </p>
             </div>
           </div>
 
-          {/* Short Date/Time Badge + Status Dropdown + Shift Controller Dropdown */}
-          <div className="flex flex-wrap items-center gap-2.5">
-            {/* Short Form Date & Time (jaise: 28 Nov, 03:33 PM) */}
-            <div className="flex items-center gap-2 rounded-xl bg-slate-900 text-white px-3 py-1.5 text-xs font-mono shadow-xs border border-slate-700">
-              <span className="text-blue-300 font-bold">📅 {shortFormattedDate}</span>
-              <span className="text-slate-500">|</span>
-              <span className="text-emerald-300 font-bold">🕒 {shortFormattedTime}</span>
-            </div>
+          {/* Bottom Compact Toolbar Row: Status Dropdown + Shift Controller Dropdown | Short Date/Time + Logout */}
+          <div className="flex items-center justify-between gap-2 overflow-x-auto scrollbar-none pt-1 border-t border-slate-100">
+            
+            {/* Left: Status Dropdown & Shift Controller Dropdown */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              
+              {/* Status Dropdown */}
+              <select
+                value={currentDoctor.status || 'AVAILABLE'}
+                onChange={(e) => {
+                  const newStatus = e.target.value as DoctorStatus;
+                  if (newStatus === 'LEAVE') {
+                    const defaultStart = currentDoctor.leaveStartDate || realTodayDate;
+                    const defaultEnd = currentDoctor.leaveEndDate || realTodayDate;
+                    setLeaveStartInput(defaultStart);
+                    setLeaveEndInput(defaultEnd);
+                    updateDoctorStatus(currentDoctor.id, 'LEAVE', undefined, defaultStart, defaultEnd);
+                  } else {
+                    updateDoctorStatus(currentDoctor.id, newStatus);
+                  }
+                }}
+                className={`text-[11px] font-bold rounded-lg px-2.5 py-1.5 border shadow-2xs outline-none cursor-pointer transition ${
+                  currentDoctor.status === 'AVAILABLE'
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                    : currentDoctor.status === 'OPD_CLOSE'
+                    ? 'bg-rose-50 text-rose-800 border-rose-300'
+                    : currentDoctor.status === 'SURGERY'
+                    ? 'bg-purple-50 text-purple-800 border-purple-300'
+                    : 'bg-slate-100 text-slate-800 border-slate-300'
+                }`}
+              >
+                <option value="AVAILABLE">🟢 Open</option>
+                <option value="OPD_CLOSE">🔴 Close</option>
+                <option value="SURGERY">🟣 Surgery</option>
+                <option value="LEAVE">⚪ Leave</option>
+              </select>
 
-            <span className="text-xs font-bold text-slate-700">Status:</span>
-            <select
-              value={currentDoctor.status || 'AVAILABLE'}
-              onChange={(e) => {
-                const newStatus = e.target.value as DoctorStatus;
-                if (newStatus === 'LEAVE') {
-                  const defaultStart = currentDoctor.leaveStartDate || realTodayDate;
-                  const defaultEnd = currentDoctor.leaveEndDate || realTodayDate;
-                  setLeaveStartInput(defaultStart);
-                  setLeaveEndInput(defaultEnd);
-                  updateDoctorStatus(currentDoctor.id, 'LEAVE', undefined, defaultStart, defaultEnd);
-                } else {
-                  updateDoctorStatus(currentDoctor.id, newStatus);
-                }
-              }}
-              className={`text-xs font-bold rounded-xl px-3 py-2 border shadow-xs outline-none cursor-pointer transition ${
-                currentDoctor.status === 'AVAILABLE'
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                  : currentDoctor.status === 'OPD_CLOSE'
-                  ? 'bg-rose-50 text-rose-800 border-rose-300'
-                  : currentDoctor.status === 'SURGERY'
-                  ? 'bg-purple-50 text-purple-800 border-purple-300'
-                  : 'bg-slate-100 text-slate-800 border-slate-300'
-              }`}
-            >
-              <option value="AVAILABLE">🟢 Available (OPD Open)</option>
-              <option value="OPD_CLOSE">🔴 OPD Close</option>
-              <option value="SURGERY">🟣 In Surgery</option>
-              <option value="LEAVE">⚪ Leave</option>
-            </select>
-
-{/* Shift Controller Dropdown (Dynamic active status label ke sath) */}
-            <div className="relative">
+              {/* Shift Controller Dropdown (Short Terms & Active Status with real actions) */}
               <select
                 onChange={(e) => {
                   const val = e.target.value;
@@ -583,7 +570,7 @@ export const StaffPortal: React.FC = () => {
                   e.target.value = ''; // Reset selection
                 }}
                 defaultValue=""
-                className={`text-xs font-bold rounded-xl px-3 py-2 border shadow-xs outline-none cursor-pointer transition ${
+                className={`text-[11px] font-bold rounded-lg px-2.5 py-1.5 border shadow-2xs outline-none cursor-pointer transition ${
                   isSessionActive && !isDoctorOnLeaveToday
                     ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
                     : 'bg-indigo-50 text-indigo-900 border-indigo-300'
@@ -591,35 +578,43 @@ export const StaffPortal: React.FC = () => {
               >
                 <option value="" disabled>
                   {isSessionActive && !isDoctorOnLeaveToday
-                    ? `🟢 ${activeDoctorShift} Shift Running`
-                    : `⚙️ Shift Controller (${activeDoctorShift})`}
+                    ? `🟢 ${shiftShortCode} Running`
+                    : `⚙️ ${shiftShortCode} Control`}
                 </option>
-                <option value="START" disabled={!canStartShift}>
-                  ▶️ {activeDoctorShift} Shift Start {isSessionActive ? '(Running)' : ''}
-                </option>
-                <option value="COMPLETE" disabled={!canPauseOrCompleteShift}>
-                  ✅ {activeDoctorShift} Shift Complete
-                </option>
-                <option value="MOVE">
-                  ⏩ Move to Next Shift
-                </option>
+                <option value="START" disabled={!canStartShift}>▶️ {shiftShortCode} Start</option>
+                <option value="COMPLETE" disabled={!canPauseOrCompleteShift}>✅ {shiftShortCode} Complete</option>
+                <option value="MOVE">⏩ Move Next</option>
               </select>
+
             </div>
 
-            <button
-              type="button"
-              onClick={staffLogout}
-              className="ml-1 rounded-xl border border-slate-200 bg-white p-2 text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition cursor-pointer"
-              title="Staff Logout"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
+            {/* Right: Short Date/Time Badge + Logout Button */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex items-center gap-1.5 rounded-lg bg-slate-900 text-white px-2 py-1.5 text-[11px] font-mono shadow-2xs">
+                <span className="text-blue-300 font-bold">{shortFormattedDate}</span>
+                <span className="text-slate-600">|</span>
+                <span className="text-emerald-300 font-bold">{shortFormattedTime}</span>
+              </div>
 
-        {/* LEAVE DATE RANGE BAR */}
-        {currentDoctor.status === 'LEAVE' && (
-          <div className="max-w-7xl mx-auto mt-4 pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+              <button
+                type="button"
+                onClick={staffLogout}
+                className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition cursor-pointer"
+                title="Staff Logout"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </div>
+
+          </div>
+
+        </div>
+      </div>
+
+      {/* LEAVE DATE RANGE BAR */}
+      {currentDoctor.status === 'LEAVE' && (
+        <div className="max-w-7xl mx-auto px-4 mt-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
             <div className="flex items-center gap-2.5">
               <Calendar className="h-5 w-5 text-blue-600 shrink-0" />
               <div>
@@ -678,8 +673,8 @@ export const StaffPortal: React.FC = () => {
               </div>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Main Container */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
