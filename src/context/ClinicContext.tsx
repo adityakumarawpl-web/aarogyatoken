@@ -1,11 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Doctor, Patient, DoctorStatus, GlobalRazorpaySettings } from '../types';
 import {
-  getNextTokenNumber,
   callPatientInCabin,
   completePatientConsultation,
   markPatientNotAvailable,
-  markPatientEmergency,
 } from '../utils/queueLogic';
 import { db } from '../firebase';
 import { collection, onSnapshot, setDoc, updateDoc, doc } from 'firebase/firestore';
@@ -63,7 +61,7 @@ export const INITIAL_DOCTORS: Doctor[] = [
     consultationFee: 500,
     onlineTokenFee: 20,
     status: 'OPD_CLOSE',
-    statusNote: 'Closed',
+    statusNote: 'OPD Closed',
     staffUsername: 'staff_priya',
     staffPassword: 'clinic123',
     profilePic: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=300&auto=format&fit=crop&q=80',
@@ -315,7 +313,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [razorpaySettings]);
 
-  // Automated WhatsApp Turn Reminder Dispatch (Approved 'opd_turn_reminder' Template)
+  // Automated WhatsApp Turn Reminder Dispatch
   const sendTurnReminderWhatsApp = async (patient: Patient, doctor: Doctor | undefined, aheadCount: number) => {
     try {
       const rawDigits = String(patient.mobile || '').replace(/\D/g, '');
@@ -384,7 +382,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  // 🔹 1. Start Shift Session: Staff clicks "Morning Shift Start" / "Evening Shift Start"
+  // 🔹 1. Start Shift Session
   const startDoctorSession = useCallback(async (doctorId: string) => {
     const matchedDoc = doctors.find((d) => d.id === doctorId);
     const currentShift = matchedDoc?.activeShift || 'Morning';
@@ -415,7 +413,6 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       );
     }).sort((a, b) => Number(a.tokenNumber) - Number(b.tokenNumber));
 
-    // Shift start hote hi top 4 waiting online patients ko pehli baar reminder jayega
     const topWaitingList = targetPatients.slice(0, 4);
 
     topWaitingList.forEach((patient) => {
@@ -451,7 +448,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, []);
 
-  // 🔹 3. Complete Shift (Morning -> Evening switch, aur bache hue patients automatic NOT_AVAILABLE me jayenge)
+  // 🔹 3. Complete Shift -> Auto switches shift & sets status to 'OPD_CLOSE'
   const completeDoctorShift = useCallback(async (doctorId: string) => {
     const matchedDoc = doctors.find((d) => d.id === doctorId);
     const currentShift = matchedDoc?.activeShift || 'Morning';
@@ -489,7 +486,6 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const nextShift: 'Morning' | 'Evening' = currentShift === 'Morning' ? 'Evening' : 'Morning';
     const morningDoneDate = currentShift === 'Morning' ? todayStr : '';
 
-    // Shift complete hone par status automatic 'OPD_CLOSE' ho jayega
     setDoctors((prev) =>
       prev.map((d) =>
         d.id === doctorId
@@ -518,7 +514,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [doctors, patients]);
 
-  // 🔹 4. Move Remaining Patients to Next Shift (Urgent Doctor Unavailability)
+  // 🔹 4. Move Remaining Patients to Next Shift
   const moveRemainingToNextShift = useCallback(async (doctorId: string) => {
     const matchedDoc = doctors.find((d) => d.id === doctorId);
     const currentShift = matchedDoc?.activeShift || 'Morning';
@@ -662,7 +658,6 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const nextToken = maxToken + 1;
     const customId = `p-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-
     const resolvedHospitalId = (data as any).hospitalId || matchedDoctor?.hospitalId || matchedDoctor?.staffUsername || '';
 
     const newPatient: Patient = {
@@ -715,7 +710,6 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const nextToken = maxToken + 1;
     const paymentId = (data as any).paymentId || `pay_rzp_${Date.now()}`;
     const customId = `p-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-
     const resolvedHospitalId = (data as any).hospitalId || matchedDoctor?.hospitalId || matchedDoctor?.staffUsername || '';
 
     const newPatient: Patient = {
