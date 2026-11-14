@@ -564,7 +564,7 @@ export const StaffPortal: React.FC = () => {
               <option value="LEAVE">⚪ Leave</option>
             </select>
 
-            {/* Shift Controller Dropdown (Status ke theek right side) */}
+{/* Shift Controller Dropdown (Dynamic active status label ke sath) */}
             <div className="relative">
               <select
                 onChange={(e) => {
@@ -583,12 +583,26 @@ export const StaffPortal: React.FC = () => {
                   e.target.value = ''; // Reset selection
                 }}
                 defaultValue=""
-                className="text-xs font-bold rounded-xl px-3 py-2 border border-indigo-300 bg-indigo-50 text-indigo-900 shadow-xs outline-none cursor-pointer"
+                className={`text-xs font-bold rounded-xl px-3 py-2 border shadow-xs outline-none cursor-pointer transition ${
+                  isSessionActive && !isDoctorOnLeaveToday
+                    ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
+                    : 'bg-indigo-50 text-indigo-900 border-indigo-300'
+                }`}
               >
-                <option value="" disabled>⚙️ Shift Controller</option>
-                <option value="START" disabled={!canStartShift}>▶️ {activeDoctorShift} Shift Start</option>
-                <option value="COMPLETE" disabled={!canPauseOrCompleteShift}>✅ {activeDoctorShift} Shift Complete</option>
-                <option value="MOVE">⏩ Move to Next Shift</option>
+                <option value="" disabled>
+                  {isSessionActive && !isDoctorOnLeaveToday
+                    ? `🟢 ${activeDoctorShift} Shift Running`
+                    : `⚙️ Shift Controller (${activeDoctorShift})`}
+                </option>
+                <option value="START" disabled={!canStartShift}>
+                  ▶️ {activeDoctorShift} Shift Start {isSessionActive ? '(Running)' : ''}
+                </option>
+                <option value="COMPLETE" disabled={!canPauseOrCompleteShift}>
+                  ✅ {activeDoctorShift} Shift Complete
+                </option>
+                <option value="MOVE">
+                  ⏩ Move to Next Shift
+                </option>
               </select>
             </div>
 
