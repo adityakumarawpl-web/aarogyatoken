@@ -2,6 +2,9 @@ import React from 'react';
 import { Activity } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
+  // Check if current URL path contains '/staff'
+  const isStaffPage = typeof window !== 'undefined' && window.location.pathname.includes('/staff');
+
   return (
     <header className="sticky top-0 z-50 w-full max-w-[100vw] overflow-x-hidden border-b border-slate-200 bg-white/95 backdrop-blur-md shadow-xs">
       {/* Main Bar: Mobile Friendly Full Responsive */}
@@ -33,18 +36,31 @@ export const Navbar: React.FC = () => {
           </div>
         </div>
 
-        {/* Right side: Public View indicator (Double click karne par seedha staff portal khulega) */}
+        {/* Right side: Dynamic Indicator (Public OPD vs Staff Desk) */}
         <div className="flex items-center gap-2">
-          <div 
-            onDoubleClick={() => {
-              window.location.href = '/staff';
-            }}
-            className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-800 px-3 py-1.5 rounded-xl text-xs font-bold select-none cursor-default"
-            title="Public OPD"
-          >
-            <span className="h-2 w-2 rounded-full bg-blue-600 animate-pulse"></span>
-            <span>Public OPD (Patient / ₹20 Booking)</span>
-          </div>
+          {isStaffPage ? (
+            <div 
+              onDoubleClick={() => {
+                window.location.href = '/';
+              }}
+              className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-1.5 rounded-xl text-xs font-bold select-none cursor-default shadow-2xs"
+              title="Staff Desk Portal (Double click to go Home)"
+            >
+              <span className="h-2 w-2 rounded-full bg-emerald-600 animate-pulse"></span>
+              <span>Staff Desk</span>
+            </div>
+          ) : (
+            <div 
+              onDoubleClick={() => {
+                window.location.href = '/staff';
+              }}
+              className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-800 px-3 py-1.5 rounded-xl text-xs font-bold select-none cursor-default shadow-2xs"
+              title="Public OPD (Double click to open Staff)"
+            >
+              <span className="h-2 w-2 rounded-full bg-blue-600 animate-pulse"></span>
+              <span>Public OPD (Patient / ₹20 Booking)</span>
+            </div>
+          )}
         </div>
 
       </div>
