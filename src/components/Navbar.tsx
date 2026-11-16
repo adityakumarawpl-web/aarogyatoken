@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useClinic } from '../../context/ClinicContext';
+import { useClinic } from '../context/ClinicContext';
 import { Activity, Stethoscope, Lock, Key, User, CheckCircle2 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -82,7 +82,7 @@ export const Navbar: React.FC = () => {
             <span className="text-[10px] opacity-40 ml-0.5">▾</span>
           </div>
 
-          {/* Secret Compact Staff Login Dropdown / Popover (Mobile & Desktop optimized) */}
+          {/* Secret Compact Staff Login Dropdown / Popover */}
           {showStaffDropdown && (
             <div className="absolute right-0 mt-2 w-72 sm:w-80 rounded-2xl bg-white border border-slate-200 shadow-2xl p-4 z-50 animate-in fade-in zoom-in-95">
               
