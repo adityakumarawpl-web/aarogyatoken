@@ -179,21 +179,21 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
           </div>
         </div>
 
-        {/* 2. ROW 1: Left Box (Status & Shift - Uniform compact size like Leave) | Right Box (Book Online Token) */}
+        {/* 2. ROW 1: Left Box (Status & Shift - Highlighted) | Right Box (Book Online Token) */}
         <div className="grid grid-cols-2 gap-2">
           {/* Status & Shift Box */}
-          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl py-2 px-2 flex flex-col justify-center text-center">
-            <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+          <div className="bg-emerald-50/70 border border-emerald-200/90 rounded-2xl py-2.5 px-2 flex flex-col justify-center text-center shadow-xs">
+            <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-700">
               {isLeaveActiveToday ? 'Status' : 'Status & Shift'}
             </span>
-            <div className="flex items-center justify-center gap-1 mt-0.5">
-              <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${isLeaveActiveToday ? 'bg-slate-400' : 'bg-emerald-500 animate-pulse'}`}></span>
-              <span className="text-xs font-extrabold text-slate-800 truncate">
+            <div className="flex items-center justify-center gap-1.5 mt-0.5">
+              <span className={`h-2 w-2 rounded-full shrink-0 ${isLeaveActiveToday ? 'bg-slate-400' : 'bg-emerald-500 animate-pulse'}`}></span>
+              <span className="text-xs font-black text-emerald-900 truncate">
                 {isLeaveActiveToday ? 'On Leave' : 'OPD Open'}
               </span>
             </div>
             {!isLeaveActiveToday && (
-              <span className="text-[10px] text-blue-600 font-semibold leading-none mt-0.5">{doctorActiveShift} Shift</span>
+              <span className="text-[10px] text-emerald-700 font-bold leading-none mt-1">{doctorActiveShift} Shift</span>
             )}
           </div>
 
@@ -225,37 +225,40 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
           </div>
         </div>
 
-        {/* 4. ROW 2: Running Token Box (Width Badha Diya [7fr]) | Know Your Token Box (Width Kam Kar Diya [5fr]) */}
+        {/* 4. ROW 2: Running Token Box (Highlighted) | Know Your Token Box (Highlighted Button) */}
         <div className="grid grid-cols-12 gap-2">
-          {/* Running Token Box (7 columns - Wider & Shorter Length) */}
-          <div className="col-span-7 bg-emerald-50/60 border border-emerald-200/80 rounded-2xl py-2 px-2 text-center flex flex-col justify-center">
-            <span className="text-[9px] font-bold text-emerald-800 uppercase tracking-wider">Running Token</span>
+          {/* Running Token Box (7 columns - Highlighted with Emerald border & soft glow) */}
+          <div className="col-span-7 bg-gradient-to-br from-emerald-50 to-teal-50/60 border border-emerald-300/80 rounded-2xl py-2.5 px-2 text-center flex flex-col justify-center shadow-xs">
+            <span className="text-[9px] font-extrabold text-emerald-800 uppercase tracking-wider flex items-center justify-center gap-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+              Running Token
+            </span>
             <div className={`my-0.5 font-mono tracking-tight leading-none ${servingInfo.textColor}`}>
               {servingInfo.displayText}
             </div>
             {servingInfo.label && (
-              <span className="text-[9px] text-emerald-600 font-medium truncate mt-0.5">
+              <span className="text-[9px] text-emerald-700 font-bold truncate mt-0.5 bg-emerald-100/60 py-0.5 px-1.5 rounded-md">
                 {servingInfo.label}
               </span>
             )}
           </div>
 
-          {/* Know Your Token Button Box (5 columns - Smaller Width & Compact Length) */}
+          {/* Know Your Token Button Box (5 columns - Highlighted Blue Interactive Look) */}
           <button
             type="button"
             disabled={isLeaveActiveToday}
             onClick={() => {
               if (!isLeaveActiveToday) setShowTokenModal(true);
             }}
-            className={`col-span-5 rounded-2xl py-2 px-1 text-center flex flex-col items-center justify-center transition shadow-2xs ${
+            className={`col-span-5 rounded-2xl py-2 px-1 text-center flex flex-col items-center justify-center transition shadow-xs ${
               isLeaveActiveToday
-                ? 'bg-slate-100 border-2 border-dashed border-slate-300 text-slate-400 cursor-not-allowed opacity-60'
-                : 'bg-white border-2 border-dashed border-blue-300 hover:border-blue-500 hover:bg-blue-50/50 text-blue-700 cursor-pointer'
+                ? 'bg-slate-100 border border-slate-300 text-slate-400 cursor-not-allowed opacity-60'
+                : 'bg-blue-50/80 border border-blue-200 hover:border-blue-400 hover:bg-blue-100/70 text-blue-800 cursor-pointer active:scale-95'
             }`}
           >
-            <Search className={`h-3.5 w-3.5 mb-0.5 ${isLeaveActiveToday ? 'text-slate-400' : 'text-blue-600'}`} />
-            <span className="text-[11px] font-bold leading-tight">Know Token</span>
-            <span className="text-[9px] text-slate-500 font-medium">खोजें</span>
+            <Search className={`h-3.5 w-3.5 mb-0.5 ${isLeaveActiveToday ? 'text-slate-400' : 'text-blue-600 animate-pulse'}`} />
+            <span className="text-[11px] font-extrabold leading-tight">Know Token</span>
+            <span className="text-[9px] text-blue-600 font-semibold">खोजें (Search)</span>
           </button>
         </div>
 
