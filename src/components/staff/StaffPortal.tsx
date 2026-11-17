@@ -508,18 +508,6 @@ export const StaffPortal: React.FC = () => {
       appointmentDate: walkInForm.appointmentDate,
     } as any);
 
-    fetch('/api/send-whatsapp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        phone: '91' + walkInForm.mobile.trim(),
-        patientName: walkInForm.name.trim(),
-        doctorName: currentDoctor.name,
-      }),
-    })
-      .then((res) => res.json())
-      .catch((err) => console.error('WhatsApp trigger error:', err));
-
     const nextValidDate = getNextAvailableDateAfterLeave(currentDoctor);
     const defaultShift = isFullDayDoctor ? 'FullDay' : (isMorningShiftActiveForDoctor(nextValidDate, currentDoctor) ? 'Morning' : 'Evening');
 
