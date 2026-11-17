@@ -38,7 +38,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
   tomorrowObj.setDate(tomorrowObj.getDate() + 1);
   const tomorrowStr = tomorrowObj.toISOString().split('T')[0];
 
-  // Check karein ki chuni gayi tarikh doctor ki Leave date range me toh nahi aati
   const isDateOnLeave = (targetDate: string, doc: Doctor) => {
     if (doc.status !== 'LEAVE') return false;
     if (doc.leaveStartDate && doc.leaveEndDate) {
@@ -47,8 +46,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
     return targetDate === todayStr;
   };
 
-  // Agar OPD_CLOSE hai aur Evening shift bhi khatam ho chuki hai (activeShift === 'Morning'),
-  // toh aaj ki saari shifts close ho chuki hain -> Default date kal (tomorrow) rakhenge
   const isTodayFullyClosed = doctor.status === 'OPD_CLOSE' && (doctor.activeShift || 'Morning') === 'Morning';
 
   const isMorningShiftActiveForDoctor = (targetDate: string, doc: Doctor) => {
@@ -161,7 +158,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
       const cleanDigits = patientData.phone.replace(/\D/g, '');
       const formattedPhone = cleanDigits.length === 10 ? `91${cleanDigits}` : cleanDigits;
 
-      const response = await fetch('/api/send-whatsapp', {
+      await fetch('/api/send-whatsapp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -174,13 +171,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
           clinicName: patientData.clinicName,
         }),
       });
-
-      const result = await response.json();
-      if (response.ok) {
-        console.log('WhatsApp message sent successfully:', result);
-      } else {
-        console.warn('WhatsApp API Response:', result);
-      }
     } catch (err) {
       console.error('Error triggering WhatsApp notification:', err);
     }
@@ -247,7 +237,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
             origin: { y: 0.6 },
           });
         } catch {
-          // confetti fallback ignore
+          // fallback ignore
         }
       },
       prefill: {
@@ -277,6 +267,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
   return (
     <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/70 p-2 sm:p-4 backdrop-blur-xs overflow-y-auto animate-in fade-in">
       <div className="relative w-full max-w-lg rounded-2xl sm:rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-2 sm:my-6 flex flex-col max-h-[92vh]">
+        
         {/* FIXED HEADER */}
         <div className="sticky top-0 z-20 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 px-4 sm:px-6 py-3.5 sm:py-4 text-white flex items-center justify-between shrink-0 shadow-sm">
           <div className="min-w-0 pr-2">
@@ -389,18 +380,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                 </div>
               </div>
 
-              {selectedDateBlockedByLeave && (
-                <div className="rounded-xl bg-rose-50 border border-rose-300 p-2.5 text-xs text-rose-800 font-bold">
-                  🚫 Yeh tarikh doctor ki Leave date ({formatDateDDMMYYYY(doctor.leaveStartDate)} - {formatDateDDMMYYYY(doctor.leaveEndDate)}) me aati hai! Kripya is tarikh ko chhod kar koi aur date chunein.
-                </div>
-              )}
-
-              {selectedDateBlockedByClosedToday && (
-                <div className="rounded-xl bg-rose-50 border border-rose-300 p-2.5 text-xs text-rose-800 font-bold">
-                  🚫 Aaj ki sabhi OPD shifts close ho chuki hain! Kripya kal ya aage ki tarikh chunein.
-                </div>
-              )}
-
               {/* Patient Name */}
               <div>
                 <label className="block text-[11px] sm:text-xs font-semibold text-slate-700 mb-1">
@@ -412,7 +391,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="e.g. Ramesh Chandra"
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm focus:border-blue-500 focus:outline-none"
                 />
               </div>
 
@@ -441,12 +420,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                         setFormData({ ...formData, mobile: val.slice(0, 10) });
                       }}
                       placeholder="10-digit number"
-                      className="w-full rounded-xl border border-slate-300 pl-16 pr-3 py-2 text-xs sm:text-sm font-medium tracking-wide focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 bg-white"
+                      className="w-full rounded-xl border border-slate-300 pl-16 pr-3 py-2 text-xs sm:text-sm font-medium bg-white"
                     />
                   </div>
-                  <span className="text-[10px] text-slate-500 block mt-0.5">
-                    WhatsApp par token aur turn alert isi number par aayega
-                  </span>
                 </div>
 
                 <div>
@@ -461,13 +437,13 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                       value={formData.age}
                       onChange={(e) => setFormData({ ...formData, age: e.target.value })}
                       placeholder="Age"
-                      className="w-20 rounded-xl border border-slate-300 px-2.5 py-2 text-xs sm:text-sm focus:border-blue-500 focus:outline-none"
+                      className="w-20 rounded-xl border border-slate-300 px-2.5 py-2 text-xs sm:text-sm focus:outline-none"
                       required
                     />
                     <select
                       value={formData.gender}
                       onChange={(e) => setFormData({ ...formData, gender: e.target.value as any })}
-                      className="flex-1 rounded-xl border border-slate-300 px-2.5 py-2 text-xs sm:text-sm focus:border-blue-500 focus:outline-none bg-white"
+                      className="flex-1 rounded-xl border border-slate-300 px-2.5 py-2 text-xs sm:text-sm bg-white"
                     >
                       <option value="Male">Male</option>
                       <option value="Female">Female</option>
@@ -488,7 +464,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   placeholder="e.g. Ghanghri Naka, Umaria"
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm focus:outline-none"
                 />
               </div>
 
@@ -501,8 +477,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                   type="text"
                   value={formData.complaint}
                   onChange={(e) => setFormData({ ...formData, complaint: e.target.value })}
-                  placeholder="e.g. Fever & Cough, BP checkup, Knee pain"
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  placeholder="e.g. Fever & Cough, BP checkup"
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm focus:outline-none"
                 />
               </div>
 
@@ -510,7 +486,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                 <button
                   type="submit"
                   disabled={selectedDateBlockedByLeave || selectedDateBlockedByClosedToday}
-                  className="w-full rounded-2xl bg-blue-600 px-4 py-3 text-xs sm:text-sm font-bold text-white shadow-lg shadow-blue-500/25 hover:bg-blue-700 transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full rounded-2xl bg-blue-600 px-4 py-3 text-xs sm:text-sm font-bold text-white shadow-lg shadow-blue-500/25 hover:bg-blue-700 transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   <span>Proceed to Pay ₹20 (आगे बढ़ें)</span>
                 </button>
@@ -518,90 +494,71 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
             </form>
           )}
 
-          {/* STEP 2: RAZORPAY / UPI ₹20 PAYMENT GATEWAY */}
+          {/* STEP 2: CLEAN RAZORPAY / UPI PAYMENT GATEWAY (Extra text & static keys removed) */}
           {step === 'PAYMENT' && (
-            <div className="space-y-4">
-              <div className="rounded-2xl bg-slate-900 text-white p-3.5 sm:p-4">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
-                  <div className="flex items-center gap-2">
-                    <div className="h-6 w-6 rounded-md bg-blue-600 flex items-center justify-center text-[10px] font-black text-white">
+            <div className="space-y-4 py-2">
+              <div className="rounded-2xl bg-slate-900 text-white p-4 shadow-md">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-7 w-7 rounded-lg bg-blue-600 flex items-center justify-center text-xs font-black text-white shadow-inner">
                       ₹
                     </div>
                     <div>
-                      <span className="text-xs font-bold text-white tracking-wide">Aarogya Instant Pay</span>
-                      <span className="text-[10px] text-blue-400 block font-mono">
-                        Key: {activeRazorpayKey ? `${String(activeRazorpayKey).slice(0, 12)}...` : 'Not Set'}
-                      </span>
+                      <span className="text-xs font-extrabold text-white tracking-wide block">Aarogya Secure Checkout</span>
+                      <span className="text-[10px] text-emerald-400 font-medium">⚡ Powered by Razorpay</span>
                     </div>
                   </div>
-                  <span className="rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold px-2 py-0.5">
-                    Secured
+                  <span className="rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold px-2.5 py-0.5">
+                    Verified Gateway
                   </span>
                 </div>
 
-                <div className="pt-2.5 flex items-center justify-between">
+                <div className="pt-3 flex items-center justify-between">
                   <div>
-                    <span className="text-[11px] text-slate-400">Online Token Fee</span>
-                    <div className="text-2xl sm:text-3xl font-black text-emerald-400">₹20.00</div>
+                    <span className="text-[11px] text-slate-400 block">Online Token Booking Fee</span>
+                    <div className="text-2xl font-black text-emerald-400">₹20.00</div>
                   </div>
                   <div className="text-right">
                     <span className="text-xs text-blue-200 font-bold block">
                       Token #{nextEstimatedToken}
                     </span>
                     <span className="text-[10px] text-slate-400">
-                      For {formData.name} ({formatDateDDMMYYYY(formData.appointmentDate)})
+                      For {formData.name}
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* Dynamic ₹20 QR Code */}
-              <div className="rounded-2xl border-2 border-dashed border-blue-300 p-4 text-center bg-blue-50/40 flex flex-col items-center justify-center">
-                <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 text-white text-[10px] sm:text-[11px] font-bold px-3 py-1 mb-2.5">
-                  <QrCode className="h-3.5 w-3.5" />
-                  <span>Scan to Pay ₹20 (QR कोड स्कैन करें)</span>
+              {/* Dynamic Secure Payment Prompt */}
+              <div className="rounded-2xl border-2 border-dashed border-blue-300 p-6 text-center bg-blue-50/40 flex flex-col items-center justify-center space-y-3">
+                <div className="h-12 w-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/30">
+                  <QrCode className="h-6 w-6" />
                 </div>
-
-                <div className="relative h-40 w-40 bg-white p-2.5 rounded-2xl border-2 border-slate-200 shadow-md flex items-center justify-center">
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=upi://pay?pa=aarogya.opd@icici%26pn=${encodeURIComponent(doctor.name)}%26am=20.00%26cu=INR%26tn=Token_${doctor.id}_${Date.now()}`}
-                    alt="Scan ₹20 QR Code"
-                    className="h-34 w-34"
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="bg-white/95 rounded-md px-1.5 py-0.5 text-[9px] font-black text-blue-700 shadow-xs border border-blue-200">
-                      ₹20
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-2.5">
-                  <span className="text-xs font-mono font-bold text-slate-800 block">
-                    UPI ID: aarogya.opd@icici
-                  </span>
-                  <p className="text-[10px] text-slate-600 mt-0.5 max-w-xs">
-                    <strong>GPay, PhonePe, Paytm, BHIM</strong> se scan karein ya neeche button dabayein.
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900">Instant UPI & Card Payment</h4>
+                  <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
+                    Neeche diye gaye button par click karke Razorpay official secure popup kholen aur Google Pay, PhonePe, UPI ya Credit/Debit card se payment karein.
                   </p>
                 </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="space-y-2 pt-1">
+              <div className="space-y-2.5 pt-1">
                 <button
                   type="button"
                   disabled={isProcessingPayment}
                   onClick={handleProcessPayment}
-                  className="w-full rounded-2xl bg-emerald-600 py-3 px-4 text-xs sm:text-sm font-extrabold text-white shadow-xl shadow-emerald-600/30 hover:bg-emerald-700 active:scale-[0.99] transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="w-full rounded-2xl bg-emerald-600 py-3.5 px-4 text-xs sm:text-sm font-extrabold text-white shadow-xl shadow-emerald-600/30 hover:bg-emerald-700 active:scale-[0.99] transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {isProcessingPayment ? (
                     <>
                       <span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin"></span>
-                      <span>₹20 Payment Verify Ho Rahi Hai...</span>
+                      <span>Opening Razorpay Secure Gateway...</span>
                     </>
                   ) : (
                     <>
                       <ShieldCheck className="h-4 w-4 text-white" />
-                      <span>Pay ₹20 Now (पेमेंट पूरा करें)</span>
+                      <span>Pay ₹20 Now via Razorpay (पेमेंट करें)</span>
                     </>
                   )}
                 </button>
@@ -615,7 +572,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                     ← Back (Edit Details)
                   </button>
                   <span className="text-[10px] text-emerald-700 font-medium flex items-center gap-1">
-                    <Lock className="h-3 w-3" /> Pay hone par hi token banega
+                    <Lock className="h-3 w-3" /> 256-bit Secure Encryption
                   </span>
                 </div>
               </div>
