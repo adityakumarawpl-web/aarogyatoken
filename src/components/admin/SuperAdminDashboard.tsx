@@ -82,7 +82,11 @@ export const SuperAdminDashboard: React.FC = () => {
   // Custom Tag Input State
   const [customTagInput, setCustomTagInput] = useState('');
 
-  // New Doctor Form State (Separate address and city)
+  // Type: Clinic ya Hospital & Schedule Type (Shift Wise vs Full Day)
+  const [establishmentType, setEstablishmentType] = useState<'CLINIC' | 'HOSPITAL'>('CLINIC');
+  const [scheduleType, setScheduleType] = useState<'SHIFT_BASED' | 'FULL_DAY'>('SHIFT_BASED');
+
+  // New Doctor Form State
   const [newDoctorForm, setNewDoctorForm] = useState({
     name: '',
     degree: '',
@@ -95,7 +99,7 @@ export const SuperAdminDashboard: React.FC = () => {
     profilePic: '',
     clinicImages: ['', ''],
     tags: [] as string[],
-    timings: '10:00 AM - 02:00 PM & 05:00 PM - 08:00 PM',
+    timings: '10:00 AM - 05:00 PM',
     morningShift: '10:00 AM - 02:00 PM',
     eveningShift: '05:00 PM - 08:00 PM',
     consultationFee: 20,
@@ -103,9 +107,6 @@ export const SuperAdminDashboard: React.FC = () => {
     staffPassword: '',
     avgTimePerPatientMinutes: 10,
   });
-
-  // Type: Clinic ya Hospital
-  const [establishmentType, setEstablishmentType] = useState<'CLINIC' | 'HOSPITAL'>('CLINIC');
 
   // Hospital ke liye multiple doctors ki list
   const [hospitalDoctors, setHospitalDoctors] = useState<Array<{
@@ -375,7 +376,6 @@ export const SuperAdminDashboard: React.FC = () => {
       return;
     }
 
-    // UNIQUE USERNAME VALIDATION GUARD
     const cleanStaffUser = newDoctorForm.staffUsername.trim().toLowerCase();
     const duplicateExists = doctors.some(
       (doc) => doc.staffUsername?.trim().toLowerCase() === cleanStaffUser
@@ -388,7 +388,6 @@ export const SuperAdminDashboard: React.FC = () => {
 
     const defaultPic = 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=300';
     
-    // 🔹 AUTOMATIC IN-BUILT RAZORPAY CONFIGURATION FROM CENTRAL VERCEL ENV
     const autoRazorpayData = {
       razorpayEnabled: true,
       razorpayKeyId: (import.meta as any).env?.VITE_RAZORPAY_KEY_ID || '',
@@ -398,6 +397,11 @@ export const SuperAdminDashboard: React.FC = () => {
     const formattedPublicAddress = newDoctorForm.address.trim()
       ? `${newDoctorForm.address.trim()}, ${newDoctorForm.city.trim()}`
       : newDoctorForm.city.trim();
+
+    // Schedule type ke hisab se timings set karein
+    const finalMorning = scheduleType === 'FULL_DAY' ? newDoctorForm.timings : newDoctorForm.morningShift;
+    const finalEvening = scheduleType === 'FULL_DAY' ? '' : newDoctorForm.eveningShift;
+    const finalActiveShift = scheduleType === 'FULL_DAY' ? 'FullDay' : 'Morning';
 
     if (establishmentType === 'CLINIC') {
       if (!newDoctorForm.name.trim()) {
@@ -419,9 +423,11 @@ export const SuperAdminDashboard: React.FC = () => {
         tags: newDoctorForm.tags || [],
         profilePic: picToSave,
         clinicImages: newDoctorForm.clinicImages || ['', ''],
-        morningShift: newDoctorForm.morningShift || '10:00 AM - 02:00 PM',
-        eveningShift: newDoctorForm.eveningShift || '05:00 PM - 08:00 PM',
-      });
+        morningShift: finalMorning,
+        eveningShift: finalEvening,
+        activeShift: finalActiveShift,
+        scheduleType: scheduleType,
+      } as any);
       setSaveSuccessMsg(`Clinic "${newDoctorForm.clinicName}" created successfully with in-built Razorpay!`);
     } else {
       const validDoctors = hospitalDoctors.filter((doc) => doc.name.trim());
@@ -445,13 +451,15 @@ export const SuperAdminDashboard: React.FC = () => {
           specialty: doc.specialty.trim(),
           cabinNumber: doc.cabinNumber.trim() || `Cabin ${idx + 1}`,
           tags: newDoctorForm.tags || [],
-          morningShift: doc.morningShift || newDoctorForm.morningShift || '10:00 AM - 02:00 PM',
-          eveningShift: doc.eveningShift || newDoctorForm.eveningShift || '05:00 PM - 08:00 PM',
+          morningShift: scheduleType === 'FULL_DAY' ? newDoctorForm.timings : (doc.morningShift || newDoctorForm.morningShift),
+          eveningShift: scheduleType === 'FULL_DAY' ? '' : (doc.eveningShift || newDoctorForm.eveningShift),
+          activeShift: finalActiveShift,
+          scheduleType: scheduleType,
           staffUsername: hospitalBaseId,
           staffPassword: newDoctorForm.staffPassword.trim() || 'hospital123',
           profilePic: doc.profilePic?.trim() ? doc.profilePic.trim() : defaultPic,
           clinicImages: newDoctorForm.clinicImages || ['', ''],
-        });
+        } as any);
       });
       setSaveSuccessMsg(`Hospital "${newDoctorForm.clinicName}" with ${validDoctors.length} doctors onboarded!`);
     }
@@ -483,7 +491,7 @@ export const SuperAdminDashboard: React.FC = () => {
       profilePic: '',
       clinicImages: ['', ''],
       tags: [],
-      timings: '10:00 AM - 02:00 PM & 05:00 PM - 08:00 PM',
+      timings: '10:00 AM - 05:00 PM',
       morningShift: '10:00 AM - 02:00 PM',
       eveningShift: '05:00 PM - 08:00 PM',
       consultationFee: 20,
@@ -904,7 +912,7 @@ export const SuperAdminDashboard: React.FC = () => {
                                       </span>
                                     </div>
                                     <div className="text-xs text-slate-500 mt-0.5">
-                                      {doc.specialty} • {doc.degree} • Shift: {doc.morningShift} & {doc.eveningShift}
+                                      {doc.specialty} • {doc.degree} • Shift: {doc.morningShift} {doc.eveningShift ? `& ${doc.eveningShift}` : ''}
                                     </div>
                                   </div>
                                 </div>
@@ -1364,6 +1372,48 @@ export const SuperAdminDashboard: React.FC = () => {
                 </div>
               </div>
 
+              {/* 🔹 NEW: Schedule Type Selector (Shift Wise vs Full Day) inside Admin Modal */}
+              <div className="p-3.5 rounded-2xl bg-indigo-50/60 border border-indigo-200">
+                <span className="block text-xs font-bold uppercase tracking-wider text-indigo-900 mb-2">
+                  Clinic Working Schedule Type *
+                </span>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition ${
+                    scheduleType === 'SHIFT_BASED' ? 'bg-white border-indigo-600 text-indigo-900 font-bold shadow-xs' : 'bg-white/50 border-slate-200 text-slate-600'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="adminScheduleType"
+                      value="SHIFT_BASED"
+                      checked={scheduleType === 'SHIFT_BASED'}
+                      onChange={() => setScheduleType('SHIFT_BASED')}
+                      className="h-4 w-4 text-indigo-600"
+                    />
+                    <div>
+                      <span className="text-xs block leading-tight font-bold">Shift Wise</span>
+                      <span className="text-[10px] text-slate-500 font-normal">Morning & Evening Shifts</span>
+                    </div>
+                  </label>
+
+                  <label className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition ${
+                    scheduleType === 'FULL_DAY' ? 'bg-white border-indigo-600 text-indigo-900 font-bold shadow-xs' : 'bg-white/50 border-slate-200 text-slate-600'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="adminScheduleType"
+                      value="FULL_DAY"
+                      checked={scheduleType === 'FULL_DAY'}
+                      onChange={() => setScheduleType('FULL_DAY')}
+                      className="h-4 w-4 text-indigo-600"
+                    />
+                    <div>
+                      <span className="text-xs block leading-tight font-bold">Full Day / Day OPD</span>
+                      <span className="text-[10px] text-slate-500 font-normal">Continuous (e.g. 10AM - 5PM)</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
               {/* 2. Common Establishment Info */}
               <div className="space-y-3">
                 <div>
@@ -1379,6 +1429,21 @@ export const SuperAdminDashboard: React.FC = () => {
                     className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-blue-600 focus:outline-none"
                   />
                 </div>
+
+                {/* Timings Input: Dynamic based on scheduleType */}
+                {scheduleType === 'FULL_DAY' ? (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Full Day Timing *</label>
+                    <input
+                      type="text"
+                      required
+                      value={newDoctorForm.timings}
+                      onChange={(e) => setNewDoctorForm({ ...newDoctorForm, timings: e.target.value })}
+                      placeholder="e.g. 10:00 AM - 05:00 PM"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-blue-600 focus:outline-none font-mono"
+                    />
+                  </div>
+                ) : null}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
@@ -1536,28 +1601,30 @@ export const SuperAdminDashboard: React.FC = () => {
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">Morning Shift</label>
-                      <input
-                        type="text"
-                        value={newDoctorForm.morningShift}
-                        onChange={(e) => setNewDoctorForm({ ...newDoctorForm, morningShift: e.target.value })}
-                        placeholder="10:00 AM - 02:00 PM"
-                        className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs bg-white focus:outline-none"
-                      />
+                  {scheduleType === 'SHIFT_BASED' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Morning Shift</label>
+                        <input
+                          type="text"
+                          value={newDoctorForm.morningShift}
+                          onChange={(e) => setNewDoctorForm({ ...newDoctorForm, morningShift: e.target.value })}
+                          placeholder="10:00 AM - 02:00 PM"
+                          className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs bg-white focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Evening Shift</label>
+                        <input
+                          type="text"
+                          value={newDoctorForm.eveningShift}
+                          onChange={(e) => setNewDoctorForm({ ...newDoctorForm, eveningShift: e.target.value })}
+                          placeholder="05:00 PM - 08:00 PM"
+                          className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs bg-white focus:outline-none"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">Evening Shift</label>
-                      <input
-                        type="text"
-                        value={newDoctorForm.eveningShift}
-                        onChange={(e) => setNewDoctorForm({ ...newDoctorForm, eveningShift: e.target.value })}
-                        placeholder="05:00 PM - 08:00 PM"
-                        className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs bg-white focus:outline-none"
-                      />
-                    </div>
-                  </div>
+                  )}
                 </div>
               )}
 
