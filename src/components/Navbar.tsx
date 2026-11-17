@@ -2,8 +2,9 @@ import React from 'react';
 import { Activity } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
-  // Check if current URL path contains '/staff'
-  const isStaffPage = typeof window !== 'undefined' && window.location.pathname.includes('/staff');
+  const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+  const isStaffPage = currentPath.includes('/staff');
+  const isAdminPage = currentPath.includes('/admin');
 
   return (
     <header className="sticky top-0 z-50 w-full max-w-[100vw] overflow-x-hidden border-b border-slate-200 bg-white/95 backdrop-blur-md shadow-xs">
@@ -36,9 +37,27 @@ export const Navbar: React.FC = () => {
           </div>
         </div>
 
-        {/* Right side: Clean Indicator (Public OPD vs Staff Desk) */}
+        {/* Right side: Dynamic Indicator (Public OPD vs Staff Desk vs Admin with Secret Clicks) */}
         <div className="flex items-center gap-2">
-          {isStaffPage ? (
+          {isAdminPage ? (
+            <div 
+              onClick={(e) => {
+                // Detect multi-clicks securely
+                if (e.detail === 2) {
+                  // 2 Clicks -> Public OPD
+                  window.location.href = '/';
+                } else if (e.detail >= 3) {
+                  // 3 Clicks -> Staff Portal
+                  window.location.href = '/staff';
+                }
+              }}
+              className="flex items-center gap-1.5 bg-slate-900 border border-slate-700 text-slate-100 px-3.5 py-1.5 rounded-xl text-xs font-bold select-none cursor-pointer shadow-sm active:scale-95 transition"
+              title="Admin Portal (Double click: Public | Triple click: Staff)"
+            >
+              <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse"></span>
+              <span>Admin</span>
+            </div>
+          ) : isStaffPage ? (
             <div 
               onDoubleClick={() => {
                 window.location.href = '/';
