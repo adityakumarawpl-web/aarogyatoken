@@ -247,6 +247,39 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return () => unsubscribePat();
   }, []);
 
+// Doctors Real-time Sync with Firestore & Auto Leave Expiry Check
+  useEffect(() => {
+    const unsubscribeDoc = onSnapshot(collection(db, 'doctors'), async (snapshot) => {
+      const todayStr = new Date().toISOString().split('T')[0];
+      if (snapshot.empty) {
+        for (const d of INITIAL_DOCTORS) {
+          await setDoc(doc(db, 'doctors', d.id), d);
+        }
+      } else {
+        const loadedDocs: Doctor[] = snapshot.docs.map((docSnap) => {
+          const dData = docSnap.data() as Doctor;
+          
+          // 🔹 Yahin par automatic leave expiry check lga hai:
+          if (dData.status === 'LEAVE' && dData.leaveEndDate && todayStr > dData.leaveEndDate) {
+            dData.status = 'OPD_CLOSE';
+            dData.statusNote = 'Leave period ended, OPD auto-closed pending staff approval';
+            updateDoc(doc(db, 'doctors', dData.id), {
+              status: 'OPD_CLOSE',
+              statusNote: 'Leave period ended, OPD auto-closed pending staff approval',
+            }).catch(console.error);
+          }
+
+          return dData;
+        });
+        setDoctors(loadedDocs);
+      }
+    }, (error) => {
+      console.error("Error fetching live doctors:", error);
+    });
+
+    return () => unsubscribeDoc();
+  }, []);
+  
   const [currentView, setCurrentView] = useState<'PUBLIC' | 'STAFF' | 'ADMIN'>('PUBLIC');
   const [selectedDoctorId, setSelectedDoctorId] = useState<string>('doc-1');
   const [staffDoctorId, setStaffDoctorId] = useState<string | null>(() => {
