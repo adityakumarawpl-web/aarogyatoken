@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useClinic } from '../../context/ClinicContext';
-import { getAutoTagSuggestions } from '../../utils/tagEngine';
 import { ArrowLeft, CheckCircle2, Sparkles, X } from 'lucide-react';
 
 export const DoctorRegisterPage: React.FC = () => {
@@ -8,7 +7,7 @@ export const DoctorRegisterPage: React.FC = () => {
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
   
   const [establishmentType, setEstablishmentType] = useState<'CLINIC' | 'HOSPITAL'>('CLINIC');
-  const [customTagInput, setCustomTagInput] = useState('');
+  const [scheduleType, setScheduleType] = useState<'SHIFT_BASED' | 'FULL_DAY'>('SHIFT_BASED');
 
   const [newDoctorForm, setNewDoctorForm] = useState({
     name: '',
@@ -22,7 +21,7 @@ export const DoctorRegisterPage: React.FC = () => {
     profilePic: '',
     clinicImages: ['', ''],
     tags: [] as string[],
-    timings: '10:00 AM - 02:00 PM & 05:00 PM - 08:00 PM',
+    timings: '10:00 AM - 05:00 PM',
     morningShift: '10:00 AM - 02:00 PM',
     eveningShift: '05:00 PM - 08:00 PM',
     consultationFee: 20,
@@ -116,6 +115,11 @@ export const DoctorRegisterPage: React.FC = () => {
       ? `${newDoctorForm.address.trim()}, ${newDoctorForm.city.trim()}`
       : newDoctorForm.city.trim();
 
+    // Schedule type ke hisab se timings aur shifts set karein
+    const finalMorning = scheduleType === 'FULL_DAY' ? newDoctorForm.timings : newDoctorForm.morningShift;
+    const finalEvening = scheduleType === 'FULL_DAY' ? '' : newDoctorForm.eveningShift;
+    const finalActiveShift = scheduleType === 'FULL_DAY' ? 'FullDay' : 'Morning';
+
     if (establishmentType === 'CLINIC') {
       if (!newDoctorForm.name.trim()) {
         alert('Kripya Doctor ka Naam bharein!');
@@ -136,9 +140,11 @@ export const DoctorRegisterPage: React.FC = () => {
         tags: newDoctorForm.tags || [],
         profilePic: picToSave,
         clinicImages: newDoctorForm.clinicImages || ['', ''],
-        morningShift: newDoctorForm.morningShift || '10:00 AM - 02:00 PM',
-        eveningShift: newDoctorForm.eveningShift || '05:00 PM - 08:00 PM',
-      });
+        morningShift: finalMorning,
+        eveningShift: finalEvening,
+        activeShift: finalActiveShift,
+        scheduleType: scheduleType,
+      } as any);
       setSaveSuccessMsg(`Clinic "${newDoctorForm.clinicName}" created successfully!`);
     } else {
       const validDoctors = hospitalDoctors.filter((doc) => doc.name.trim());
@@ -162,13 +168,15 @@ export const DoctorRegisterPage: React.FC = () => {
           specialty: doc.specialty.trim(),
           cabinNumber: doc.cabinNumber.trim() || `Cabin ${idx + 1}`,
           tags: newDoctorForm.tags || [],
-          morningShift: doc.morningShift || newDoctorForm.morningShift || '10:00 AM - 02:00 PM',
-          eveningShift: doc.eveningShift || newDoctorForm.eveningShift || '05:00 PM - 08:00 PM',
+          morningShift: scheduleType === 'FULL_DAY' ? newDoctorForm.timings : (doc.morningShift || newDoctorForm.morningShift),
+          eveningShift: scheduleType === 'FULL_DAY' ? '' : (doc.eveningShift || newDoctorForm.eveningShift),
+          activeShift: finalActiveShift,
+          scheduleType: scheduleType,
           staffUsername: hospitalBaseId,
           staffPassword: newDoctorForm.staffPassword.trim() || 'hospital123',
           profilePic: doc.profilePic?.trim() ? doc.profilePic.trim() : defaultPic,
           clinicImages: newDoctorForm.clinicImages || ['', ''],
-        });
+        } as any);
       });
       setSaveSuccessMsg(`Hospital "${newDoctorForm.clinicName}" with ${validDoctors.length} doctors onboarded!`);
     }
@@ -206,6 +214,7 @@ export const DoctorRegisterPage: React.FC = () => {
 
         <form onSubmit={handleCreateDoctor} className="p-6 sm:p-8 space-y-5 max-h-[75vh] overflow-y-auto">
           
+          {/* Establishment Type */}
           <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
             <span className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
               Select Establishment Type *
@@ -247,6 +256,48 @@ export const DoctorRegisterPage: React.FC = () => {
             </div>
           </div>
 
+          {/* 🔹 NEW: Schedule Type Selector (Shift Wise vs Full Day) */}
+          <div className="p-4 rounded-2xl bg-indigo-50/60 border border-indigo-200">
+            <span className="block text-xs font-bold uppercase tracking-wider text-indigo-900 mb-2">
+              Clinic Working Schedule Type *
+            </span>
+            <div className="grid grid-cols-2 gap-3">
+              <label className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition ${
+                scheduleType === 'SHIFT_BASED' ? 'bg-white border-indigo-600 text-indigo-900 font-bold shadow-xs' : 'bg-white/50 border-slate-200 text-slate-600'
+              }`}>
+                <input
+                  type="radio"
+                  name="scheduleType"
+                  value="SHIFT_BASED"
+                  checked={scheduleType === 'SHIFT_BASED'}
+                  onChange={() => setScheduleType('SHIFT_BASED')}
+                  className="h-4 w-4 text-indigo-600"
+                />
+                <div>
+                  <span className="text-xs block leading-tight font-bold">Shift Wise</span>
+                  <span className="text-[10px] text-slate-500 font-normal">Morning & Evening Shifts</span>
+                </div>
+              </label>
+
+              <label className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition ${
+                scheduleType === 'FULL_DAY' ? 'bg-white border-indigo-600 text-indigo-900 font-bold shadow-xs' : 'bg-white/50 border-slate-200 text-slate-600'
+              }`}>
+                <input
+                  type="radio"
+                  name="scheduleType"
+                  value="FULL_DAY"
+                  checked={scheduleType === 'FULL_DAY'}
+                  onChange={() => setScheduleType('FULL_DAY')}
+                  className="h-4 w-4 text-indigo-600"
+                />
+                <div>
+                  <span className="text-xs block leading-tight font-bold">Full Day / Day OPD</span>
+                  <span className="text-[10px] text-slate-500 font-normal">Continuous (e.g. 10AM - 5PM)</span>
+                </div>
+              </label>
+            </div>
+          </div>
+
           <div className="space-y-3.5">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -261,6 +312,46 @@ export const DoctorRegisterPage: React.FC = () => {
                 className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-blue-600 focus:outline-none"
               />
             </div>
+
+            {/* Timings Input: Dynamic based on scheduleType */}
+            {scheduleType === 'FULL_DAY' ? (
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Full Day Timing *</label>
+                <input
+                  type="text"
+                  required
+                  value={newDoctorForm.timings}
+                  onChange={(e) => setNewDoctorForm({ ...newDoctorForm, timings: e.target.value })}
+                  placeholder="e.g. 10:00 AM - 05:00 PM"
+                  className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-blue-600 focus:outline-none font-mono"
+                />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Morning Shift Timing *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newDoctorForm.morningShift}
+                    onChange={(e) => setNewDoctorForm({ ...newDoctorForm, morningShift: e.target.value })}
+                    placeholder="e.g. 10:00 AM - 02:00 PM"
+                    className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs focus:border-blue-600 focus:outline-none font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Evening Shift Timing *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newDoctorForm.eveningShift}
+                    onChange={(e) => setNewDoctorForm({ ...newDoctorForm, eveningShift: e.target.value })}
+                    placeholder="e.g. 05:00 PM - 08:00 PM"
+                    className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs focus:border-blue-600 focus:outline-none font-mono"
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div>
@@ -504,7 +595,7 @@ export const DoctorRegisterPage: React.FC = () => {
           )}
 
           <button
-            type="submit"
+            type="establishment-submit"
             disabled={isCurrentUsernameTaken}
             className={`w-full rounded-xl py-3.5 text-xs font-bold text-white shadow-lg transition cursor-pointer ${
               isCurrentUsernameTaken ? 'bg-slate-400 cursor-not-allowed opacity-60' : 'bg-blue-600 hover:bg-blue-500'
