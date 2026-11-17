@@ -777,8 +777,12 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           return Number(a.tokenNumber) - Number(b.tokenNumber);
         });
 
-      remainingWaiting.slice(0, 5).forEach((pat, index) => {
+      // Jab #1 IN_CABIN hoga, toh remainingWaiting = [#2, #3, #4, #5, ...]
+      // slice(0, 4) exact #5 (index 3) tak check karega aur index + 1 = 4 mareez aage bhejega
+      remainingWaiting.slice(0, 4).forEach((pat, index) => {
         if (pat.bookingType !== 'ONLINE' || pat.botCallAlertSent) return;
+
+        const patientsAheadCount = index + 1;
 
         updateDoc(doc(db, 'patients', pat.id), {
           botCallAlertSent: true,
@@ -789,7 +793,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           prev.map((p) => (p.id === pat.id ? { ...p, botCallAlertSent: true } : p))
         );
 
-        sendTurnReminderWhatsApp(pat, matchedDoc, index);
+        sendTurnReminderWhatsApp(pat, matchedDoc, patientsAheadCount);
       });
     }
   }, [patients, doctors]);
