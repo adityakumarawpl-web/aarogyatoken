@@ -391,7 +391,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="e.g. Ramesh Chandra"
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm focus:border-blue-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm focus:outline-none"
                 />
               </div>
 
@@ -494,7 +494,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
             </form>
           )}
 
-          {/* STEP 2: CLEAN RAZORPAY / UPI PAYMENT GATEWAY (Extra text & static keys removed) */}
+          {/* STEP 2: DYNAMIC QR CODE + RAZORPAY GREEN BUTTON INTEGRATION */}
           {step === 'PAYMENT' && (
             <div className="space-y-4 py-2">
               <div className="rounded-2xl bg-slate-900 text-white p-4 shadow-md">
@@ -529,20 +529,35 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                 </div>
               </div>
 
-              {/* Dynamic Secure Payment Prompt */}
-              <div className="rounded-2xl border-2 border-dashed border-blue-300 p-6 text-center bg-blue-50/40 flex flex-col items-center justify-center space-y-3">
-                <div className="h-12 w-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/30">
-                  <QrCode className="h-6 w-6" />
+              {/* Dynamic QR Code Section */}
+              <div className="rounded-2xl border-2 border-dashed border-blue-300 p-4 text-center bg-blue-50/40 flex flex-col items-center justify-center">
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 text-white text-[10px] sm:text-[11px] font-bold px-3 py-1 mb-2">
+                  <QrCode className="h-3.5 w-3.5" />
+                  <span>Scan to Pay ₹20 (QR कोड स्कैन करें)</span>
                 </div>
-                <div>
-                  <h4 className="text-sm font-bold text-slate-900">Instant UPI & Card Payment</h4>
-                  <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
-                    Neeche diye gaye button par click karke Razorpay official secure popup kholen aur Google Pay, PhonePe, UPI ya Credit/Debit card se payment karein.
-                  </p>
+
+                <div className="relative h-36 w-36 bg-white p-2 rounded-xl border-2 border-slate-200 shadow-sm flex items-center justify-center my-1">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=upi://pay?pa=aarogya.opd@icici%26pn=${encodeURIComponent(doctor.name)}%26am=20.00%26cu=INR%26tn=Token_${doctor.id}_${Date.now()}`}
+                    alt="Scan ₹20 QR Code"
+                    className="h-32 w-32"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="bg-white/95 rounded-md px-1.5 py-0.5 text-[9px] font-black text-blue-700 shadow-xs border border-blue-200">
+                      ₹20
+                    </div>
+                  </div>
                 </div>
+
+                <span className="text-xs font-mono font-bold text-slate-800 mt-1 block">
+                  UPI ID: aarogya.opd@icici
+                </span>
+                <p className="text-[10px] text-slate-600">
+                  GPay, PhonePe, Paytm ya kisi bhi app se scan karein.
+                </p>
               </div>
 
-              {/* Action Buttons */}
+              {/* Action Buttons (Green Razorpay Button + Back) */}
               <div className="space-y-2.5 pt-1">
                 <button
                   type="button"
