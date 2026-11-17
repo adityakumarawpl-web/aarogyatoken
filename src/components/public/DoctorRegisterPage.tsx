@@ -1,19 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useClinic } from '../../context/ClinicContext';
 import { getAutoTagSuggestions } from '../../utils/tagEngine';
-import { Building, Stethoscope, ArrowLeft, CheckCircle2, Sparkles, X } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Sparkles, X } from 'lucide-react';
 
 export const DoctorRegisterPage: React.FC = () => {
   const { doctors, addNewDoctor } = useClinic();
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
   
-  // Type: Clinic ya Hospital
   const [establishmentType, setEstablishmentType] = useState<'CLINIC' | 'HOSPITAL'>('CLINIC');
-  
-  // Custom Tag Input State
   const [customTagInput, setCustomTagInput] = useState('');
 
-  // New Doctor Form State
   const [newDoctorForm, setNewDoctorForm] = useState({
     name: '',
     degree: '',
@@ -35,7 +31,6 @@ export const DoctorRegisterPage: React.FC = () => {
     avgTimePerPatientMinutes: 10,
   });
 
-  // Hospital ke liye multiple doctors ki list
   const [hospitalDoctors, setHospitalDoctors] = useState<Array<{
     name: string;
     degree: string;
@@ -56,28 +51,12 @@ export const DoctorRegisterPage: React.FC = () => {
     },
   ]);
 
-  // SMART USERNAME AUTO-GENERATOR
   useEffect(() => {
-    const cleanCity = newDoctorForm.city
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]/g, '');
-
-    const cleanClinic = newDoctorForm.clinicName
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]/g, '_')
-      .replace(/_+/g, '_')
-      .replace(/^_|_$/g, '');
+    const cleanCity = newDoctorForm.city.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+    const cleanClinic = newDoctorForm.clinicName.toLowerCase().trim().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
 
     if (establishmentType === 'CLINIC') {
-      const cleanDoc = newDoctorForm.name
-        .toLowerCase()
-        .trim()
-        .replace(/[^a-z0-9]/g, '_')
-        .replace(/_+/g, '_')
-        .replace(/^_|_$/g, '');
-
+      const cleanDoc = newDoctorForm.name.toLowerCase().trim().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
       const parts = [cleanDoc, cleanClinic, cleanCity].filter(Boolean);
       const generated = parts.join('_');
       if (generated) {
@@ -90,12 +69,7 @@ export const DoctorRegisterPage: React.FC = () => {
         setNewDoctorForm((prev) => ({ ...prev, staffUsername: generated }));
       }
     }
-  }, [
-    establishmentType,
-    newDoctorForm.name,
-    newDoctorForm.clinicName,
-    newDoctorForm.city,
-  ]);
+  }, [establishmentType, newDoctorForm.name, newDoctorForm.clinicName, newDoctorForm.city]);
 
   const isUsernameTaken = (username: string): boolean => {
     if (!username.trim()) return false;
@@ -132,7 +106,6 @@ export const DoctorRegisterPage: React.FC = () => {
     }
 
     const defaultPic = 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=300';
-    
     const autoRazorpayData = {
       razorpayEnabled: true,
       razorpayKeyId: (import.meta as any).env?.VITE_RAZORPAY_KEY_ID || '',
@@ -233,26 +206,21 @@ export const DoctorRegisterPage: React.FC = () => {
 
         <form onSubmit={handleCreateDoctor} className="p-6 sm:p-8 space-y-5 max-h-[75vh] overflow-y-auto">
           
-          {/* Establishment Type Selector */}
           <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
             <span className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
               Select Establishment Type *
             </span>
             <div className="grid grid-cols-2 gap-3">
-              <label
-                className={`flex items-center gap-2.5 p-3.5 rounded-xl border cursor-pointer transition ${
-                  establishmentType === 'CLINIC'
-                    ? 'bg-blue-50 border-blue-600 text-blue-900 font-bold'
-                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
-                }`}
-              >
+              <label className={`flex items-center gap-2.5 p-3.5 rounded-xl border cursor-pointer transition ${
+                establishmentType === 'CLINIC' ? 'bg-blue-50 border-blue-600 text-blue-900 font-bold' : 'bg-white border-slate-200 text-slate-700'
+              }`}>
                 <input
                   type="radio"
                   name="establishmentType"
                   value="CLINIC"
                   checked={establishmentType === 'CLINIC'}
                   onChange={() => setEstablishmentType('CLINIC')}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+                  className="h-4 w-4 text-blue-600"
                 />
                 <div>
                   <span className="text-sm block leading-none">Private Clinic</span>
@@ -260,20 +228,16 @@ export const DoctorRegisterPage: React.FC = () => {
                 </div>
               </label>
 
-              <label
-                className={`flex items-center gap-2.5 p-3.5 rounded-xl border cursor-pointer transition ${
-                  establishmentType === 'HOSPITAL'
-                    ? 'bg-blue-50 border-blue-600 text-blue-900 font-bold'
-                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
-                }`}
-              >
+              <label className={`flex items-center gap-2.5 p-3.5 rounded-xl border cursor-pointer transition ${
+                establishmentType === 'HOSPITAL' ? 'bg-blue-50 border-blue-600 text-blue-900 font-bold' : 'bg-white border-slate-200 text-slate-700'
+              }`}>
                 <input
                   type="radio"
                   name="establishmentType"
                   value="HOSPITAL"
                   checked={establishmentType === 'HOSPITAL'}
                   onChange={() => setEstablishmentType('HOSPITAL')}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+                  className="h-4 w-4 text-blue-600"
                 />
                 <div>
                   <span className="text-sm block leading-none">Hospital</span>
@@ -283,7 +247,6 @@ export const DoctorRegisterPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Common Establishment Info */}
           <div className="space-y-3.5">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -301,13 +264,13 @@ export const DoctorRegisterPage: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Address (Gali / Mohalla / Landmark) *</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Address *</label>
                 <input
                   type="text"
                   required
                   value={newDoctorForm.address}
                   onChange={(e) => setNewDoctorForm({ ...newDoctorForm, address: e.target.value })}
-                  placeholder="e.g. Rewa Road, Near Old Bus Stand"
+                  placeholder="e.g. Rewa Road"
                   className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-blue-600 focus:outline-none"
                 />
               </div>
@@ -337,17 +300,14 @@ export const DoctorRegisterPage: React.FC = () => {
               />
             </div>
 
-            {/* Common Staff Credentials */}
             <div className="rounded-2xl bg-amber-50 border border-amber-200 p-4 space-y-2.5">
               <span className="text-xs font-bold text-amber-900 uppercase tracking-wider block">
-                {establishmentType === 'CLINIC' ? 'Staff Login Credentials' : 'Hospital Reception Common Login'}
+                Staff Login Credentials
               </span>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="block text-[10px] font-bold text-slate-700">
-                      Staff ID * (Auto Generated)
-                    </label>
+                    <label className="block text-[10px] font-bold text-slate-700">Staff ID *</label>
                     {newDoctorForm.staffUsername.trim() && (
                       <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
                         isCurrentUsernameTaken ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-800'
@@ -384,7 +344,6 @@ export const DoctorRegisterPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Single Clinic Doctor Details */}
           {establishmentType === 'CLINIC' && (
             <div className="space-y-3.5 p-4 rounded-2xl bg-slate-50 border border-slate-200">
               <span className="block text-xs font-bold uppercase tracking-wider text-slate-600">
@@ -404,32 +363,32 @@ export const DoctorRegisterPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Degree / Qualification *</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Degree *</label>
                   <input
                     type="text"
                     required
                     value={newDoctorForm.degree}
                     onChange={(e) => setNewDoctorForm({ ...newDoctorForm, degree: e.target.value })}
-                    placeholder="e.g. MBBS, MD (Medicine)"
+                    placeholder="e.g. MBBS, MD"
                     className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs bg-white focus:outline-none"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Specialty / Department *</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Specialty *</label>
                 <input
                   type="text"
                   required
                   value={newDoctorForm.specialty}
                   onChange={(e) => setNewDoctorForm({ ...newDoctorForm, specialty: e.target.value })}
-                  placeholder="e.g. Cardiologist & Heart Specialist"
+                  placeholder="e.g. Cardiologist"
                   className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs bg-white focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Doctor DP / Profile Picture URL</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Profile Picture URL</label>
                 <input
                   type="text"
                   value={newDoctorForm.profilePic}
@@ -441,7 +400,6 @@ export const DoctorRegisterPage: React.FC = () => {
             </div>
           )}
 
-          {/* Multi-Doctor Hospital Section */}
           {establishmentType === 'HOSPITAL' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -464,7 +422,7 @@ export const DoctorRegisterPage: React.FC = () => {
                       },
                     ])
                   }
-                  className="rounded-xl bg-blue-600 text-white px-3 py-1.5 text-xs font-bold hover:bg-blue-700 transition cursor-pointer"
+                  className="rounded-xl bg-blue-600 text-white px-3 py-1.5 text-xs font-bold hover:bg-blue-700 cursor-pointer"
                 >
                   + Add Another Doctor
                 </button>
@@ -495,7 +453,7 @@ export const DoctorRegisterPage: React.FC = () => {
                           updated[idx].name = e.target.value;
                           setHospitalDoctors(updated);
                         }}
-                        placeholder="Doctor Full Name (e.g. Dr. Vinamra Jain)"
+                        placeholder="Doctor Full Name"
                         className="w-full rounded-xl border border-slate-300 px-3 py-1.5 text-xs bg-white focus:outline-none"
                       />
                     </div>
@@ -524,7 +482,7 @@ export const DoctorRegisterPage: React.FC = () => {
                         updated[idx].degree = e.target.value;
                         setHospitalDoctors(updated);
                       }}
-                      placeholder="Degree (e.g. MBBS, MS)"
+                      placeholder="Degree"
                       className="w-full rounded-xl border border-slate-300 px-3 py-1.5 text-xs bg-white focus:outline-none"
                     />
                     <input
@@ -536,7 +494,7 @@ export const DoctorRegisterPage: React.FC = () => {
                         updated[idx].specialty = e.target.value;
                         setHospitalDoctors(updated);
                       }}
-                      placeholder="Specialty (e.g. Surgeon)"
+                      placeholder="Specialty"
                       className="w-full rounded-xl border border-slate-300 px-3 py-1.5 text-xs bg-white focus:outline-none"
                     />
                   </div>
@@ -544,50 +502,6 @@ export const DoctorRegisterPage: React.FC = () => {
               ))}
             </div>
           )}
-
-          {/* Smart Auto Tags */}
-          <div className="rounded-2xl bg-indigo-50/70 border border-indigo-200 p-3.5 space-y-2">
-            <span className="text-xs font-bold text-indigo-900 uppercase tracking-wider flex items-center gap-1.5">
-              <Sparkles className="h-4 w-4 text-indigo-600" />
-              <span>Search Keywords & Tags</span>
-            </span>
-            <div className="flex flex-wrap gap-1.5 min-h-[28px]">
-              {(newDoctorForm.tags || []).map((tag) => (
-                <span key={tag} className="inline-flex items-center gap-1 bg-indigo-600 text-white text-[11px] font-bold px-2 py-0.5 rounded-lg">
-                  <span>{tag}</span>
-                  <button
-                    type="button"
-                    onClick={() => setNewDoctorForm({ ...newDoctorForm, tags: newDoctorForm.tags.filter((t) => t !== tag) })}
-                    className="cursor-pointer"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={customTagInput}
-                onChange={(e) => setCustomTagInput(e.target.value)}
-                placeholder="Koi keyword likhein aur Add dabayein..."
-                className="flex-1 rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-xs focus:outline-none"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  const val = customTagInput.trim();
-                  if (val && !(newDoctorForm.tags || []).includes(val)) {
-                    setNewDoctorForm({ ...newDoctorForm, tags: [...newDoctorForm.tags, val] });
-                    setCustomTagInput('');
-                  }
-                }}
-                className="rounded-xl bg-indigo-600 text-white px-3.5 py-1.5 text-xs font-bold cursor-pointer"
-              >
-                Add
-              </button>
-            </div>
-          </div>
 
           <button
             type="submit"
