@@ -211,15 +211,30 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [doctors, setDoctors] = useState<Doctor[]>(INITIAL_DOCTORS);
   const [patients, setPatients] = useState<Patient[]>(INITIAL_PATIENTS);
 
-  // Doctors Real-time Sync with Firestore
+  // Doctors Real-time Sync with Firestore & Auto Leave Expiry Check
   useEffect(() => {
     const unsubscribeDoc = onSnapshot(collection(db, 'doctors'), async (snapshot) => {
+      const todayStr = new Date().toISOString().split('T')[0];
       if (snapshot.empty) {
         for (const d of INITIAL_DOCTORS) {
           await setDoc(doc(db, 'doctors', d.id), d);
         }
       } else {
-        const loadedDocs: Doctor[] = snapshot.docs.map((docSnap) => docSnap.data() as Doctor);
+        const loadedDocs: Doctor[] = snapshot.docs.map((docSnap) => {
+          const dData = docSnap.data() as Doctor;
+
+          // Automatic Leave Expiry Check
+          if (dData.status === 'LEAVE' && dData.leaveEndDate && todayStr > dData.leaveEndDate) {
+            dData.status = 'OPD_CLOSE';
+            dData.statusNote = 'Leave period ended, OPD auto-closed pending staff approval';
+            updateDoc(doc(db, 'doctors', dData.id), {
+              status: 'OPD_CLOSE',
+              statusNote: 'Leave period ended, OPD auto-closed pending staff approval',
+            }).catch(console.error);
+          }
+
+          return dData;
+        });
         setDoctors(loadedDocs);
       }
     }, (error) => {
@@ -247,39 +262,6 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return () => unsubscribePat();
   }, []);
 
-// Doctors Real-time Sync with Firestore & Auto Leave Expiry Check
-  useEffect(() => {
-    const unsubscribeDoc = onSnapshot(collection(db, 'doctors'), async (snapshot) => {
-      const todayStr = new Date().toISOString().split('T')[0];
-      if (snapshot.empty) {
-        for (const d of INITIAL_DOCTORS) {
-          await setDoc(doc(db, 'doctors', d.id), d);
-        }
-      } else {
-        const loadedDocs: Doctor[] = snapshot.docs.map((docSnap) => {
-          const dData = docSnap.data() as Doctor;
-          
-          // 🔹 Yahin par automatic leave expiry check lga hai:
-          if (dData.status === 'LEAVE' && dData.leaveEndDate && todayStr > dData.leaveEndDate) {
-            dData.status = 'OPD_CLOSE';
-            dData.statusNote = 'Leave period ended, OPD auto-closed pending staff approval';
-            updateDoc(doc(db, 'doctors', dData.id), {
-              status: 'OPD_CLOSE',
-              statusNote: 'Leave period ended, OPD auto-closed pending staff approval',
-            }).catch(console.error);
-          }
-
-          return dData;
-        });
-        setDoctors(loadedDocs);
-      }
-    }, (error) => {
-      console.error("Error fetching live doctors:", error);
-    });
-
-    return () => unsubscribeDoc();
-  }, []);
-  
   const [currentView, setCurrentView] = useState<'PUBLIC' | 'STAFF' | 'ADMIN'>('PUBLIC');
   const [selectedDoctorId, setSelectedDoctorId] = useState<string>('doc-1');
   const [staffDoctorId, setStaffDoctorId] = useState<string | null>(() => {
@@ -415,10 +397,11 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  // 🔹 1. Start Shift Session
+  // 🔹 1. Start Shift / Full Day Session
   const startDoctorSession = useCallback(async (doctorId: string) => {
     const matchedDoc = doctors.find((d) => d.id === doctorId);
-    const currentShift = matchedDoc?.activeShift || 'Morning';
+    const isFullDay = (matchedDoc as any)?.scheduleType === 'FULL_DAY' || (matchedDoc?.activeShift || '').toLowerCase() === 'fullday';
+    const currentShift: any = isFullDay ? 'FullDay' : (matchedDoc?.activeShift || 'Morning');
 
     setDoctors((prev) =>
       prev.map((d) => (d.id === doctorId ? { ...d, isSessionActive: true, activeShift: currentShift } : d))
@@ -437,13 +420,10 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const targetPatients = patients.filter((p) => {
       const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
+      if (p.doctorId !== doctorId || pDate !== targetDate || p.status !== 'WAITING') return false;
+      if (isFullDay) return true;
       const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim().toLowerCase();
-      return (
-        p.doctorId === doctorId &&
-        pDate === targetDate &&
-        pShift === currentShift.toLowerCase() &&
-        p.status === 'WAITING'
-      );
+      return pShift === currentShift.toLowerCase();
     }).sort((a, b) => Number(a.tokenNumber) - Number(b.tokenNumber));
 
     const topWaitingList = targetPatients.slice(0, 4);
@@ -461,6 +441,10 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         botCallAlertSent: true,
         botCallAlertSentAt: new Date().toISOString(),
       }).catch(console.error);
+
+      setPatients((prev) =>
+        prev.map((p) => (p.id === patient.id ? { ...p, botCallAlertSent: true } : p))
+      );
 
       sendTurnReminderWhatsApp(patient, matchedDoc, aheadCount);
     });
@@ -481,21 +465,19 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, []);
 
-  // 🔹 3. Complete Shift -> Auto switches shift & sets status to 'OPD_CLOSE'
+  // 🔹 3. Complete Shift / Full Day -> Auto marks unseen as NOT_AVAILABLE & sets status to 'OPD_CLOSE'
   const completeDoctorShift = useCallback(async (doctorId: string) => {
     const matchedDoc = doctors.find((d) => d.id === doctorId);
-    const currentShift = matchedDoc?.activeShift || 'Morning';
+    const isFullDay = (matchedDoc as any)?.scheduleType === 'FULL_DAY' || (matchedDoc?.activeShift || '').toLowerCase() === 'fullday';
+    const currentShift = isFullDay ? 'FullDay' : (matchedDoc?.activeShift || 'Morning');
     const todayStr = new Date().toISOString().split('T')[0];
 
     const remainingUnseenPatients = patients.filter((p) => {
       const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
+      if (p.doctorId !== doctorId || pDate !== todayStr || (p.status !== 'WAITING' && p.status !== 'IN_CABIN')) return false;
+      if (isFullDay) return true;
       const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim().toLowerCase();
-      return (
-        p.doctorId === doctorId &&
-        pDate === todayStr &&
-        pShift === currentShift.toLowerCase() &&
-        (p.status === 'WAITING' || p.status === 'IN_CABIN')
-      );
+      return pShift === currentShift.toLowerCase();
     });
 
     if (remainingUnseenPatients.length > 0) {
@@ -516,8 +498,8 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     }
 
-    const nextShift: 'Morning' | 'Evening' = currentShift === 'Morning' ? 'Evening' : 'Morning';
-    const morningDoneDate = currentShift === 'Morning' ? todayStr : '';
+    const nextShift: any = isFullDay ? 'FullDay' : (currentShift === 'Morning' ? 'Evening' : 'Morning');
+    const morningDoneDate = !isFullDay && currentShift === 'Morning' ? todayStr : '';
 
     setDoctors((prev) =>
       prev.map((d) =>
@@ -528,7 +510,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               activeShift: nextShift,
               morningCompletedDate: morningDoneDate,
               status: 'OPD_CLOSE',
-              statusNote: `${currentShift} shift completed`,
+              statusNote: isFullDay ? 'Full Day OPD completed' : `${currentShift} shift completed`,
             }
           : d
       )
@@ -540,48 +522,44 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         activeShift: nextShift,
         morningCompletedDate: morningDoneDate,
         status: 'OPD_CLOSE',
-        statusNote: `${currentShift} shift completed`,
+        statusNote: isFullDay ? 'Full Day OPD completed' : `${currentShift} shift completed`,
       });
     } catch (e) {
       console.error("Error completing shift in Firestore:", e);
     }
   }, [doctors, patients]);
 
-  // 🔹 4. Move Remaining Patients to Next Shift
+  // 🔹 4. Move Remaining Patients to Next Shift (or Next Day for Full Day doctors)
   const moveRemainingToNextShift = useCallback(async (doctorId: string) => {
     const matchedDoc = doctors.find((d) => d.id === doctorId);
-    const currentShift = matchedDoc?.activeShift || 'Morning';
+    const isFullDay = (matchedDoc as any)?.scheduleType === 'FULL_DAY' || (matchedDoc?.activeShift || '').toLowerCase() === 'fullday';
+    const currentShift = isFullDay ? 'FullDay' : (matchedDoc?.activeShift || 'Morning');
     const todayStr = new Date().toISOString().split('T')[0];
 
     const tomorrowObj = new Date();
     tomorrowObj.setDate(tomorrowObj.getDate() + 1);
     const tomorrowStr = tomorrowObj.toISOString().split('T')[0];
 
-    const targetShift: 'Morning' | 'Evening' = currentShift === 'Morning' ? 'Evening' : 'Morning';
-    const targetDate = currentShift === 'Morning' ? todayStr : tomorrowStr;
+    const targetShift: any = isFullDay ? 'FullDay' : (currentShift === 'Morning' ? 'Evening' : 'Morning');
+    const targetDate = isFullDay ? tomorrowStr : (currentShift === 'Morning' ? todayStr : tomorrowStr);
 
     const remainingCurrentPatients = patients
       .filter((p) => {
         const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
+        if (p.doctorId !== doctorId || pDate !== todayStr || p.status === 'COMPLETED') return false;
+        if (isFullDay) return true;
         const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim().toLowerCase();
-        return (
-          p.doctorId === doctorId &&
-          pDate === todayStr &&
-          pShift === currentShift.toLowerCase() &&
-          p.status !== 'COMPLETED'
-        );
+        return pShift === currentShift.toLowerCase();
       })
       .sort((a, b) => Number(a.tokenNumber) - Number(b.tokenNumber));
 
     const existingTargetPatients = patients
       .filter((p) => {
         const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
+        if (p.doctorId !== doctorId || pDate !== targetDate) return false;
+        if (isFullDay) return true;
         const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim().toLowerCase();
-        return (
-          p.doctorId === doctorId &&
-          pDate === targetDate &&
-          pShift === targetShift.toLowerCase()
-        );
+        return pShift === targetShift.toLowerCase();
       })
       .sort((a, b) => Number(a.tokenNumber) - Number(b.tokenNumber));
 
@@ -636,8 +614,8 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     }
 
-    const nextDoctorShift: 'Morning' | 'Evening' = currentShift === 'Morning' ? 'Evening' : 'Morning';
-    const morningDoneDate = currentShift === 'Morning' ? todayStr : '';
+    const nextDoctorShift: any = isFullDay ? 'FullDay' : (currentShift === 'Morning' ? 'Evening' : 'Morning');
+    const morningDoneDate = !isFullDay && currentShift === 'Morning' ? todayStr : '';
 
     setDoctors((prev) =>
       prev.map((d) =>
@@ -669,19 +647,17 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const addWalkInPatient = useCallback((data: Omit<Patient, 'id' | 'tokenNumber' | 'status' | 'bookingType' | 'paymentStatus' | 'paymentAmount' | 'createdAt' | 'botCallAlertSent'>): Patient => {
     const matchedDoctor = doctors.find((d) => d.id === data.doctorId);
+    const isFullDay = (matchedDoctor as any)?.scheduleType === 'FULL_DAY' || (matchedDoctor?.activeShift || '').toLowerCase() === 'fullday';
     const targetDate = (data as any).appointmentDate || new Date().toISOString().split('T')[0];
-    const fallbackShift = matchedDoctor?.activeShift || 'Morning';
-    const targetShift = ((data as any).selectedShift || (data as any).shift || fallbackShift).trim();
+    const fallbackShift = isFullDay ? 'FullDay' : (matchedDoctor?.activeShift || 'Morning');
+    const targetShift = isFullDay ? 'FullDay' : ((data as any).selectedShift || (data as any).shift || fallbackShift).trim();
 
     const matchingPatients = patients.filter((p) => {
       const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
+      if (p.doctorId !== data.doctorId || pDate !== targetDate) return false;
+      if (isFullDay) return true;
       const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim();
-
-      return (
-        p.doctorId === data.doctorId &&
-        pDate === targetDate &&
-        pShift.toLowerCase() === targetShift.toLowerCase()
-      );
+      return pShift.toLowerCase() === targetShift.toLowerCase();
     });
 
     const maxToken = matchingPatients.reduce((max, p) => {
@@ -720,19 +696,17 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const bookOnlineAppointment = useCallback((data: Omit<Patient, 'id' | 'tokenNumber' | 'status' | 'bookingType' | 'paymentStatus' | 'paymentAmount' | 'createdAt' | 'botCallAlertSent'>) => {
     const matchedDoctor = doctors.find((d) => d.id === data.doctorId);
+    const isFullDay = (matchedDoctor as any)?.scheduleType === 'FULL_DAY' || (matchedDoctor?.activeShift || '').toLowerCase() === 'fullday';
     const targetDate = (data as any).appointmentDate || new Date().toISOString().split('T')[0];
-    const fallbackShift = matchedDoctor?.activeShift || 'Morning';
-    const targetShift = ((data as any).selectedShift || (data as any).shift || fallbackShift).trim();
+    const fallbackShift = isFullDay ? 'FullDay' : (matchedDoctor?.activeShift || 'Morning');
+    const targetShift = isFullDay ? 'FullDay' : ((data as any).selectedShift || (data as any).shift || fallbackShift).trim();
 
     const matchingPatients = patients.filter((p) => {
       const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
+      if (p.doctorId !== data.doctorId || pDate !== targetDate) return false;
+      if (isFullDay) return true;
       const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim();
-
-      return (
-        p.doctorId === data.doctorId &&
-        pDate === targetDate &&
-        pShift.toLowerCase() === targetShift.toLowerCase()
-      );
+      return pShift.toLowerCase() === targetShift.toLowerCase();
     });
 
     const maxToken = matchingPatients.reduce((max, p) => {
@@ -759,7 +733,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       paymentAmount: 20,
       paymentId,
       createdAt: new Date().toISOString(),
-      botCallAlertSent: true,
+      botCallAlertSent: false,
     } as any;
 
     setDoc(doc(db, 'patients', customId), newPatient).catch((err) => {
@@ -781,8 +755,44 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         status: target.status,
         calledInAt: target.calledInAt,
       }).catch((err) => console.error("Error updating callPatient:", err));
+
+      // 🔹 4 Mareez Pehle Online Reminder Check
+      const matchedDoc = doctors.find((d) => d.id === target.doctorId);
+      const isFullDay = (matchedDoc as any)?.scheduleType === 'FULL_DAY' || (matchedDoc?.activeShift || '').toLowerCase() === 'fullday';
+      const targetDate = target.appointmentDate || new Date().toISOString().split('T')[0];
+      const targetShift = ((target as any).selectedShift || (target as any).shift || matchedDoc?.activeShift || 'Morning').trim().toLowerCase();
+
+      const remainingWaiting = updated
+        .filter((p) => {
+          if (p.doctorId !== target.doctorId || p.status !== 'WAITING') return false;
+          const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
+          if (pDate !== targetDate) return false;
+          if (isFullDay) return true;
+          const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim().toLowerCase();
+          return pShift === targetShift;
+        })
+        .sort((a, b) => {
+          if (a.isEmergency && !b.isEmergency) return -1;
+          if (!a.isEmergency && b.isEmergency) return 1;
+          return Number(a.tokenNumber) - Number(b.tokenNumber);
+        });
+
+      remainingWaiting.slice(0, 5).forEach((pat, index) => {
+        if (pat.bookingType !== 'ONLINE' || pat.botCallAlertSent) return;
+
+        updateDoc(doc(db, 'patients', pat.id), {
+          botCallAlertSent: true,
+          botCallAlertSentAt: new Date().toISOString(),
+        }).catch(console.error);
+
+        setPatients((prev) =>
+          prev.map((p) => (p.id === pat.id ? { ...p, botCallAlertSent: true } : p))
+        );
+
+        sendTurnReminderWhatsApp(pat, matchedDoc, index);
+      });
     }
-  }, [patients]);
+  }, [patients, doctors]);
 
   const completePatient = useCallback((patientId: string) => {
     const updated = completePatientConsultation(patients, patientId);
@@ -842,7 +852,8 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     const matchedDoc = doctors.find((d) => d.id === targetPatient.doctorId);
-    const currentDoctorShift = matchedDoc?.activeShift || 'Morning';
+    const isFullDay = (matchedDoc as any)?.scheduleType === 'FULL_DAY' || (matchedDoc?.activeShift || '').toLowerCase() === 'fullday';
+    const currentDoctorShift: any = isFullDay ? 'FullDay' : (matchedDoc?.activeShift || 'Morning');
     const pShift = ((targetPatient as any).selectedShift || (targetPatient as any).shift || 'Morning').trim();
     const preservedOriginalShift = targetPatient.originalShift || pShift;
 
@@ -887,7 +898,6 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const resolvedLeaveEnd =
         status === 'LEAVE' ? (leaveEnd || matchedDoc?.leaveEndDate || todayStr) : '';
 
-      // 1. Doctor Status & Leave Dates Update
       setDoctors((prev) =>
         prev.map((docItem) => {
           if (docItem.id === doctorId) {
@@ -912,8 +922,6 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         })
       );
 
-      // 2. Agar Leave extend hui hai aur koi token ab nayi Leave range me aa gaya hai,
-      // toh unhe automatic Leave End Date ke just agle din (next day) shift aur rearrange karein
       if (status === 'LEAVE' && resolvedLeaveStart && resolvedLeaveEnd) {
         const affectedPatients = patients.filter((p) => {
           if (p.doctorId !== doctorId || p.status === 'COMPLETED') return false;
@@ -928,7 +936,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
           const updatesMap = new Map<string, Partial<Patient>>();
 
-          (['Morning', 'Evening'] as const).forEach((shiftName) => {
+          (['Morning', 'Evening', 'FullDay'] as const).forEach((shiftName) => {
             const shiftLower = shiftName.toLowerCase();
 
             const affectedInShift = affectedPatients
@@ -955,7 +963,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               updatesMap.set(p.id, {
                 tokenNumber: newToken,
                 appointmentDate: targetDateStr,
-                selectedShift: shiftName,
+                selectedShift: shiftName as any,
                 status: p.status === 'IN_CABIN' ? 'WAITING' : p.status,
                 botCallAlertSent: false,
               });
@@ -1035,8 +1043,8 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       establishmentType: (data as any).establishmentType || 'CLINIC',
       hospitalId: (data as any).hospitalId || baseUsername,
       isSessionActive: false,
-      activeShift: 'Morning',
-    };
+      activeShift: (data as any).scheduleType === 'FULL_DAY' ? 'FullDay' : ((data as any).activeShift || 'Morning'),
+    } as any;
 
     const safePayload = JSON.parse(JSON.stringify(newDoc));
 
