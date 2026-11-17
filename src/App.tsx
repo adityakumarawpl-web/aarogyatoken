@@ -5,7 +5,7 @@ import { PublicOPDView } from './components/public/PublicOPDView';
 import { StaffPortal } from './components/staff/StaffPortal';
 import { SuperAdminDashboard } from './components/admin/SuperAdminDashboard';
 import { BotCallModal } from './components/common/BotCallModal';
-import { DoctorRegister } from './components/public/DoctorRegister';
+import { DoctorRegisterPage } from './components/public/DoctorRegisterPage';
 
 const AppContent: React.FC = () => {
   const { currentView, setCurrentView } = useClinic();
@@ -33,9 +33,9 @@ const AppContent: React.FC = () => {
     }
   }, [routePath, setCurrentView]);
 
-  // Agar URL /doctor-register hai toh direct DoctorRegister component dikhayein
+  // Agar URL /doctor-register hai toh direct DoctorRegisterPage component dikhayein
   if (routePath === '/doctor-register') {
-    return <DoctorRegister />;
+    return <DoctorRegisterPage />;
   }
 
   return (
