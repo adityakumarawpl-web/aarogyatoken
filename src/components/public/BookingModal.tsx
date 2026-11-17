@@ -33,6 +33,10 @@ const formatDateDDMMYYYY = (isoDate?: string): string => {
 export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) => {
   const { patients, bookOnlineAppointment, razorpaySettings } = useClinic();
 
+  const isFullDayDoctor =
+    (doctor as any).scheduleType === 'FULL_DAY' ||
+    (doctor.activeShift || '').toLowerCase() === 'fullday';
+
   const todayStr = new Date().toISOString().split('T')[0];
   const tomorrowObj = new Date();
   tomorrowObj.setDate(tomorrowObj.getDate() + 1);
@@ -46,9 +50,12 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
     return targetDate === todayStr;
   };
 
-  const isTodayFullyClosed = doctor.status === 'OPD_CLOSE' && (doctor.activeShift || 'Morning') === 'Morning';
+  const isTodayFullyClosed = isFullDayDoctor
+    ? doctor.status === 'OPD_CLOSE'
+    : doctor.status === 'OPD_CLOSE' && (doctor.activeShift || 'Morning') === 'Morning';
 
   const isMorningShiftActiveForDoctor = (targetDate: string, doc: Doctor) => {
+    if (isFullDayDoctor) return true;
     if (targetDate > todayStr) return true;
     if (doc.status === 'OPD_CLOSE') return false;
     return (doc.activeShift || 'Morning') === 'Morning';
@@ -74,7 +81,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
     age: '',
     gender: 'Male' as 'Male' | 'Female' | 'Other',
     appointmentDate: initialDate,
-    selectedShift: initialMorningActive ? 'Morning' : 'Evening',
+    selectedShift: isFullDayDoctor ? 'FullDay' : initialMorningActive ? 'Morning' : 'Evening',
     address: '',
     complaint: '',
   });
@@ -90,24 +97,30 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
     setFormData((prev) => ({
       ...prev,
       appointmentDate: newDate,
-      selectedShift: (!morningAllowed && prev.selectedShift === 'Morning') ? 'Evening' : prev.selectedShift,
+      selectedShift: isFullDayDoctor
+        ? 'FullDay'
+        : !morningAllowed && prev.selectedShift === 'Morning'
+        ? 'Evening'
+        : prev.selectedShift,
     }));
   };
 
   const matchingShiftPatients = patients.filter((p) => {
     const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
+    if (p.doctorId !== doctor.id || pDate !== formData.appointmentDate) return false;
+    if (isFullDayDoctor) return true;
     const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim();
-    return (
-      p.doctorId === doctor.id &&
-      pDate === formData.appointmentDate &&
-      pShift.toLowerCase() === formData.selectedShift.toLowerCase()
-    );
+    return pShift.toLowerCase() === formData.selectedShift.toLowerCase();
   });
 
-  const nextEstimatedToken = matchingShiftPatients.reduce((max, p) => {
-    const num = typeof p.tokenNumber === 'number' ? p.tokenNumber : parseInt(String(p.tokenNumber), 10) || 0;
-    return num > max ? num : max;
-  }, 0) + 1;
+  const nextEstimatedToken =
+    matchingShiftPatients.reduce((max, p) => {
+      const num =
+        typeof p.tokenNumber === 'number'
+          ? p.tokenNumber
+          : parseInt(String(p.tokenNumber), 10) || 0;
+      return num > max ? num : max;
+    }, 0) + 1;
 
   const activeRazorpayKey =
     (import.meta as any).env?.VITE_RAZORPAY_KEY_ID ||
@@ -121,13 +134,17 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
     e.preventDefault();
     if (selectedDateBlockedByLeave) {
       setErrorMsg(
-        `Doctor ${formatDateDDMMYYYY(doctor.leaveStartDate)} se ${formatDateDDMMYYYY(doctor.leaveEndDate)} tak chhutti (Leave) par hain. Kripya in dates ko chhod kar koi aur tarikh chunein.`
+        `Doctor ${formatDateDDMMYYYY(doctor.leaveStartDate)} se ${formatDateDDMMYYYY(
+          doctor.leaveEndDate
+        )} tak chhutti (Leave) par hain. Kripya in dates ko chhod kar koi aur tarikh chunein.`
       );
       return;
     }
     if (selectedDateBlockedByClosedToday) {
       setErrorMsg(
-        'Aaj ki sabhi OPD shifts close ho chuki hain. Kripya agli shift ke liye kal (Next Date) ki tarikh chunein.'
+        isFullDayDoctor
+          ? 'Aaj ki OPD close ho chuki hai. Kripya kal (Next Date) ki tarikh chunein.'
+          : 'Aaj ki sabhi OPD shifts close ho chuki hain. Kripya agli shift ke liye kal (Next Date) ki tarikh chunein.'
       );
       return;
     }
@@ -193,6 +210,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
     setErrorMsg('');
 
     const resolvedHospitalId = doctor.hospitalId || doctor.staffUsername || doctor.id;
+    const resolvedShift = isFullDayDoctor ? 'FullDay' : formData.selectedShift;
 
     const options = {
       key: razorpayKey,
@@ -211,8 +229,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
           age: parseInt(formData.age, 10) || 28,
           gender: formData.gender,
           appointmentDate: formData.appointmentDate,
-          selectedShift: formData.selectedShift,
-          shift: formData.selectedShift,
+          selectedShift: resolvedShift,
+          shift: resolvedShift,
           address: formData.address.trim(),
           complaint: formData.complaint.trim() || 'General OPD Consultation',
           isEmergency: false,
@@ -267,7 +285,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
   return (
     <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/70 p-2 sm:p-4 backdrop-blur-xs overflow-y-auto animate-in fade-in">
       <div className="relative w-full max-w-lg rounded-2xl sm:rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-2 sm:my-6 flex flex-col max-h-[92vh]">
-        
         {/* FIXED HEADER */}
         <div className="sticky top-0 z-20 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 px-4 sm:px-6 py-3.5 sm:py-4 text-white flex items-center justify-between shrink-0 shadow-sm">
           <div className="min-w-0 pr-2">
@@ -278,7 +295,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
               <span className="text-[11px] text-blue-100">घर बैठे टोकन लें</span>
             </div>
             <h3 className="text-base sm:text-lg font-bold mt-0.5 truncate">{doctor.name}</h3>
-            <p className="text-[11px] text-blue-100 truncate">{doctor.clinicName} • {doctor.cabinNumber}</p>
+            <p className="text-[11px] text-blue-100 truncate">
+              {doctor.clinicName} • {doctor.cabinNumber}
+            </p>
           </div>
           <button
             type="button"
@@ -292,18 +311,48 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
 
         {/* STEP PROGRESS TRACKER */}
         <div className="sticky top-[68px] sm:top-[76px] z-10 bg-slate-50 border-b border-slate-200 px-3 sm:px-6 py-2.5 flex items-center justify-between text-xs shrink-0">
-          <div className={`flex items-center gap-1 sm:gap-1.5 font-semibold ${step === 'DETAILS' ? 'text-blue-600' : 'text-slate-400'}`}>
-            <span className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold ${step === 'DETAILS' ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'}`}>1</span>
+          <div
+            className={`flex items-center gap-1 sm:gap-1.5 font-semibold ${
+              step === 'DETAILS' ? 'text-blue-600' : 'text-slate-400'
+            }`}
+          >
+            <span
+              className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                step === 'DETAILS' ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'
+              }`}
+            >
+              1
+            </span>
             <span className="text-[11px] sm:text-xs">Details</span>
           </div>
           <div className="h-0.5 flex-1 max-w-[40px] sm:max-w-[60px] bg-slate-200 mx-1"></div>
-          <div className={`flex items-center gap-1 sm:gap-1.5 font-semibold ${step === 'PAYMENT' ? 'text-blue-600' : 'text-slate-400'}`}>
-            <span className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold ${step === 'PAYMENT' ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'}`}>2</span>
+          <div
+            className={`flex items-center gap-1 sm:gap-1.5 font-semibold ${
+              step === 'PAYMENT' ? 'text-blue-600' : 'text-slate-400'
+            }`}
+          >
+            <span
+              className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                step === 'PAYMENT' ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'
+              }`}
+            >
+              2
+            </span>
             <span className="text-[11px] sm:text-xs">₹20 Fee</span>
           </div>
           <div className="h-0.5 flex-1 max-w-[40px] sm:max-w-[60px] bg-slate-200 mx-1"></div>
-          <div className={`flex items-center gap-1 sm:gap-1.5 font-semibold ${step === 'SUCCESS' ? 'text-emerald-600' : 'text-slate-400'}`}>
-            <span className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold ${step === 'SUCCESS' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}`}>3</span>
+          <div
+            className={`flex items-center gap-1 sm:gap-1.5 font-semibold ${
+              step === 'SUCCESS' ? 'text-emerald-600' : 'text-slate-400'
+            }`}
+          >
+            <span
+              className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                step === 'SUCCESS' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'
+              }`}
+            >
+              3
+            </span>
             <span className="text-[11px] sm:text-xs">Token</span>
           </div>
         </div>
@@ -322,28 +371,45 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
             <form onSubmit={handleDetailsSubmit} className="space-y-3.5 sm:space-y-4">
               {doctor.status === 'OPD_CLOSE' && (
                 <div className="rounded-xl bg-amber-50 border border-amber-300 p-2.5 text-xs text-amber-900 font-semibold">
-                  ℹ️ Abhi OPD close hai. Aap <strong>{formData.selectedShift} Shift ({formatDateDDMMYYYY(formData.appointmentDate)})</strong> ya aage ki date ke liye advance token book kar sakte hain.
+                  ℹ️ Abhi OPD close hai. Aap{' '}
+                  <strong>
+                    {isFullDayDoctor
+                      ? `Full Day (${formatDateDDMMYYYY(formData.appointmentDate)})`
+                      : `${formData.selectedShift} Shift (${formatDateDDMMYYYY(
+                          formData.appointmentDate
+                        )})`}
+                  </strong>{' '}
+                  ya aage ki date ke liye advance token book kar sakte hain.
                 </div>
               )}
 
               {doctor.status === 'LEAVE' && doctor.leaveStartDate && doctor.leaveEndDate && (
                 <div className="rounded-xl bg-blue-50 border border-blue-200 p-2.5 text-xs text-blue-900 font-semibold">
-                  📅 Doctor <strong>{formatDateDDMMYYYY(doctor.leaveStartDate)}</strong> se <strong>{formatDateDDMMYYYY(doctor.leaveEndDate)}</strong> tak Leave par hain. Leave dates chhod kar advance booking chalu hai.
+                  📅 Doctor <strong>{formatDateDDMMYYYY(doctor.leaveStartDate)}</strong> se{' '}
+                  <strong>{formatDateDDMMYYYY(doctor.leaveEndDate)}</strong> tak Leave par hain.
+                  Leave dates chhod kar advance booking chalu hai.
                 </div>
               )}
 
               <div className="rounded-2xl bg-blue-50/80 border border-blue-200 p-3 text-xs text-blue-900 flex items-start gap-2.5">
                 <Sparkles className="h-4 w-4 shrink-0 text-blue-600 mt-0.5" />
                 <div>
-                  <span className="font-bold text-blue-950">Next Available Token: #{nextEstimatedToken}</span>
+                  <span className="font-bold text-blue-950">
+                    Next Available Token: #{nextEstimatedToken}
+                  </span>
                   <p className="text-blue-800 text-[11px] mt-0.5 leading-relaxed">
-                    Online token fee is ₹20. Clinic walk-in is free. Live tracking & WhatsApp update included!
+                    Online token fee is ₹20. Clinic walk-in is free. Live tracking & WhatsApp
+                    update included!
                   </p>
                 </div>
               </div>
 
-              {/* Date & Shift Selection */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 bg-slate-50 p-2.5 sm:p-3 rounded-xl border border-slate-200">
+              {/* Date & Shift Selection (Shift dropdown hidden for Full Day doctors) */}
+              <div
+                className={`grid grid-cols-1 ${
+                  isFullDayDoctor ? '' : 'sm:grid-cols-2'
+                } gap-2.5 sm:gap-3 bg-slate-50 p-2.5 sm:p-3 rounded-xl border border-slate-200`}
+              >
                 <div>
                   <label className="block text-[11px] sm:text-xs font-semibold text-slate-700 mb-1">
                     Appointment Date (DD/MM/YYYY)
@@ -363,21 +429,26 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                     />
                   </div>
                 </div>
-                <div>
-                  <label className="block text-[11px] sm:text-xs font-semibold text-slate-700 mb-1">
-                    Preferred Shift
-                  </label>
-                  <select
-                    value={formData.selectedShift}
-                    onChange={(e) => setFormData({ ...formData, selectedShift: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 p-2 text-xs font-medium bg-white focus:outline-none focus:border-blue-500"
-                  >
-                    {isMorningShiftActiveForDoctor(formData.appointmentDate, doctor) && (
-                      <option value="Morning">Morning Shift</option>
-                    )}
-                    <option value="Evening">Evening Shift</option>
-                  </select>
-                </div>
+
+                {!isFullDayDoctor && (
+                  <div>
+                    <label className="block text-[11px] sm:text-xs font-semibold text-slate-700 mb-1">
+                      Preferred Shift
+                    </label>
+                    <select
+                      value={formData.selectedShift}
+                      onChange={(e) =>
+                        setFormData({ ...formData, selectedShift: e.target.value })
+                      }
+                      className="w-full rounded-lg border border-slate-300 p-2 text-xs font-medium bg-white focus:outline-none focus:border-blue-500"
+                    >
+                      {isMorningShiftActiveForDoctor(formData.appointmentDate, doctor) && (
+                        <option value="Morning">Morning Shift</option>
+                      )}
+                      <option value="Evening">Evening Shift</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
               {/* Patient Name */}
@@ -442,7 +513,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                     />
                     <select
                       value={formData.gender}
-                      onChange={(e) => setFormData({ ...formData, gender: e.target.value as any })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, gender: e.target.value as any })
+                      }
                       className="flex-1 rounded-xl border border-slate-300 px-2.5 py-2 text-xs sm:text-sm bg-white"
                     >
                       <option value="Male">Male</option>
@@ -504,8 +577,12 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                       ₹
                     </div>
                     <div>
-                      <span className="text-xs font-extrabold text-white tracking-wide block">Aarogya Secure Checkout</span>
-                      <span className="text-[10px] text-emerald-400 font-medium">⚡ Powered by Razorpay</span>
+                      <span className="text-xs font-extrabold text-white tracking-wide block">
+                        Aarogya Secure Checkout
+                      </span>
+                      <span className="text-[10px] text-emerald-400 font-medium">
+                        ⚡ Powered by Razorpay
+                      </span>
                     </div>
                   </div>
                   <span className="rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold px-2.5 py-0.5">
@@ -515,16 +592,16 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
 
                 <div className="pt-3 flex items-center justify-between">
                   <div>
-                    <span className="text-[11px] text-slate-400 block">Online Token Booking Fee</span>
+                    <span className="text-[11px] text-slate-400 block">
+                      Online Token Booking Fee
+                    </span>
                     <div className="text-2xl font-black text-emerald-400">₹20.00</div>
                   </div>
                   <div className="text-right">
                     <span className="text-xs text-blue-200 font-bold block">
                       Token #{nextEstimatedToken}
                     </span>
-                    <span className="text-[10px] text-slate-400">
-                      For {formData.name}
-                    </span>
+                    <span className="text-[10px] text-slate-400">For {formData.name}</span>
                   </div>
                 </div>
               </div>
@@ -538,7 +615,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
 
                 <div className="relative h-36 w-36 bg-white p-2 rounded-xl border-2 border-slate-200 shadow-sm flex items-center justify-center my-1">
                   <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=upi://pay?pa=aarogya.opd@icici%26pn=${encodeURIComponent(doctor.name)}%26am=20.00%26cu=INR%26tn=Token_${doctor.id}_${Date.now()}`}
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=upi://pay?pa=aarogya.opd@icici%26pn=${encodeURIComponent(
+                      doctor.name
+                    )}%26am=20.00%26cu=INR%26tn=Token_${doctor.id}_${Date.now()}`}
                     alt="Scan ₹20 QR Code"
                     className="h-32 w-32"
                   />
@@ -620,7 +699,21 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                     {confirmedPatient.name} ({confirmedPatient.gender}, {confirmedPatient.age} yrs)
                   </div>
                   <div className="mt-1 text-[11px] font-semibold text-slate-600">
-                    Date: <span className="font-mono text-slate-800">{formatDateDDMMYYYY(confirmedPatient.appointmentDate)}</span> • Shift: <span className="text-blue-700">{confirmedPatient.selectedShift || (confirmedPatient as any).shift}</span>
+                    Date:{' '}
+                    <span className="font-mono text-slate-800">
+                      {formatDateDDMMYYYY(confirmedPatient.appointmentDate)}
+                    </span>{' '}
+                    •{' '}
+                    {isFullDayDoctor ? (
+                      <span className="text-blue-700">Full Day</span>
+                    ) : (
+                      <>
+                        Shift:{' '}
+                        <span className="text-blue-700">
+                          {confirmedPatient.selectedShift || (confirmedPatient as any).shift}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -636,7 +729,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-400">Clinic Address:</span>
-                    <span className="text-slate-300 text-right text-[11px] max-w-[200px] truncate">{doctor.address}</span>
+                    <span className="text-slate-300 text-right text-[11px] max-w-[200px] truncate">
+                      {doctor.address}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between pt-1 border-t border-slate-800">
                     <span className="text-slate-400 flex items-center gap-1">
@@ -664,8 +759,15 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, onClose }) =
                 <button
                   type="button"
                   onClick={() => {
-                    const text = `AarogyaToken Pass - Dr. ${doctor.name}, Token #${confirmedPatient.tokenNumber} (${formatDateDDMMYYYY(confirmedPatient.appointmentDate)}). Clinic: ${doctor.clinicName}.`;
-                    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+                    const text = `AarogyaToken Pass - Dr. ${doctor.name}, Token #${
+                      confirmedPatient.tokenNumber
+                    } (${formatDateDDMMYYYY(confirmedPatient.appointmentDate)}). Clinic: ${
+                      doctor.clinicName
+                    }.`;
+                    window.open(
+                      `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`,
+                      '_blank'
+                    );
                   }}
                   className="flex-1 rounded-xl bg-emerald-600 px-2.5 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition cursor-pointer flex items-center justify-center gap-1"
                 >
