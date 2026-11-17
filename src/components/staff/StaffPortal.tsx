@@ -130,11 +130,13 @@ export const StaffPortal: React.FC = () => {
     return realTodayDate;
   };
 
-  const activeDoctorShift: 'Morning' | 'Evening' = currentDoctor?.activeShift || 'Morning';
+  const isFullDayDoctor = currentDoctor?.scheduleType === 'FULL_DAY';
+  const activeDoctorShift: string = isFullDayDoctor ? 'FullDay' : (currentDoctor?.activeShift || 'Morning');
   const realCurrentShift = activeDoctorShift;
-  const shiftShortCode = activeDoctorShift === 'Morning' ? 'M. S.' : 'E. S.';
+  const shiftShortCode = isFullDayDoctor ? 'Full Day' : (activeDoctorShift === 'Morning' ? 'M. S.' : 'E. S.');
 
   const isMorningShiftActiveForDoctor = (targetDate: string, doctor: any) => {
+    if (doctor?.scheduleType === 'FULL_DAY') return true;
     const todayStr = new Date().toISOString().split('T')[0];
     if (targetDate > todayStr) return true;
     return (doctor?.activeShift || 'Morning') === 'Morning';
@@ -151,7 +153,7 @@ export const StaffPortal: React.FC = () => {
     complaint: '',
     isEmergency: false,
     appointmentDate: realTodayDate,
-    selectedShift: 'Morning',
+    selectedShift: isFullDayDoctor ? 'FullDay' : 'Morning',
   });
 
   const [reportPeriod, setReportPeriod] = useState<'day' | 'week' | 'month' | 'year'>('day');
@@ -162,7 +164,7 @@ export const StaffPortal: React.FC = () => {
     setWalkInForm((prev) => ({
       ...prev,
       appointmentDate: newDate,
-      selectedShift: (!morningAllowed && prev.selectedShift === 'Morning') ? 'Evening' : prev.selectedShift,
+      selectedShift: isFullDayDoctor ? 'FullDay' : ((!morningAllowed && prev.selectedShift === 'Morning') ? 'Evening' : prev.selectedShift),
     }));
   };
 
@@ -519,7 +521,7 @@ export const StaffPortal: React.FC = () => {
       .catch((err) => console.error('WhatsApp trigger error:', err));
 
     const nextValidDate = getNextAvailableDateAfterLeave(currentDoctor);
-    const defaultShift = isMorningShiftActiveForDoctor(nextValidDate, currentDoctor) ? 'Morning' : 'Evening';
+    const defaultShift = isFullDayDoctor ? 'FullDay' : (isMorningShiftActiveForDoctor(nextValidDate, currentDoctor) ? 'Morning' : 'Evening');
 
     setWalkInForm({
       name: '',
@@ -569,10 +571,9 @@ export const StaffPortal: React.FC = () => {
             </div>
           </div>
 
-          {/* Bottom Compact Toolbar Row: Status Dropdown + Shift Controller Dropdown | Short Date/Time + Logout */}
+          {/* Bottom Compact Toolbar Row: Status Dropdown + Shift / Full Day Controller Dropdown */}
           <div className="flex items-center justify-between gap-2 overflow-x-auto scrollbar-none pt-1 border-t border-slate-100">
             
-            {/* Left: Status Dropdown & Shift Controller Dropdown */}
             <div className="flex items-center gap-1.5 shrink-0">
               
               {/* Status Dropdown */}
@@ -606,7 +607,7 @@ export const StaffPortal: React.FC = () => {
                 <option value="LEAVE">⚪ Leave</option>
               </select>
 
-              {/* Shift Controller Dropdown */}
+              {/* Shift / Full Day Controller Dropdown */}
               <select
                 disabled={isDoctorOnLeaveToday}
                 onChange={(e) => {
@@ -614,14 +615,17 @@ export const StaffPortal: React.FC = () => {
                   if (val === 'START') {
                     startDoctorSession(currentDoctor.id);
                   } else if (val === 'COMPLETE') {
-                    if (window.confirm(`Kya aap ${activeDoctorShift} Shift complete karna chahte hain? Status automatic OPD Close ho jayega.`)) {
+                    const confirmMsg = isFullDayDoctor 
+                      ? 'Kya aap Full Day session complete karna chahte hain? Jo patients nahi dekhe gaye wo absent ho jayenge aur status OPD Close ho jayega.'
+                      : `Kya aap ${activeDoctorShift} Shift complete karna chahte hain? Status automatic OPD Close ho jayega.`;
+                    if (window.confirm(confirmMsg)) {
                       completeDoctorShift(currentDoctor.id);
                     }
                   } else if (val === 'MOVE') {
-                    const nextShiftLabel = activeDoctorShift === 'Morning' ? 'Aaj ki Evening Shift' : 'Kal ki Morning Shift';
-                    if (window.confirm(`Bache hue sabhi patients ko ${nextShiftLabel} ke sabse upar transfer karein?`)) {
+                    const nextMoveLabel = isFullDayDoctor ? 'agle din (Next Day)' : (activeDoctorShift === 'Morning' ? 'Aaj ki Evening Shift' : 'Kal ki Morning Shift');
+                    if (window.confirm(`Bache hue sabhi patients ko ${nextMoveLabel} ke sabse upar transfer karein?`)) {
                       moveRemainingToNextShift(currentDoctor.id).then((result) => {
-                        alert(`✅ Transfer Complete! ${result.movedCount} patients ko ${result.targetShift} Shift (${formatDateDDMMYYYY(result.targetDate)}) me shift kar diya gaya hai.`);
+                        alert(`✅ Transfer Complete! ${result.movedCount} patients ko transfer kar diya gaya hai.`);
                       });
                     }
                   }
@@ -643,9 +647,9 @@ export const StaffPortal: React.FC = () => {
                     ? `🟢 ${shiftShortCode} Running`
                     : `⚙️ ${shiftShortCode} Control`}
                 </option>
-                <option value="START" disabled={!canStartShift}>▶️ {shiftShortCode} Start</option>
-                <option value="COMPLETE" disabled={!canPauseOrCompleteShift}>✅ {shiftShortCode} Complete</option>
-                <option value="MOVE" disabled={isDoctorOnLeaveToday}>⏩ Move Next</option>
+                <option value="START" disabled={!canStartShift}>▶️ {isFullDayDoctor ? 'Full Day Start' : `${shiftShortCode} Start`}</option>
+                <option value="COMPLETE" disabled={!canPauseOrCompleteShift}>✅ {isFullDayDoctor ? 'Full Day Complete' : `${shiftShortCode} Complete`}</option>
+                <option value="MOVE" disabled={isDoctorOnLeaveToday}>⏩ {isFullDayDoctor ? 'Move Next Day' : 'Move Next'}</option>
               </select>
 
             </div>
@@ -762,7 +766,7 @@ export const StaffPortal: React.FC = () => {
             type="button"
             onClick={() => {
               const nextValidDate = getNextAvailableDateAfterLeave(currentDoctor);
-              const defaultShift = isMorningShiftActiveForDoctor(nextValidDate, currentDoctor) ? 'Morning' : 'Evening';
+              const defaultShift = isFullDayDoctor ? 'FullDay' : (isMorningShiftActiveForDoctor(nextValidDate, currentDoctor) ? 'Morning' : 'Evening');
               setWalkInError('');
               setWalkInForm({
                 name: '',
@@ -901,15 +905,17 @@ export const StaffPortal: React.FC = () => {
                     />
                   </div>
 
-                  <select
-                    value={selectedShiftFilter}
-                    onChange={(e) => setSelectedShiftFilter(e.target.value)}
-                    className="rounded-xl border border-blue-300 px-3 py-1.5 text-xs font-medium text-slate-800 bg-blue-50/50 shadow-xs outline-none"
-                  >
-                    <option value="ALL">All Shifts</option>
-                    <option value="Morning">Morning Shift</option>
-                    <option value="Evening">Evening Shift</option>
-                  </select>
+                  {!isFullDayDoctor && (
+                    <select
+                      value={selectedShiftFilter}
+                      onChange={(e) => setSelectedShiftFilter(e.target.value)}
+                      className="rounded-xl border border-blue-300 px-3 py-1.5 text-xs font-medium text-slate-800 bg-blue-50/50 shadow-xs outline-none"
+                    >
+                      <option value="ALL">All Shifts</option>
+                      <option value="Morning">Morning Shift</option>
+                      <option value="Evening">Evening Shift</option>
+                    </select>
+                  )}
                 </>
               )}
 
@@ -934,6 +940,9 @@ export const StaffPortal: React.FC = () => {
               const liveShiftWaiting = sortedWaitingPatients.filter((p) => {
                 const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
                 const pShift = (p.selectedShift || (p as any).shift || 'Morning').trim();
+                if (isFullDayDoctor) {
+                  return p.isEmergency || pDate === realTodayDate;
+                }
                 return p.isEmergency || (pDate === realTodayDate && pShift.toLowerCase() === realCurrentShift.toLowerCase());
               });
 
@@ -941,7 +950,7 @@ export const StaffPortal: React.FC = () => {
                 return (
                   <div className="rounded-2xl bg-white border border-slate-200 p-12 text-center">
                     <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-500" />
-                    <h3 className="mt-3 text-base font-bold text-slate-900">Current Slot Queue is Clear!</h3>
+                    <h3 className="mt-3 text-base font-bold text-slate-900">Current Queue is Clear!</h3>
                   </div>
                 );
               }
@@ -1026,7 +1035,7 @@ export const StaffPortal: React.FC = () => {
                 <div>
                   <span className="font-extrabold uppercase tracking-wide">Advance & Future Date Inspector</span>
                   <p className="text-[11px] text-blue-700 mt-0.5">
-                    Aane wale dino ya dusri shift ke tokens check karne ke liye upar Date ({formatDateDDMMYYYY(selectedDateFilter)}) aur Shift filter ka prayog karein.
+                    Aane wale dino ke tokens check karne ke liye upar Date ({formatDateDDMMYYYY(selectedDateFilter)}) ka prayog karein.
                   </p>
                 </div>
               </div>
@@ -1037,7 +1046,7 @@ export const StaffPortal: React.FC = () => {
 
             {doctorPatients.length === 0 ? (
               <div className="rounded-2xl bg-white border border-slate-200 p-10 text-center text-xs text-slate-500">
-                Is chuni gayi date/shift ke liye koi token book nahi hai.
+                Is chuni gayi date ke liye koi token book nahi hai.
               </div>
             ) : (
               doctorPatients.map((patient) => (
@@ -1127,7 +1136,7 @@ export const StaffPortal: React.FC = () => {
         )}
       </div>
 
-      {/* ADD WALK-IN PATIENT MODAL (FULL COMPLETE FORM) */}
+      {/* ADD WALK-IN PATIENT MODAL */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-in fade-in">
           <div className="w-full max-w-md rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
@@ -1157,12 +1166,6 @@ export const StaffPortal: React.FC = () => {
                 </div>
               )}
 
-              {currentDoctor.status === 'LEAVE' && currentDoctor.leaveStartDate && currentDoctor.leaveEndDate && (
-                <div className="rounded-xl bg-amber-50 border border-amber-200 p-2.5 text-[11px] font-semibold text-amber-900">
-                  📅 Doctor <strong>{formatDateDDMMYYYY(currentDoctor.leaveStartDate)}</strong> se <strong>{formatDateDDMMYYYY(currentDoctor.leaveEndDate)}</strong> tak Leave par hain. Leave dates ko chhod kar hi token banega.
-                </div>
-              )}
-
               <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -1185,33 +1188,26 @@ export const StaffPortal: React.FC = () => {
                     />
                   </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Shift
-                  </label>
-                  <select
-                    value={walkInForm.selectedShift}
-                    onChange={(e) => setWalkInForm({ ...walkInForm, selectedShift: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 p-2 text-xs font-medium bg-white focus:outline-none focus:border-emerald-500"
-                  >
-                    {isMorningShiftActiveForDoctor(walkInForm.appointmentDate, currentDoctor) && (
-                      <option value="Morning">Morning Shift</option>
-                    )}
-                    <option value="Evening">Evening Shift</option>
-                  </select>
-                </div>
+
+                {!isFullDayDoctor && (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Shift</label>
+                    <select
+                      value={walkInForm.selectedShift}
+                      onChange={(e) => setWalkInForm({ ...walkInForm, selectedShift: e.target.value })}
+                      className="w-full rounded-lg border border-slate-300 p-2 text-xs font-medium bg-white focus:outline-none focus:border-emerald-500"
+                    >
+                      {isMorningShiftActiveForDoctor(walkInForm.appointmentDate, currentDoctor) && (
+                        <option value="Morning">Morning Shift</option>
+                      )}
+                      <option value="Evening">Evening Shift</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
-              {isDateInLeaveRange(walkInForm.appointmentDate, currentDoctor) && (
-                <div className="rounded-xl bg-rose-50 border border-rose-300 p-2 text-xs font-bold text-rose-800">
-                  🚫 Yeh tarikh doctor ki Leave date me aati hai! Kripya {formatDateDDMMYYYY(currentDoctor.leaveEndDate)} ke baad ki tarikh chunein.
-                </div>
-              )}
-
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Patient Full Name *
-                </label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Patient Full Name *</label>
                 <input
                   type="text"
                   required
@@ -1224,9 +1220,7 @@ export const StaffPortal: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Mobile Number *
-                  </label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Mobile Number *</label>
                   <input
                     type="tel"
                     required
@@ -1238,9 +1232,7 @@ export const StaffPortal: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Age & Gender *
-                  </label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Age & Gender *</label>
                   <div className="flex gap-2">
                     <input
                       type="number"
@@ -1263,9 +1255,7 @@ export const StaffPortal: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Address / Locality
-                </label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Address / Locality</label>
                 <input
                   type="text"
                   value={walkInForm.address}
@@ -1276,14 +1266,12 @@ export const StaffPortal: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Complaint / Reason
-                </label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Complaint / Reason</label>
                 <input
                   type="text"
                   value={walkInForm.complaint}
                   onChange={(e) => setWalkInForm({ ...walkInForm, complaint: e.target.value })}
-                  placeholder="e.g. Chest pain, Fever, Regular checkup"
+                  placeholder="e.g. Fever, Checkup"
                   className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
                 />
               </div>
@@ -1291,9 +1279,7 @@ export const StaffPortal: React.FC = () => {
               <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Flame className="h-4 w-4 text-rose-600" />
-                  <span className="text-xs font-bold text-rose-800">
-                    Emergency Case? (आपातकालीन प्राथमिकता)
-                  </span>
+                  <span className="text-xs font-bold text-rose-800">Emergency Case?</span>
                 </div>
                 <input
                   type="checkbox"
@@ -1313,8 +1299,7 @@ export const StaffPortal: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={isDateInLeaveRange(walkInForm.appointmentDate, currentDoctor)}
-                  className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow hover:bg-emerald-700 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow hover:bg-emerald-700 transition cursor-pointer"
                 >
                   Confirm (Free Token)
                 </button>
