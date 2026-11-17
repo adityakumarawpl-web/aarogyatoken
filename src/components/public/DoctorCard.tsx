@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { Doctor } from '../../types';
 import { useClinic } from '../../context/ClinicContext';
-import { 
-  MapPin, 
-  Clock, 
-  Sparkles, 
-  Search, 
-  X, 
-  Phone, 
-  Stethoscope 
+import {
+  MapPin,
+  Clock,
+  Sparkles,
+  Search,
+  X,
+  Phone,
+  Stethoscope,
 } from 'lucide-react';
 
 interface DoctorCardProps {
@@ -51,6 +51,9 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
   const todayStr = getLocalTodayYYYYMMDD();
   const doctorActiveShift = doctor.activeShift || 'Morning';
   const activeShiftLower = doctorActiveShift.toLowerCase();
+  const isFullDayDoctor =
+    (doctor as any).scheduleType === 'FULL_DAY' || activeShiftLower === 'fullday';
+  const shiftDisplayLabel = isFullDayDoctor ? 'Full Day' : `${doctorActiveShift} Shift`;
 
   const isLeaveActiveToday = Boolean(
     doctor.status === 'LEAVE' &&
@@ -69,6 +72,18 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
         ? `${formatShortDate(doctor.leaveStartDate)}`
         : `${formatShortDate(doctor.leaveStartDate)} - ${formatShortDate(doctor.leaveEndDate)}`
       : 'On Leave';
+
+  // Helper: Filter today's patients (Full Day = all today, Shift = matching shift)
+  const getTodaysRelevantPatients = () => {
+    return patients.filter((p) => {
+      if (p.doctorId !== doctor.id) return false;
+      const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
+      if (pDate !== todayStr) return false;
+      if (isFullDayDoctor) return true;
+      const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim().toLowerCase();
+      return pShift === activeShiftLower;
+    });
+  };
 
   // Live Serving Details Logic (Single line text formatting)
   const getLiveServingDetails = () => {
@@ -94,12 +109,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
       };
     }
 
-    const todaysShiftPatients = patients.filter((p) => {
-      if (p.doctorId !== doctor.id) return false;
-      const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
-      const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim().toLowerCase();
-      return pDate === todayStr && pShift === activeShiftLower;
-    });
+    const todaysShiftPatients = getTodaysRelevantPatients();
 
     const inCabinPatient = todaysShiftPatients.find((p) => p.status === 'IN_CABIN');
     if (inCabinPatient) {
@@ -157,12 +167,11 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
   };
 
   const servingInfo = getLiveServingDetails();
+  const todaysPatientsList = getTodaysRelevantPatients();
 
   return (
     <div className="group rounded-3xl bg-white border border-slate-200 shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden flex flex-col justify-between w-full">
-      
       <div className="p-4 sm:p-5 space-y-3.5">
-        
         {/* 1. TOP SECTION: Doctor DP, Name, Degree, Speciality */}
         <div className="flex items-start gap-3.5 pb-3 border-b border-slate-100">
           <img
@@ -179,37 +188,59 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
           </div>
         </div>
 
-        {/* 2. ROW 1: Left Box (Status & Shift - Dynamic) | Right Box (Book Online Token) */}
+        {/* 2. ROW 1: Left Box (Status & Shift/Full Day) | Right Box (Book Online Token) */}
         <div className="grid grid-cols-2 gap-2">
           {/* Status & Shift Box */}
-          <div className={`border rounded-2xl py-2.5 px-2 flex flex-col justify-center text-center shadow-xs ${
-            effectiveStatusToday === 'OPD_CLOSE'
-              ? 'bg-rose-50/70 border-rose-200/90'
-              : isLeaveActiveToday
-              ? 'bg-blue-50/70 border-blue-200/90'
-              : 'bg-emerald-50/70 border-emerald-200/90'
-          }`}>
-            <span className={`text-[9px] font-bold uppercase tracking-wider ${
-              effectiveStatusToday === 'OPD_CLOSE' ? 'text-rose-700' : isLeaveActiveToday ? 'text-blue-700' : 'text-emerald-700'
-            }`}>
-              {isLeaveActiveToday ? 'Status' : 'Status & Shift'}
+          <div
+            className={`border rounded-2xl py-2.5 px-2 flex flex-col justify-center text-center shadow-xs ${
+              effectiveStatusToday === 'OPD_CLOSE'
+                ? 'bg-rose-50/70 border-rose-200/90'
+                : isLeaveActiveToday
+                ? 'bg-blue-50/70 border-blue-200/90'
+                : 'bg-emerald-50/70 border-emerald-200/90'
+            }`}
+          >
+            <span
+              className={`text-[9px] font-bold uppercase tracking-wider ${
+                effectiveStatusToday === 'OPD_CLOSE'
+                  ? 'text-rose-700'
+                  : isLeaveActiveToday
+                  ? 'text-blue-700'
+                  : 'text-emerald-700'
+              }`}
+            >
+              {isLeaveActiveToday ? 'Status' : isFullDayDoctor ? 'Status & Timing' : 'Status & Shift'}
             </span>
             <div className="flex items-center justify-center gap-1.5 mt-0.5">
-              <span className={`h-2 w-2 rounded-full shrink-0 ${
-                effectiveStatusToday === 'OPD_CLOSE'
-                  ? 'bg-rose-500'
-                  : isLeaveActiveToday
-                  ? 'bg-blue-500'
-                  : 'bg-emerald-500 animate-pulse'
-              }`}></span>
-              <span className={`text-xs font-black truncate ${
-                effectiveStatusToday === 'OPD_CLOSE' ? 'text-rose-900' : isLeaveActiveToday ? 'text-blue-900' : 'text-emerald-900'
-              }`}>
-                {isLeaveActiveToday ? 'On Leave' : effectiveStatusToday === 'OPD_CLOSE' ? 'OPD Closed' : 'OPD Open'}
+              <span
+                className={`h-2 w-2 rounded-full shrink-0 ${
+                  effectiveStatusToday === 'OPD_CLOSE'
+                    ? 'bg-rose-500'
+                    : isLeaveActiveToday
+                    ? 'bg-blue-500'
+                    : 'bg-emerald-500 animate-pulse'
+                }`}
+              ></span>
+              <span
+                className={`text-xs font-black truncate ${
+                  effectiveStatusToday === 'OPD_CLOSE'
+                    ? 'text-rose-900'
+                    : isLeaveActiveToday
+                    ? 'text-blue-900'
+                    : 'text-emerald-900'
+                }`}
+              >
+                {isLeaveActiveToday
+                  ? 'On Leave'
+                  : effectiveStatusToday === 'OPD_CLOSE'
+                  ? 'OPD Closed'
+                  : 'OPD Open'}
               </span>
             </div>
             {!isLeaveActiveToday && effectiveStatusToday !== 'OPD_CLOSE' && (
-              <span className="text-[10px] text-emerald-700 font-bold leading-none mt-1">{doctorActiveShift} Shift</span>
+              <span className="text-[10px] text-emerald-700 font-bold leading-none mt-1">
+                {shiftDisplayLabel}
+              </span>
             )}
           </div>
 
@@ -229,7 +260,9 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
         <div className="bg-slate-50/70 border border-slate-100 rounded-2xl p-2.5 space-y-1 text-xs">
           <div className="flex items-center gap-1.5 font-bold text-slate-800 truncate">
             <Stethoscope className="h-3.5 w-3.5 text-blue-600 shrink-0" />
-            <span className="truncate">{doctor.clinicName} • {doctor.cabinNumber}</span>
+            <span className="truncate">
+              {doctor.clinicName} • {doctor.cabinNumber}
+            </span>
           </div>
           <div className="flex items-center gap-1.5 text-slate-500 text-[11px] pl-5">
             <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
@@ -237,7 +270,14 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
           </div>
           <div className="flex items-center gap-1.5 text-slate-500 text-[11px] pl-5">
             <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-            <span className="truncate">{doctor.timings || `${doctor.morningShift || '10:00 AM - 02:00 PM'} & ${doctor.eveningShift || '05:00 PM - 08:00 PM'}`}</span>
+            <span className="truncate">
+              {isFullDayDoctor
+                ? doctor.timings || doctor.morningShift || '10:00 AM - 05:00 PM'
+                : doctor.timings ||
+                  `${doctor.morningShift || '10:00 AM - 02:00 PM'} & ${
+                    doctor.eveningShift || '05:00 PM - 08:00 PM'
+                  }`}
+            </span>
           </div>
         </div>
 
@@ -272,7 +312,11 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
                 : 'bg-blue-50/80 border border-blue-200 hover:border-blue-400 hover:bg-blue-100/70 text-blue-800 cursor-pointer active:scale-95'
             }`}
           >
-            <Search className={`h-3.5 w-3.5 mb-0.5 ${isLeaveActiveToday ? 'text-slate-400' : 'text-blue-600 animate-pulse'}`} />
+            <Search
+              className={`h-3.5 w-3.5 mb-0.5 ${
+                isLeaveActiveToday ? 'text-slate-400' : 'text-blue-600 animate-pulse'
+              }`}
+            />
             <span className="text-[11px] font-extrabold leading-tight">Know Token</span>
             <span className="text-[9px] text-blue-600 font-semibold">खोजें (Search)</span>
           </button>
@@ -283,7 +327,9 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
           const imgs = doctor.clinicImages;
           if (!imgs) return null;
           const imagesArray = Array.isArray(imgs) ? imgs : Object.values(imgs);
-          const validImages = imagesArray.filter(url => typeof url === 'string' && url.trim().length > 0);
+          const validImages = imagesArray.filter(
+            (url) => typeof url === 'string' && url.trim().length > 0
+          );
           if (validImages.length === 0) return null;
 
           return (
@@ -304,21 +350,24 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
             </div>
           );
         })()}
-
       </div>
 
       {/* KNOW YOUR TOKEN POPUP SEARCH MODAL */}
       {showTokenModal && !isLeaveActiveToday && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-in fade-in">
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[85vh]">
-            
             <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-4 text-white flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-base">Know Your Token</h3>
-                <p className="text-xs text-blue-100">{doctor.name} • {doctor.clinicName}</p>
+                <p className="text-xs text-blue-100">
+                  {doctor.name} • {doctor.clinicName}
+                </p>
               </div>
               <button
-                onClick={() => { setShowTokenModal(false); setPatientSearchTerm(''); }}
+                onClick={() => {
+                  setShowTokenModal(false);
+                  setPatientSearchTerm('');
+                }}
                 className="bg-white/20 hover:bg-white/30 rounded-full p-1.5 transition text-white cursor-pointer"
               >
                 <X className="h-5 w-5" />
@@ -339,23 +388,25 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
 
               <div className="space-y-2">
                 <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                  Queue List / Patients ({doctorActiveShift} Shift)
+                  Queue List / Patients ({shiftDisplayLabel})
                 </span>
-                
-                {patients
-                  .filter((p) => {
-                    if (p.doctorId !== doctor.id) return false;
-                    const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
-                    const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim().toLowerCase();
-                    if (pDate !== todayStr || pShift !== activeShiftLower) return false;
 
+                {todaysPatientsList
+                  .filter((p) => {
                     const query = patientSearchTerm.toLowerCase().trim();
                     if (!query) return true;
-                    return p.name.toLowerCase().includes(query) || String(p.mobile).includes(query) || String(p.tokenNumber).includes(query);
+                    return (
+                      p.name.toLowerCase().includes(query) ||
+                      String(p.mobile).includes(query) ||
+                      String(p.tokenNumber).includes(query)
+                    );
                   })
                   .sort((a, b) => Number(a.tokenNumber) - Number(b.tokenNumber))
                   .map((pat) => (
-                    <div key={pat.id} className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3 flex items-center justify-between">
+                    <div
+                      key={pat.id}
+                      className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3 flex items-center justify-between"
+                    >
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="font-extrabold text-blue-600 text-sm bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-200">
@@ -368,23 +419,27 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
                           <span>Mo: {maskMobile(pat.mobile)}</span>
                         </p>
                       </div>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        pat.status === 'IN_CABIN' ? 'bg-amber-100 text-amber-800' :
-                        pat.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'
-                      }`}>
-                        {pat.status === 'IN_CABIN' ? 'In Cabin' : pat.status === 'COMPLETED' ? 'Done' : 'Waiting'}
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          pat.status === 'IN_CABIN'
+                            ? 'bg-amber-100 text-amber-800'
+                            : pat.status === 'COMPLETED'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-blue-100 text-blue-800'
+                        }`}
+                      >
+                        {pat.status === 'IN_CABIN'
+                          ? 'In Cabin'
+                          : pat.status === 'COMPLETED'
+                          ? 'Done'
+                          : 'Waiting'}
                       </span>
                     </div>
                   ))}
 
-                {patients.filter((p) => {
-                  if (p.doctorId !== doctor.id) return false;
-                  const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
-                  const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim().toLowerCase();
-                  return pDate === todayStr && pShift === activeShiftLower;
-                }).length === 0 && (
+                {todaysPatientsList.length === 0 && (
                   <div className="text-center py-8 text-slate-400 text-xs">
-                    Aaj ki is shift mein koi patient available nahi hai.
+                    Aaj {isFullDayDoctor ? 'ke din' : 'ki is shift mein'} koi patient available nahi hai.
                   </div>
                 )}
               </div>
@@ -392,17 +447,18 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
 
             <div className="p-3 bg-slate-50 border-t border-slate-200 text-center">
               <button
-                onClick={() => { setShowTokenModal(false); setPatientSearchTerm(''); }}
+                onClick={() => {
+                  setShowTokenModal(false);
+                  setPatientSearchTerm('');
+                }}
                 className="w-full bg-slate-900 hover:bg-slate-800 text-white py-2.5 rounded-xl text-xs font-bold transition cursor-pointer"
               >
                 Close
               </button>
             </div>
-
           </div>
         </div>
       )}
-
     </div>
   );
 };
