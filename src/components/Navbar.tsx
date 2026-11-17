@@ -36,7 +36,7 @@ export const Navbar: React.FC = () => {
           </div>
         </div>
 
-        {/* Right side: Dynamic Indicator (Public OPD vs Staff Desk) */}
+        {/* Right side: Clean Indicator (Public OPD vs Staff Desk) */}
         <div className="flex items-center gap-2">
           {isStaffPage ? (
             <div 
@@ -58,7 +58,7 @@ export const Navbar: React.FC = () => {
               title="Public OPD (Double click to open Staff)"
             >
               <span className="h-2 w-2 rounded-full bg-blue-600 animate-pulse"></span>
-              <span>Public OPD (Patient / ₹20 Booking)</span>
+              <span>Public OPD</span>
             </div>
           )}
         </div>
