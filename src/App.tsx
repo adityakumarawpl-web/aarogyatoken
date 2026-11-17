@@ -5,6 +5,7 @@ import { PublicOPDView } from './components/public/PublicOPDView';
 import { StaffPortal } from './components/staff/StaffPortal';
 import { SuperAdminDashboard } from './components/admin/SuperAdminDashboard';
 import { BotCallModal } from './components/common/BotCallModal';
+import { DoctorRegister } from './components/public/DoctorRegister';
 
 const AppContent: React.FC = () => {
   const { currentView, setCurrentView } = useClinic();
@@ -25,10 +26,17 @@ const AppContent: React.FC = () => {
       setCurrentView('STAFF');
     } else if (routePath === '/admin') {
       setCurrentView('ADMIN');
+    } else if (routePath === '/doctor-register') {
+      // Register route ke liye special handling
     } else {
       setCurrentView('PUBLIC');
     }
   }, [routePath, setCurrentView]);
+
+  // Agar URL /doctor-register hai toh direct DoctorRegister component dikhayein
+  if (routePath === '/doctor-register') {
+    return <DoctorRegister />;
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 font-sans text-slate-900 selection:bg-blue-600 selection:text-white">
