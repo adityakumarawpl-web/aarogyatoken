@@ -179,25 +179,41 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
           </div>
         </div>
 
-        {/* 2. ROW 1: Left Box (Status & Shift - Highlighted) | Right Box (Book Online Token) */}
+        {/* 2. ROW 1: Left Box (Status & Shift - Dynamic) | Right Box (Book Online Token) */}
         <div className="grid grid-cols-2 gap-2">
           {/* Status & Shift Box */}
-          <div className="bg-emerald-50/70 border border-emerald-200/90 rounded-2xl py-2.5 px-2 flex flex-col justify-center text-center shadow-xs">
-            <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-700">
+          <div className={`border rounded-2xl py-2.5 px-2 flex flex-col justify-center text-center shadow-xs ${
+            effectiveStatusToday === 'OPD_CLOSE'
+              ? 'bg-rose-50/70 border-rose-200/90'
+              : isLeaveActiveToday
+              ? 'bg-blue-50/70 border-blue-200/90'
+              : 'bg-emerald-50/70 border-emerald-200/90'
+          }`}>
+            <span className={`text-[9px] font-bold uppercase tracking-wider ${
+              effectiveStatusToday === 'OPD_CLOSE' ? 'text-rose-700' : isLeaveActiveToday ? 'text-blue-700' : 'text-emerald-700'
+            }`}>
               {isLeaveActiveToday ? 'Status' : 'Status & Shift'}
             </span>
             <div className="flex items-center justify-center gap-1.5 mt-0.5">
-              <span className={`h-2 w-2 rounded-full shrink-0 ${isLeaveActiveToday ? 'bg-slate-400' : 'bg-emerald-500 animate-pulse'}`}></span>
-              <span className="text-xs font-black text-emerald-900 truncate">
-                {isLeaveActiveToday ? 'On Leave' : 'OPD Open'}
+              <span className={`h-2 w-2 rounded-full shrink-0 ${
+                effectiveStatusToday === 'OPD_CLOSE'
+                  ? 'bg-rose-500'
+                  : isLeaveActiveToday
+                  ? 'bg-blue-500'
+                  : 'bg-emerald-500 animate-pulse'
+              }`}></span>
+              <span className={`text-xs font-black truncate ${
+                effectiveStatusToday === 'OPD_CLOSE' ? 'text-rose-900' : isLeaveActiveToday ? 'text-blue-900' : 'text-emerald-900'
+              }`}>
+                {isLeaveActiveToday ? 'On Leave' : effectiveStatusToday === 'OPD_CLOSE' ? 'OPD Closed' : 'OPD Open'}
               </span>
             </div>
-            {!isLeaveActiveToday && (
+            {!isLeaveActiveToday && effectiveStatusToday !== 'OPD_CLOSE' && (
               <span className="text-[10px] text-emerald-700 font-bold leading-none mt-1">{doctorActiveShift} Shift</span>
             )}
           </div>
 
-          {/* Book Online Token Button Box (Hamesha Active) */}
+          {/* Book Online Token Button Box */}
           <button
             type="button"
             onClick={() => onBookOnline(doctor)}
@@ -225,9 +241,9 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
           </div>
         </div>
 
-        {/* 4. ROW 2: Running Token Box (Highlighted) | Know Your Token Box (Highlighted Button) */}
+        {/* 4. ROW 2: Running Token Box | Know Your Token Box */}
         <div className="grid grid-cols-12 gap-2">
-          {/* Running Token Box (7 columns - Highlighted with Emerald border & soft glow) */}
+          {/* Running Token Box */}
           <div className="col-span-7 bg-gradient-to-br from-emerald-50 to-teal-50/60 border border-emerald-300/80 rounded-2xl py-2.5 px-2 text-center flex flex-col justify-center shadow-xs">
             <span className="text-[9px] font-extrabold text-emerald-800 uppercase tracking-wider flex items-center justify-center gap-1">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping"></span>
@@ -243,7 +259,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
             )}
           </div>
 
-          {/* Know Your Token Button Box (5 columns - Highlighted Blue Interactive Look) */}
+          {/* Know Your Token Button Box */}
           <button
             type="button"
             disabled={isLeaveActiveToday}
@@ -262,7 +278,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
           </button>
         </div>
 
-        {/* 5. CLINIC PHOTOS (LAST SECTION) */}
+        {/* 5. CLINIC PHOTOS */}
         {(() => {
           const imgs = doctor.clinicImages;
           if (!imgs) return null;
@@ -296,7 +312,6 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-in fade-in">
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[85vh]">
             
-            {/* Modal Header */}
             <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-4 text-white flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-base">Know Your Token</h3>
@@ -310,7 +325,6 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
               </button>
             </div>
 
-            {/* Modal Body / Search & List */}
             <div className="p-4 space-y-4 overflow-y-auto flex-1">
               <div className="relative">
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -376,7 +390,6 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
               </div>
             </div>
 
-            {/* Modal Footer */}
             <div className="p-3 bg-slate-50 border-t border-slate-200 text-center">
               <button
                 onClick={() => { setShowTokenModal(false); setPatientSearchTerm(''); }}
