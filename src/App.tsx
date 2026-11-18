@@ -152,10 +152,10 @@ const AppContent: React.FC = () => {
                       <div>
                         <span className="text-[11px] font-bold uppercase text-slate-400 block">Support Email</span>
                         <a
-                          href="mailto:adityakumar123@gmail.com"
+                          href="mailto:adityakumarchaudhari771@gmail.com"
                           className="font-bold text-slate-900 hover:text-blue-600"
                         >
-                          adityakumar123@gmail.com
+                          adityakumarchaudhari771@gmail.com
                         </a>
                       </div>
                     </div>
@@ -167,10 +167,10 @@ const AppContent: React.FC = () => {
                       <div>
                         <span className="text-[11px] font-bold uppercase text-slate-400 block">Helpline / WhatsApp</span>
                         <a
-                          href="tel:+911234567890"
+                          href="tel:+91 7440524533"
                           className="font-bold text-slate-900 hover:text-emerald-600"
                         >
-                          +91 1234567890
+                          +91 7440524533
                         </a>
                       </div>
                     </div>
