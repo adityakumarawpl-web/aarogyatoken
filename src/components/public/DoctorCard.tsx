@@ -52,7 +52,9 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
   const doctorActiveShift = doctor.activeShift || 'Morning';
   const activeShiftLower = doctorActiveShift.toLowerCase();
   const isFullDayDoctor =
-    (doctor as any).scheduleType === 'FULL_DAY' || activeShiftLower === 'fullday';
+    (doctor as any).scheduleType === 'FULL_DAY' ||
+    activeShiftLower === 'fullday' ||
+    activeShiftLower === 'full_day';
   const shiftDisplayLabel = isFullDayDoctor ? 'Full Day' : `${doctorActiveShift} Shift`;
 
   const isLeaveActiveToday = Boolean(
@@ -73,7 +75,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
         : `${formatShortDate(doctor.leaveStartDate)} - ${formatShortDate(doctor.leaveEndDate)}`
       : 'On Leave';
 
-  // Helper: Filter today's patients (Full Day = all today, Shift = matching shift)
+  // Helper: Filter today's patients (Full Day = all today, Shift = matching shift or FullDay)
   const getTodaysRelevantPatients = () => {
     return patients.filter((p) => {
       if (p.doctorId !== doctor.id) return false;
@@ -81,6 +83,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
       if (pDate !== todayStr) return false;
       if (isFullDayDoctor) return true;
       const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim().toLowerCase();
+      if (pShift === 'fullday' || pShift === 'full_day') return true;
       return pShift === activeShiftLower;
     });
   };
