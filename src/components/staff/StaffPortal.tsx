@@ -18,6 +18,16 @@ import {
   ChevronLeft,
 } from 'lucide-react';
 
+// Local IST Date Helpers (YYYY-MM-DD)
+const formatLocalYYYYMMDD = (dateObj: Date): string => {
+  const y = dateObj.getFullYear();
+  const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const d = String(dateObj.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+const getLocalTodayYYYYMMDD = (): string => formatLocalYYYYMMDD(new Date());
+
 // Universal Short Date Formatter (e.g., 14 Nov)
 export const formatShortDate = (dateObj: Date): string => {
   return dateObj.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
@@ -75,7 +85,7 @@ export const StaffPortal: React.FC = () => {
   // Active Tab
   const [activeTab, setActiveTab] = useState<'QUEUE' | 'COMPLETED' | 'ABSENT' | 'REPORTS' | 'FUTURE'>('QUEUE');
   const [searchFilter, setSearchFilter] = useState('');
-  const realTodayDate = new Date().toISOString().split('T')[0];
+  const realTodayDate = getLocalTodayYYYYMMDD();
 
   const [selectedDateFilter, setSelectedDateFilter] = useState<string>(realTodayDate);
   const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('ALL');
@@ -125,19 +135,26 @@ export const StaffPortal: React.FC = () => {
     if (doctor?.status === 'LEAVE' && doctor?.leaveEndDate && doctor.leaveEndDate >= realTodayDate && isDateInLeaveRange(realTodayDate, doctor)) {
       const [y, m, d] = doctor.leaveEndDate.split('-').map(Number);
       const nextDay = new Date(y, m - 1, d + 1);
-      return nextDay.toISOString().split('T')[0];
+      return formatLocalYYYYMMDD(nextDay);
     }
     return realTodayDate;
   };
 
-  const isFullDayDoctor = currentDoctor?.scheduleType === 'FULL_DAY';
+  const isFullDayDoctor =
+    (currentDoctor as any)?.scheduleType === 'FULL_DAY' ||
+    (currentDoctor?.activeShift || '').toLowerCase() === 'fullday';
   const activeDoctorShift: string = isFullDayDoctor ? 'FullDay' : (currentDoctor?.activeShift || 'Morning');
   const realCurrentShift = activeDoctorShift;
   const shiftShortCode = isFullDayDoctor ? 'Full Day' : (activeDoctorShift === 'Morning' ? 'M. S.' : 'E. S.');
 
   const isMorningShiftActiveForDoctor = (targetDate: string, doctor: any) => {
-    if (doctor?.scheduleType === 'FULL_DAY') return true;
-    const todayStr = new Date().toISOString().split('T')[0];
+    if (
+      (doctor as any)?.scheduleType === 'FULL_DAY' ||
+      (doctor?.activeShift || '').toLowerCase() === 'fullday'
+    ) {
+      return true;
+    }
+    const todayStr = getLocalTodayYYYYMMDD();
     if (targetDate > todayStr) return true;
     return (doctor?.activeShift || 'Morning') === 'Morning';
   };
@@ -469,12 +486,10 @@ export const StaffPortal: React.FC = () => {
 
   const matchingShiftPatients = patients.filter((p) => {
     const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
+    if (p.doctorId !== currentDoctor?.id || pDate !== defaultBookingDate) return false;
+    if (isFullDayDoctor) return true;
     const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim();
-    return (
-      p.doctorId === currentDoctor?.id &&
-      pDate === defaultBookingDate &&
-      pShift.toLowerCase() === currentActiveShift.toLowerCase()
-    );
+    return pShift.toLowerCase() === currentActiveShift.toLowerCase();
   });
 
   const nextDisplayToken = matchingShiftPatients.reduce((max, p) => {
@@ -504,7 +519,7 @@ export const StaffPortal: React.FC = () => {
       address: walkInForm.address.trim() || 'Local Area',
       complaint: walkInForm.complaint.trim() || 'OPD Checkup',
       isEmergency: walkInForm.isEmergency,
-      selectedShift: walkInForm.selectedShift,
+      selectedShift: isFullDayDoctor ? 'FullDay' : walkInForm.selectedShift,
       appointmentDate: walkInForm.appointmentDate,
     } as any);
 
