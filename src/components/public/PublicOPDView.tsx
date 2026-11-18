@@ -15,13 +15,14 @@ import {
   ArrowDown,
   ChevronLeft,
   ChevronRight,
+  MapPin,
 } from 'lucide-react';
 
 export const PublicOPDView: React.FC = () => {
   const { doctors, patients } = useClinic();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedSpecialty, setSelectedSpecialty] = useState<string>('ALL');
+  const [selectedCity, setSelectedCity] = useState<string>('ALL');
   const [activeDoctorForBooking, setActiveDoctorForBooking] = useState<Doctor | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [showScrollBottom, setShowScrollBottom] = useState(true);
@@ -31,12 +32,12 @@ export const PublicOPDView: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const doctorsPerPage = 10;
 
-  // Dynamic Unique Specialty Chips
-  const specialtyList = useMemo(() => {
+  // Dynamic Unique City Chips
+  const cityList = useMemo(() => {
     const list: string[] = [];
     doctors.forEach((doc) => {
-      if (doc.specialty && typeof doc.specialty === 'string') {
-        const clean = doc.specialty.trim();
+      if (doc.city && typeof doc.city === 'string') {
+        const clean = doc.city.trim();
         if (clean && !clean.startsWith('http') && !list.includes(clean)) {
           list.push(clean);
         }
@@ -93,9 +94,9 @@ export const PublicOPDView: React.FC = () => {
   const filteredDoctors = doctors.filter((doc) => {
     const query = searchQuery.toLowerCase().trim();
 
-    if (selectedSpecialty !== 'ALL') {
-      const specMatch = doc.specialty?.toLowerCase().trim() === selectedSpecialty.toLowerCase().trim();
-      if (!specMatch) return false;
+    if (selectedCity !== 'ALL') {
+      const cityMatch = doc.city?.toLowerCase().trim() === selectedCity.toLowerCase().trim();
+      if (!cityMatch) return false;
     }
 
     if (!query) return true;
@@ -108,10 +109,10 @@ export const PublicOPDView: React.FC = () => {
     );
   });
 
-  // Reset to page 1 whenever search query or specialty filter changes
+  // Reset to page 1 whenever search query or city filter changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, selectedSpecialty]);
+  }, [searchQuery, selectedCity]);
 
   // Pagination slicing calculations
   const indexOfLastDoctor = currentPage * doctorsPerPage;
@@ -136,11 +137,11 @@ export const PublicOPDView: React.FC = () => {
         <div className="max-w-4xl mx-auto text-center space-y-1.5">
           <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/25 px-2.5 py-0.5 text-[10px] sm:text-xs font-semibold text-blue-100 border border-blue-400/30">
             <Radio className="h-3 w-3 text-emerald-400 animate-pulse" />
-            <span>Live OPD Token & Doctor Availability</span>
+            <span>Live Clinic Queue & Digital Token Tracker</span>
           </div>
 
           <h1 className="text-xl sm:text-3xl font-black tracking-tight text-white leading-tight">
-            Live Doctor Status &{' '}
+            Live Queue Status &{' '}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-200 to-emerald-300">
               Token Tracker
             </span>
@@ -148,7 +149,7 @@ export const PublicOPDView: React.FC = () => {
         </div>
       </div>
 
-      {/* SEARCH & FILTER BAR */}
+      {/* SEARCH & CITY FILTER BAR */}
       <div className="bg-blue-900/95 px-3 sm:px-6 py-2.5 border-b border-blue-700/60 shadow-md">
         <div className="max-w-2xl mx-auto">
           {/* Search Box */}
@@ -163,7 +164,7 @@ export const PublicOPDView: React.FC = () => {
                   (e.target as HTMLInputElement).blur();
                 }
               }}
-              placeholder="Doctor ka naam, Specialty ya Clinic dhoondhein..."
+              placeholder="Clinic, Doctor ka naam ya City dhoondhein..."
               className="w-full rounded-xl bg-white text-slate-900 pl-10 pr-9 py-2 text-xs sm:text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
             {searchQuery && (
@@ -178,7 +179,7 @@ export const PublicOPDView: React.FC = () => {
           </div>
         </div>
 
-        {/* FULL-WIDTH SMOOTH SLIDER WITH CONTROLS */}
+        {/* FULL-WIDTH SMOOTH CITY SLIDER WITH CONTROLS */}
         <div className="max-w-4xl mx-auto mt-2.5 relative flex items-center group">
           <button
             type="button"
@@ -197,37 +198,38 @@ export const PublicOPDView: React.FC = () => {
             <button
               type="button"
               onClick={() => {
-                setSelectedSpecialty('ALL');
+                setSelectedCity('ALL');
                 if (document.activeElement instanceof HTMLElement) {
                   document.activeElement.blur();
                 }
               }}
               className={`px-3.5 py-1 rounded-full text-xs font-bold transition cursor-pointer shrink-0 whitespace-nowrap ${
-                selectedSpecialty === 'ALL'
+                selectedCity === 'ALL'
                   ? 'bg-blue-500 text-white shadow-sm'
                   : 'bg-white/15 text-blue-100 hover:bg-white/25 border border-white/20'
               }`}
             >
-              Sabhi Doctors (All)
+              Sabhi Cities (All)
             </button>
 
-            {specialtyList.map((spec) => (
+            {cityList.map((city) => (
               <button
-                key={spec}
+                key={city}
                 type="button"
                 onClick={() => {
-                  setSelectedSpecialty(spec);
+                  setSelectedCity(city);
                   if (document.activeElement instanceof HTMLElement) {
                     document.activeElement.blur();
                   }
                 }}
-                className={`px-3.5 py-1 rounded-full text-xs font-bold transition cursor-pointer shrink-0 whitespace-nowrap ${
-                  selectedSpecialty === spec
+                className={`inline-flex items-center gap-1 px-3.5 py-1 rounded-full text-xs font-bold transition cursor-pointer shrink-0 whitespace-nowrap ${
+                  selectedCity === city
                     ? 'bg-blue-500 text-white shadow-sm'
                     : 'bg-white/15 text-blue-100 hover:bg-white/25 border border-white/20'
                 }`}
               >
-                {spec}
+                <MapPin className="h-3 w-3 shrink-0" />
+                <span>{city}</span>
               </button>
             ))}
           </div>
@@ -251,7 +253,7 @@ export const PublicOPDView: React.FC = () => {
               Live OPD Clinics ({filteredDoctors.length})
             </h2>
             <p className="text-[11px] text-slate-500">
-              Live status, currently serving token, and instant ₹20 online booking
+              Live queue status, currently serving token, and instant ₹20 digital token fee
             </p>
           </div>
         </div>
@@ -259,8 +261,8 @@ export const PublicOPDView: React.FC = () => {
         {filteredDoctors.length === 0 ? (
           <div className="rounded-3xl bg-white p-8 text-center border border-slate-200 shadow-sm">
             <Activity className="mx-auto h-10 w-10 text-slate-400" />
-            <h3 className="text-sm font-bold text-slate-800 mt-2">Koi doctor nahi mila</h3>
-            <p className="text-xs text-slate-500 mt-0.5">Kripya doosra naam ya specialty filter chunein</p>
+            <h3 className="text-sm font-bold text-slate-800 mt-2">Is city mein koi clinic nahi mila</h3>
+            <p className="text-xs text-slate-500 mt-0.5">Kripya doosri city filter ya naam chunein</p>
           </div>
         ) : (
           <>
@@ -325,10 +327,10 @@ export const PublicOPDView: React.FC = () => {
             </div>
             <div>
               <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                2. Automated Bot Call Alert
+                2. Automated WhatsApp & Call Alert
               </h4>
               <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
-                Aapka number aane se theek pehle system se call alert aayega.
+                Aapka number aane se theek pehle system se alert aayega.
               </p>
             </div>
           </div>
@@ -339,10 +341,10 @@ export const PublicOPDView: React.FC = () => {
             </div>
             <div>
               <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                3. Complete Patient Privacy
+                3. Complete Visitor Privacy
               </h4>
               <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
-                Public page par poori mareez list ya mobile number expose nahi hote.
+                Public page par poori queue list ya mobile number expose nahi hote.
               </p>
             </div>
           </div>
