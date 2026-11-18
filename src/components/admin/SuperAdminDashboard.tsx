@@ -3,37 +3,124 @@ import { useClinic } from '../../context/ClinicContext';
 import { calculatePlatformAnalytics } from '../../utils/queueLogic';
 import { voiceBot } from '../../utils/voiceBot';
 import { getAutoTagSuggestions } from '../../utils/tagEngine';
+import { db } from '../../firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import {
   Shield,
   TrendingUp,
   DollarSign,
   Users,
   Building,
-  Key,
   Plus,
   Search,
   CheckCircle2,
-  Stethoscope,
-  Copy,
-  Check,
-  Eye,
-  EyeOff,
   Lock,
   LogOut,
   PhoneCall,
   CreditCard,
-  Settings,
-  Sliders,
   Sparkles,
   Volume2,
   Save,
-  Radio,
   AlertCircle,
-  Tag,
   X,
   ChevronDown,
   ChevronUp,
+  Smartphone,
+  RefreshCw,
 } from 'lucide-react';
+
+// ==========================================
+// TOTP (Google Authenticator) Helper via Web Crypto API (Zero external library needed)
+// ==========================================
+const BASE32_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+
+function generateBase32Secret(length = 16): string {
+  const randomBytes = new Uint8Array(length);
+  crypto.getRandomValues(randomBytes);
+  let secret = '';
+  for (let i = 0; i < length; i++) {
+    secret += BASE32_CHARS[randomBytes[i] % 32];
+  }
+  return secret;
+}
+
+function base32ToBytes(base32: string): Uint8Array {
+  const cleaned = base32.toUpperCase().replace(/[^A-Z2-7]/g, '');
+  let bits = 0;
+  let value = 0;
+  const output: number[] = [];
+  for (let i = 0; i < cleaned.length; i++) {
+    const idx = BASE32_CHARS.indexOf(cleaned[i]);
+    if (idx === -1) continue;
+    value = (value << 5) | idx;
+    bits += 5;
+    if (bits >= 8) {
+      output.push((value >>> (bits - 8)) & 255);
+      bits -= 8;
+    }
+  }
+  return new Uint8Array(output);
+}
+
+async function generateTOTPCode(secret: string, counterOffset = 0): Promise<string> {
+  const keyBytes = base32ToBytes(secret);
+  const counter = Math.floor(Date.now() / 1000 / 30) + counterOffset;
+  const buffer = new ArrayBuffer(8);
+  const view = new DataView(buffer);
+  view.setUint32(0, Math.floor(counter / 0x100000000), false);
+  view.setUint32(4, counter >>> 0, false);
+
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    keyBytes,
+    { name: 'HMAC', hash: 'SHA-1' },
+    false,
+    ['sign']
+  );
+  const signature = new Uint8Array(await crypto.subtle.sign('HMAC', cryptoKey, buffer));
+  const offset = signature[signature.length - 1] & 0xf;
+  const binary =
+    ((signature[offset] & 0x7f) << 24) |
+    ((signature[offset + 1] & 0xff) << 16) |
+    ((signature[offset + 2] & 0xff) << 8) |
+    (signature[offset + 3] & 0xff);
+  const otp = binary % 1000000;
+  return String(otp).padStart(6, '0');
+}
+
+async function verifyTOTPCode(secret: string, inputCode: string): Promise<boolean> {
+  const clean = inputCode.trim();
+  if (!/^\d{6}$/.test(clean)) return false;
+  // Check current 30s window, previous 30s, and next 30s for clock drift tolerance
+  for (const offset of [-1, 0, 1]) {
+    const valid = await generateTOTPCode(secret, offset);
+    if (valid === clean) return true;
+  }
+  return false;
+}
+
+interface AdminSecurityConfig {
+  adminId: string;
+  password: string;
+  totpSecret: string;
+  totpEnabled: boolean;
+  backupPin: string;
+  failedAttempts: number;
+  lockoutUntil: number; // timestamp in ms
+}
+
+const DEFAULT_SECURITY_CONFIG: AdminSecurityConfig = {
+  adminId: 'admin',
+  password: 'admin123',
+  totpSecret: 'JBSWY3DPEHPK3PXP',
+  totpEnabled: false,
+  backupPin: '7869',
+  failedAttempts: 0,
+  lockoutUntil: 0,
+};
+
+const MAX_ATTEMPTS = 3;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes lock
 
 export const SuperAdminDashboard: React.FC = () => {
   const {
@@ -54,20 +141,66 @@ export const SuperAdminDashboard: React.FC = () => {
     updateRazorpaySettings,
   } = useClinic();
 
-  // Admin Login Form States
-  const [adminUsernameInput, setAdminUsernameInput] = useState('admin');
-  const [adminPasswordInput, setAdminPasswordInput] = useState('admin123');
+  // Real Security Config synced with Firestore
+  const [securityConfig, setSecurityConfig] = useState<AdminSecurityConfig>(DEFAULT_SECURITY_CONFIG);
+  const [isLoadingSecurity, setIsLoadingSecurity] = useState<boolean>(true);
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const loadSecurityConfig = async () => {
+      try {
+        const snap = await getDoc(doc(db, 'platform_security', 'admin_master'));
+        if (snap.exists()) {
+          setSecurityConfig({ ...DEFAULT_SECURITY_CONFIG, ...(snap.data() as AdminSecurityConfig) });
+        } else {
+          await setDoc(doc(db, 'platform_security', 'admin_master'), DEFAULT_SECURITY_CONFIG);
+        }
+      } catch (err) {
+        console.error('Error loading admin security config:', err);
+      } finally {
+        setIsLoadingSecurity(false);
+      }
+    };
+    loadSecurityConfig();
+  }, []);
+
+  const persistSecurityConfig = async (updated: AdminSecurityConfig) => {
+    setSecurityConfig(updated);
+    try {
+      await setDoc(doc(db, 'platform_security', 'admin_master'), updated, { merge: true });
+    } catch (err) {
+      console.error('Error saving admin security config:', err);
+    }
+  };
+
+  // Admin Login Form States (No pre-filled password in production)
+  const [adminUsernameInput, setAdminUsernameInput] = useState('');
+  const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [adminPinInput, setAdminPinInput] = useState('');
   const [loginError, setLoginError] = useState('');
   const [pinError, setPinError] = useState('');
 
-  // Dashboard Sub-tabs
-  const [adminTab, setAdminTab] = useState<'OVERVIEW' | 'DOCTORS' | 'RAZORPAY' | 'CALL_AUTOMATION'>('OVERVIEW');
+  // Security Settings Form States
+  const [editAdminId, setEditAdminId] = useState('');
+  const [editNewPassword, setEditNewPassword] = useState('');
+  const [editBackupPin, setEditBackupPin] = useState('');
+  const [totpVerifyTestCode, setTotpVerifyTestCode] = useState('');
+
+  useEffect(() => {
+    setEditAdminId(securityConfig.adminId);
+    setEditBackupPin(securityConfig.backupPin);
+  }, [securityConfig.adminId, securityConfig.backupPin]);
+
+  // Default Tab is DOCTORS so revenue/transactions are hidden until explicitly clicked!
+  const [adminTab, setAdminTab] = useState<'DOCTORS' | 'OVERVIEW' | 'RAZORPAY' | 'CALL_AUTOMATION' | 'SECURITY'>('DOCTORS');
 
   // Modals & UI states
   const [showAddDoctorModal, setShowAddDoctorModal] = useState(false);
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const [showPasswords, setShowPasswords] = useState<{ [key: string]: boolean }>({});
   const [doctorSearch, setDoctorSearch] = useState('');
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
 
@@ -170,7 +303,6 @@ export const SuperAdminDashboard: React.FC = () => {
     newDoctorForm.city,
   ]);
 
-  // Unique Username Check Helper
   const isUsernameTaken = (username: string): boolean => {
     if (!username.trim()) return false;
     const clean = username.trim().toLowerCase();
@@ -179,8 +311,34 @@ export const SuperAdminDashboard: React.FC = () => {
 
   const isCurrentUsernameTaken = isUsernameTaken(newDoctorForm.staffUsername);
 
+  // Lockout helper
+  const isLockedOut = securityConfig.lockoutUntil > nowMs;
+  const remainingLockSeconds = Math.max(0, Math.ceil((securityConfig.lockoutUntil - nowMs) / 1000));
+  const lockMinutes = Math.floor(remainingLockSeconds / 60);
+  const lockSeconds = remainingLockSeconds % 60;
+
+  const recordFailedAttempt = async (setErrFn: (msg: string) => void, label: string) => {
+    const nextAttempts = (securityConfig.failedAttempts || 0) + 1;
+    if (nextAttempts >= MAX_ATTEMPTS) {
+      const lockUntil = Date.now() + LOCKOUT_DURATION_MS;
+      await persistSecurityConfig({
+        ...securityConfig,
+        failedAttempts: 0,
+        lockoutUntil: lockUntil,
+      });
+      setErrFn(`🔒 3 galat attempts ke karan Admin Panel 15 minute ke liye lock kar diya gaya hai.`);
+    } else {
+      const left = MAX_ATTEMPTS - nextAttempts;
+      await persistSecurityConfig({
+        ...securityConfig,
+        failedAttempts: nextAttempts,
+      });
+      setErrFn(`⚠️ Galat ${label}! Sirf ${left} attempt${left > 1 ? 's' : ''} bache hain.`);
+    }
+  };
+
   // ==========================================
-  // LAYER 1: ADMIN USERNAME & PASSWORD LOGIN
+  // LAYER 1: REAL ADMIN ID & PASSWORD LOGIN
   // ==========================================
   if (!adminAuthenticated) {
     return (
@@ -191,17 +349,27 @@ export const SuperAdminDashboard: React.FC = () => {
               <Shield className="h-8 w-8 stroke-[2.2]" />
             </div>
             <div className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-slate-800 px-3 py-0.5 text-[10px] font-bold text-amber-300 uppercase tracking-wider">
-              Layer 1 of 2 Security
+              Layer 1 of 2 Security • 3-Attempt Protection
             </div>
             <h2 className="mt-2 text-2xl font-black text-white tracking-tight">
               Super Admin Master Login
             </h2>
             <p className="mt-1 text-xs text-slate-400">
-              Platform owner access to revenue, doctor pages & call automation
+              Verified founder access only
             </p>
           </div>
 
-          {loginError && (
+          {isLockedOut && (
+            <div className="mt-4 rounded-xl bg-rose-950/80 border border-rose-500/50 p-3.5 text-xs text-rose-200 text-center space-y-1">
+              <span className="font-black text-rose-400 block uppercase">🔒 Account Temporarily Locked</span>
+              <p>3 baar galat credentials daalne ke karan login block hai.</p>
+              <p className="font-mono text-sm font-bold text-white">
+                Dobara koshish karein: {lockMinutes}m {String(lockSeconds).padStart(2, '0')}s baad
+              </p>
+            </div>
+          )}
+
+          {!isLockedOut && loginError && (
             <div className="mt-4 rounded-xl bg-rose-500/10 border border-rose-500/30 p-3 text-xs text-rose-300 flex items-center gap-2">
               <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
               <span>{loginError}</span>
@@ -209,13 +377,27 @@ export const SuperAdminDashboard: React.FC = () => {
           )}
 
           <form
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault();
-              const res = adminLogin(adminUsernameInput, adminPasswordInput);
-              if (!res.success) {
-                setLoginError(res.message);
-              } else {
+              if (isLockedOut || isLoadingSecurity) return;
+
+              const cleanUser = adminUsernameInput.trim().toLowerCase();
+              const cleanPass = adminPasswordInput.trim();
+
+              if (
+                cleanUser === securityConfig.adminId.trim().toLowerCase() &&
+                cleanPass === securityConfig.password
+              ) {
+                await persistSecurityConfig({
+                  ...securityConfig,
+                  failedAttempts: 0,
+                  lockoutUntil: 0,
+                });
+                // Sync context auth state
+                adminLogin('admin', 'admin123');
                 setLoginError('');
+              } else {
+                await recordFailedAttempt(setLoginError, 'Admin ID ya Password');
               }
             }}
             className="mt-6 space-y-4"
@@ -227,10 +409,11 @@ export const SuperAdminDashboard: React.FC = () => {
               <input
                 type="text"
                 required
+                disabled={isLockedOut}
                 value={adminUsernameInput}
                 onChange={(e) => setAdminUsernameInput(e.target.value)}
-                placeholder="e.g. admin"
-                className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-sm text-white focus:border-amber-500 focus:outline-none"
+                placeholder="Enter Master Admin ID"
+                className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-sm text-white focus:border-amber-500 focus:outline-none disabled:opacity-50"
               />
             </div>
 
@@ -241,34 +424,29 @@ export const SuperAdminDashboard: React.FC = () => {
               <input
                 type="password"
                 required
+                disabled={isLockedOut}
                 value={adminPasswordInput}
                 onChange={(e) => setAdminPasswordInput(e.target.value)}
                 placeholder="••••••••"
-                className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-sm text-white focus:border-amber-500 focus:outline-none"
+                className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-sm text-white focus:border-amber-500 focus:outline-none disabled:opacity-50"
               />
             </div>
 
             <button
               type="submit"
-              className="w-full rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-amber-500/20 hover:from-amber-400 hover:to-amber-500 transition cursor-pointer"
+              disabled={isLockedOut || isLoadingSecurity}
+              className="w-full rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-amber-500/20 hover:from-amber-400 hover:to-amber-500 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Verify Layer 1 Credentials →
+              {isLoadingSecurity ? 'Verifying Security...' : 'Verify Layer 1 Credentials →'}
             </button>
           </form>
-
-          <div className="mt-6 border-t border-slate-800/80 pt-4 text-center">
-            <span className="text-[11px] text-slate-500 block">Default Master Credentials:</span>
-            <span className="font-mono text-xs text-amber-300 bg-slate-900 px-2.5 py-1 rounded-md border border-slate-800 mt-1 inline-block">
-              ID: admin • Pass: admin123
-            </span>
-          </div>
         </div>
       </div>
     );
   }
 
   // ==========================================
-  // LAYER 2: 2-FACTOR AUTHENTICATION (2FA PIN)
+  // LAYER 2: 2-FACTOR AUTHENTICATION (GOOGLE AUTHENTICATOR / BACKUP PIN)
   // ==========================================
   if (!adminTwoFactorVerified) {
     return (
@@ -279,17 +457,28 @@ export const SuperAdminDashboard: React.FC = () => {
               <Lock className="h-8 w-8 stroke-[2.2]" />
             </div>
             <div className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-3 py-0.5 text-[10px] font-bold text-emerald-300 uppercase tracking-wider">
-              Layer 1 Verified ✓ • Layer 2: 2FA PIN
+              Layer 1 Verified ✓ • Layer 2: {securityConfig.totpEnabled ? 'Authenticator App' : 'Security PIN'}
             </div>
             <h2 className="mt-2 text-2xl font-black text-white tracking-tight">
               Two-Layer Security Check
             </h2>
             <p className="mt-1 text-xs text-slate-400">
-              Enter your Master 2FA Security PIN to access the Founder Dashboard
+              {securityConfig.totpEnabled
+                ? 'Apne mobile Authenticator app mein dikh raha 6-digit code daalein'
+                : 'Apna Master 2FA Security PIN daalein'}
             </p>
           </div>
 
-          {pinError && (
+          {isLockedOut && (
+            <div className="mt-4 rounded-xl bg-rose-950/80 border border-rose-500/50 p-3.5 text-xs text-rose-200 text-center space-y-1">
+              <span className="font-black text-rose-400 block uppercase">🔒 Account Temporarily Locked</span>
+              <p className="font-mono text-sm font-bold text-white">
+                Dobara koshish karein: {lockMinutes}m {String(lockSeconds).padStart(2, '0')}s baad
+              </p>
+            </div>
+          )}
+
+          {!isLockedOut && pinError && (
             <div className="mt-4 rounded-xl bg-rose-500/10 border border-rose-500/30 p-3 text-xs text-rose-300 flex items-center gap-2">
               <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
               <span>{pinError}</span>
@@ -297,36 +486,55 @@ export const SuperAdminDashboard: React.FC = () => {
           )}
 
           <form
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault();
-              const res = adminVerify2FA(adminPinInput);
-              if (!res.success) {
-                setPinError(res.message);
-              } else {
+              if (isLockedOut) return;
+
+              const cleanInput = adminPinInput.trim();
+              let isValid = false;
+
+              if (securityConfig.totpEnabled && securityConfig.totpSecret) {
+                isValid = await verifyTOTPCode(securityConfig.totpSecret, cleanInput);
+              }
+              if (!isValid && cleanInput === securityConfig.backupPin) {
+                isValid = true;
+              }
+
+              if (isValid) {
+                await persistSecurityConfig({
+                  ...securityConfig,
+                  failedAttempts: 0,
+                  lockoutUntil: 0,
+                });
+                adminVerify2FA('7869');
                 setPinError('');
+              } else {
+                await recordFailedAttempt(setPinError, securityConfig.totpEnabled ? 'Authenticator Code' : '2FA PIN');
               }
             }}
             className="mt-6 space-y-4"
           >
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1 text-center">
-                Enter 4-Digit Security PIN *
+                {securityConfig.totpEnabled ? 'Enter 6-Digit Authenticator Code *' : 'Enter Security PIN *'}
               </label>
               <input
                 type="password"
                 maxLength={6}
                 autoFocus
                 required
+                disabled={isLockedOut}
                 value={adminPinInput}
-                onChange={(e) => setAdminPinInput(e.target.value)}
-                placeholder="• • • •"
-                className="w-full text-center tracking-[0.5em] text-2xl font-mono rounded-xl border border-blue-500/50 bg-slate-900 px-3.5 py-3 text-white focus:border-blue-400 focus:outline-none"
+                onChange={(e) => setAdminPinInput(e.target.value.replace(/\D/g, ''))}
+                placeholder="• • • • • •"
+                className="w-full text-center tracking-[0.5em] text-2xl font-mono rounded-xl border border-blue-500/50 bg-slate-900 px-3.5 py-3 text-white focus:border-blue-400 focus:outline-none disabled:opacity-50"
               />
             </div>
 
             <button
               type="submit"
-              className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-lg shadow-blue-600/25 hover:bg-blue-500 transition cursor-pointer"
+              disabled={isLockedOut}
+              className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-lg shadow-blue-600/25 hover:bg-blue-500 transition cursor-pointer disabled:opacity-50"
             >
               Verify 2FA & Access Dashboard
             </button>
@@ -339,13 +547,6 @@ export const SuperAdminDashboard: React.FC = () => {
               Cancel & Return to Login
             </button>
           </form>
-
-          <div className="mt-6 border-t border-slate-800/80 pt-4 text-center">
-            <span className="text-[11px] text-slate-500 block">Default 2FA Security PIN:</span>
-            <span className="font-mono text-xs text-emerald-400 bg-slate-900 px-2.5 py-1 rounded-md border border-slate-800 mt-1 inline-block">
-              PIN: 7869 (ya 123456)
-            </span>
-          </div>
         </div>
       </div>
     );
@@ -398,7 +599,6 @@ export const SuperAdminDashboard: React.FC = () => {
       ? `${newDoctorForm.address.trim()}, ${newDoctorForm.city.trim()}`
       : newDoctorForm.city.trim();
 
-    // Schedule type ke hisab se timings set karein
     const finalMorning = scheduleType === 'FULL_DAY' ? newDoctorForm.timings : newDoctorForm.morningShift;
     const finalEvening = scheduleType === 'FULL_DAY' ? '' : newDoctorForm.eveningShift;
     const finalActiveShift = scheduleType === 'FULL_DAY' ? 'FullDay' : 'Morning';
@@ -538,6 +738,9 @@ export const SuperAdminDashboard: React.FC = () => {
     );
   });
 
+  const totpOtpAuthUrl = `otpauth://totp/AarogyaToken:${encodeURIComponent(securityConfig.adminId)}?secret=${securityConfig.totpSecret}&issuer=AarogyaToken`;
+  const totpQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(totpOtpAuthUrl)}`;
+
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-slate-100 pb-20">
       {/* Top Banner */}
@@ -554,7 +757,7 @@ export const SuperAdminDashboard: React.FC = () => {
               SaaS Business & Doctor Management
             </h1>
             <p className="text-xs text-slate-400 mt-0.5">
-              Live ₹20 revenue tracking, Razorpay payment gateway API, and automatic voice call configuration
+              Hospital & clinic directory, Razorpay payment gateway, call automation & security settings
             </p>
           </div>
 
@@ -596,19 +799,6 @@ export const SuperAdminDashboard: React.FC = () => {
         <div className="flex items-center gap-2 border-b border-slate-200 pb-3 overflow-x-auto">
           <button
             type="button"
-            onClick={() => setAdminTab('OVERVIEW')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shrink-0 ${
-              adminTab === 'OVERVIEW'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'bg-white text-slate-600 hover:bg-slate-200/70 border border-slate-200'
-            }`}
-          >
-            <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
-            <span>Business Analytics (₹20 Revenue)</span>
-          </button>
-
-          <button
-            type="button"
             onClick={() => setAdminTab('DOCTORS')}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shrink-0 ${
               adminTab === 'DOCTORS'
@@ -618,6 +808,19 @@ export const SuperAdminDashboard: React.FC = () => {
           >
             <Building className="h-3.5 w-3.5 text-blue-400" />
             <span>Hospitals & Doctor Directory ({hospitalGroups.length} Establishments)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setAdminTab('OVERVIEW')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shrink-0 ${
+              adminTab === 'OVERVIEW'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'bg-white text-slate-600 hover:bg-slate-200/70 border border-slate-200'
+            }`}
+          >
+            <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
+            <span>Business Analytics (₹20 Revenue)</span>
           </button>
 
           <button
@@ -645,11 +848,24 @@ export const SuperAdminDashboard: React.FC = () => {
             <PhoneCall className="h-3.5 w-3.5 text-emerald-400" />
             <span>Automatic Call Bot Settings</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setAdminTab('SECURITY')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shrink-0 ${
+              adminTab === 'SECURITY'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'bg-white text-slate-600 hover:bg-slate-200/70 border border-slate-200'
+            }`}
+          >
+            <Shield className="h-3.5 w-3.5 text-amber-400" />
+            <span>Security & 2FA Settings</span>
+          </button>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
-        {/* TAB 1: OVERVIEW & REVENUE ANALYTICS */}
+        {/* TAB 1: BUSINESS ANALYTICS & REVENUE (ONLY SHOWN ON CLICK) */}
         {adminTab === 'OVERVIEW' && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1299,6 +1515,187 @@ export const SuperAdminDashboard: React.FC = () => {
             </form>
           </div>
         )}
+
+        {/* TAB 5: REAL SECURITY & GOOGLE AUTHENTICATOR 2FA SETTINGS */}
+        {adminTab === 'SECURITY' && (
+          <div className="rounded-3xl bg-white border border-slate-200 shadow-sm p-6 sm:p-8 space-y-6">
+            <div className="border-b border-slate-100 pb-4 flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-amber-600" />
+                  <span>Founder Login & 2-Layer Authenticator Security</span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Apna Master Admin ID, Password aur Google Authenticator (30-sec dynamic OTP) yahan se manage karein
+                </p>
+              </div>
+              <span className="rounded-full bg-amber-100 text-amber-900 text-xs font-bold px-3 py-1 border border-amber-200">
+                3-Attempt Auto-Lock Active
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Left: Change Admin ID, Password & Backup PIN */}
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const nextAdminId = editAdminId.trim() || securityConfig.adminId;
+                  const nextPassword = editNewPassword.trim() ? editNewPassword.trim() : securityConfig.password;
+                  const nextPin = editBackupPin.trim() || securityConfig.backupPin;
+
+                  await persistSecurityConfig({
+                    ...securityConfig,
+                    adminId: nextAdminId,
+                    password: nextPassword,
+                    backupPin: nextPin,
+                  });
+                  setEditNewPassword('');
+                  setSaveSuccessMsg('✅ Master Admin ID, Password & Backup PIN safely updated!');
+                  setTimeout(() => setSaveSuccessMsg(''), 4000);
+                }}
+                className="space-y-4 bg-slate-50 p-5 rounded-2xl border border-slate-200"
+              >
+                <h4 className="text-sm font-black text-slate-900">1. Master Login Credentials Badlein</h4>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-slate-700 mb-1">
+                    Master Admin ID *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editAdminId}
+                    onChange={(e) => setEditAdminId(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-bold text-slate-900 focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-slate-700 mb-1">
+                    New Master Password (Khali chhodein agar nahi badalna)
+                  </label>
+                  <input
+                    type="password"
+                    value={editNewPassword}
+                    onChange={(e) => setEditNewPassword(e.target.value)}
+                    placeholder="Enter strong new password..."
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs text-slate-900 focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-slate-700 mb-1">
+                    Emergency Backup PIN (4-6 Digits) *
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    required
+                    value={editBackupPin}
+                    onChange={(e) => setEditBackupPin(e.target.value.replace(/\D/g, ''))}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-mono font-bold text-slate-900 focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-bold text-white hover:bg-slate-800 transition cursor-pointer flex items-center gap-2"
+                >
+                  <Save className="h-4 w-4" />
+                  <span>Update Master Credentials</span>
+                </button>
+              </form>
+
+              {/* Right: Google Authenticator 2FA Setup */}
+              <div className="space-y-4 bg-blue-50/50 p-5 rounded-2xl border border-blue-200">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-black text-blue-950 flex items-center gap-2">
+                    <Smartphone className="h-4 w-4 text-blue-600" />
+                    <span>2. Google / Microsoft Authenticator (2FA)</span>
+                  </h4>
+                  <span
+                    className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                      securityConfig.totpEnabled
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        : 'bg-amber-100 text-amber-800 border border-amber-300'
+                    }`}
+                  >
+                    {securityConfig.totpEnabled ? 'ACTIVE ✓' : 'NOT ENABLED'}
+                  </span>
+                </div>
+
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Apne phone par <strong>Google Authenticator</strong> app kholein, <strong>Scan a QR code</strong> par tap karein aur neeche diya gaya QR scan karein. Har 30 second mein naya 6-digit code milega.
+                </p>
+
+                <div className="flex flex-col sm:flex-row items-center gap-4 bg-white p-4 rounded-2xl border border-blue-100">
+                  <img
+                    src={totpQrUrl}
+                    alt="Authenticator QR Code"
+                    className="h-36 w-36 rounded-xl border border-slate-200 shrink-0"
+                  />
+                  <div className="space-y-2 text-xs w-full">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase text-slate-400 block">Manual Setup Key:</span>
+                      <span className="font-mono font-bold text-slate-900 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 inline-block mt-0.5 select-all">
+                        {securityConfig.totpSecret}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const freshSecret = generateBase32Secret(16);
+                        await persistSecurityConfig({
+                          ...securityConfig,
+                          totpSecret: freshSecret,
+                          totpEnabled: false,
+                        });
+                        setSaveSuccessMsg('Naya Authenticator QR generate ho gaya hai. Scan karke verify karein.');
+                        setTimeout(() => setSaveSuccessMsg(''), 4000);
+                      }}
+                      className="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                      <span>Generate New QR / Reset Secret</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="text"
+                    maxLength={6}
+                    value={totpVerifyTestCode}
+                    onChange={(e) => setTotpVerifyTestCode(e.target.value.replace(/\D/g, ''))}
+                    placeholder="App ka 6-digit code daalein"
+                    className="flex-1 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-mono font-bold text-slate-900 focus:border-blue-500 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const ok = await verifyTOTPCode(securityConfig.totpSecret, totpVerifyTestCode);
+                      if (ok) {
+                        await persistSecurityConfig({
+                          ...securityConfig,
+                          totpEnabled: true,
+                        });
+                        setTotpVerifyTestCode('');
+                        setSaveSuccessMsg('🎉 Authenticator App 2FA successfully activate ho gaya hai!');
+                        setTimeout(() => setSaveSuccessMsg(''), 4000);
+                      } else {
+                        alert('❌ Code match nahi hua! Phone ka time Automatic par rakhein aur current 6-digit code daalein.');
+                      }
+                    }}
+                    className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 transition cursor-pointer shrink-0"
+                  >
+                    {securityConfig.totpEnabled ? 'Verify Code' : 'Verify & Activate 2FA'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* CREATE NEW DOCTOR / CLINIC / HOSPITAL MODAL */}
@@ -1372,7 +1769,7 @@ export const SuperAdminDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* 🔹 NEW: Schedule Type Selector (Shift Wise vs Full Day) inside Admin Modal */}
+              {/* Schedule Type Selector */}
               <div className="p-3.5 rounded-2xl bg-indigo-50/60 border border-indigo-200">
                 <span className="block text-xs font-bold uppercase tracking-wider text-indigo-900 mb-2">
                   Clinic Working Schedule Type *
@@ -1430,7 +1827,6 @@ export const SuperAdminDashboard: React.FC = () => {
                   />
                 </div>
 
-                {/* Timings Input: Dynamic based on scheduleType */}
                 {scheduleType === 'FULL_DAY' ? (
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">Full Day Timing *</label>
@@ -1483,7 +1879,6 @@ export const SuperAdminDashboard: React.FC = () => {
                   />
                 </div>
 
-                {/* Common Staff / Receptionist Login Credentials */}
                 <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3.5 space-y-2">
                   <span className="text-xs font-bold text-amber-900 uppercase tracking-wider block">
                     {establishmentType === 'CLINIC' ? 'Staff Login Credentials' : 'Hospital Reception Common Login (एक ही लॉगिन आईडी/पासवर्ड)'}
