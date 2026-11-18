@@ -8,6 +8,15 @@ import {
 import { db } from '../firebase';
 import { collection, onSnapshot, setDoc, updateDoc, doc } from 'firebase/firestore';
 
+const formatLocalYYYYMMDD = (dateObj: Date): string => {
+  const y = dateObj.getFullYear();
+  const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const d = String(dateObj.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+const getLocalTodayYYYYMMDD = (): string => formatLocalYYYYMMDD(new Date());
+
 export const DEFAULT_RAZORPAY_SETTINGS: GlobalRazorpaySettings = {
   enabled: true,
   mode: 'test',
@@ -214,7 +223,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Doctors Real-time Sync with Firestore & Auto Leave Expiry Check
   useEffect(() => {
     const unsubscribeDoc = onSnapshot(collection(db, 'doctors'), async (snapshot) => {
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = getLocalTodayYYYYMMDD();
       if (snapshot.empty) {
         for (const d of INITIAL_DOCTORS) {
           await setDoc(doc(db, 'doctors', d.id), d);
@@ -416,7 +425,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       console.error("Error setting isSessionActive in Firestore:", e);
     }
 
-    const targetDate = new Date().toISOString().split('T')[0];
+    const targetDate = getLocalTodayYYYYMMDD();
 
     const targetPatients = patients.filter((p) => {
       const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
@@ -470,7 +479,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const matchedDoc = doctors.find((d) => d.id === doctorId);
     const isFullDay = (matchedDoc as any)?.scheduleType === 'FULL_DAY' || (matchedDoc?.activeShift || '').toLowerCase() === 'fullday';
     const currentShift = isFullDay ? 'FullDay' : (matchedDoc?.activeShift || 'Morning');
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getLocalTodayYYYYMMDD();
 
     const remainingUnseenPatients = patients.filter((p) => {
       const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
@@ -534,11 +543,11 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const matchedDoc = doctors.find((d) => d.id === doctorId);
     const isFullDay = (matchedDoc as any)?.scheduleType === 'FULL_DAY' || (matchedDoc?.activeShift || '').toLowerCase() === 'fullday';
     const currentShift = isFullDay ? 'FullDay' : (matchedDoc?.activeShift || 'Morning');
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getLocalTodayYYYYMMDD();
 
     const tomorrowObj = new Date();
     tomorrowObj.setDate(tomorrowObj.getDate() + 1);
-    const tomorrowStr = tomorrowObj.toISOString().split('T')[0];
+    const tomorrowStr = formatLocalYYYYMMDD(tomorrowObj);
 
     const targetShift: any = isFullDay ? 'FullDay' : (currentShift === 'Morning' ? 'Evening' : 'Morning');
     const targetDate = isFullDay ? tomorrowStr : (currentShift === 'Morning' ? todayStr : tomorrowStr);
@@ -648,7 +657,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const addWalkInPatient = useCallback((data: Omit<Patient, 'id' | 'tokenNumber' | 'status' | 'bookingType' | 'paymentStatus' | 'paymentAmount' | 'createdAt' | 'botCallAlertSent'>): Patient => {
     const matchedDoctor = doctors.find((d) => d.id === data.doctorId);
     const isFullDay = (matchedDoctor as any)?.scheduleType === 'FULL_DAY' || (matchedDoctor?.activeShift || '').toLowerCase() === 'fullday';
-    const targetDate = (data as any).appointmentDate || new Date().toISOString().split('T')[0];
+    const targetDate = (data as any).appointmentDate || getLocalTodayYYYYMMDD();
     const fallbackShift = isFullDay ? 'FullDay' : (matchedDoctor?.activeShift || 'Morning');
     const targetShift = isFullDay ? 'FullDay' : ((data as any).selectedShift || (data as any).shift || fallbackShift).trim();
 
@@ -697,7 +706,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const bookOnlineAppointment = useCallback((data: Omit<Patient, 'id' | 'tokenNumber' | 'status' | 'bookingType' | 'paymentStatus' | 'paymentAmount' | 'createdAt' | 'botCallAlertSent'>) => {
     const matchedDoctor = doctors.find((d) => d.id === data.doctorId);
     const isFullDay = (matchedDoctor as any)?.scheduleType === 'FULL_DAY' || (matchedDoctor?.activeShift || '').toLowerCase() === 'fullday';
-    const targetDate = (data as any).appointmentDate || new Date().toISOString().split('T')[0];
+    const targetDate = (data as any).appointmentDate || getLocalTodayYYYYMMDD();
     const fallbackShift = isFullDay ? 'FullDay' : (matchedDoctor?.activeShift || 'Morning');
     const targetShift = isFullDay ? 'FullDay' : ((data as any).selectedShift || (data as any).shift || fallbackShift).trim();
 
@@ -759,7 +768,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       // 🔹 4 Mareez Pehle Online Reminder Check
       const matchedDoc = doctors.find((d) => d.id === target.doctorId);
       const isFullDay = (matchedDoc as any)?.scheduleType === 'FULL_DAY' || (matchedDoc?.activeShift || '').toLowerCase() === 'fullday';
-      const targetDate = target.appointmentDate || new Date().toISOString().split('T')[0];
+      const targetDate = target.appointmentDate || getLocalTodayYYYYMMDD();
       const targetShift = ((target as any).selectedShift || (target as any).shift || matchedDoc?.activeShift || 'Morning').trim().toLowerCase();
 
       const remainingWaiting = updated
@@ -844,7 +853,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const targetPatient = patients.find((p) => p.id === patientId);
     if (!targetPatient) return;
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getLocalTodayYYYYMMDD();
     const patientOriginalDate =
       targetPatient.originalDate ||
       targetPatient.appointmentDate ||
@@ -894,7 +903,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // 🔹 Update Doctor Status + Leave Start & End Dates + Auto Shift Tokens if Leave Extended
   const updateDoctorStatus = useCallback(
     (doctorId: string, status: DoctorStatus, note?: string, leaveStart?: string, leaveEnd?: string) => {
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = getLocalTodayYYYYMMDD();
       const matchedDoc = doctors.find((d) => d.id === doctorId);
 
       const resolvedLeaveStart =
@@ -936,7 +945,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (affectedPatients.length > 0) {
           const [y, m, d] = resolvedLeaveEnd.split('-').map(Number);
           const nextDayObj = new Date(y, m - 1, d + 1);
-          const targetDateStr = `${nextDayObj.getFullYear()}-${String(nextDayObj.getMonth() + 1).padStart(2, '0')}-${String(nextDayObj.getDate()).padStart(2, '0')}`;
+          const targetDateStr = formatLocalYYYYMMDD(nextDayObj);
 
           const updatesMap = new Map<string, Partial<Patient>>();
 
