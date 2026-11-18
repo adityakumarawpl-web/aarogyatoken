@@ -1,7 +1,7 @@
 import { Doctor, Patient, PatientStatus, SummaryReport, AdminAnalytics } from '../types';
 
 /**
- * Calculates the next sequential token number for a doctor on the current day.
+- Calculates the next sequential token number for a doctor on the current day.
  */
 export function getNextTokenNumber(patients: Patient[], doctorId: string): number {
   const doctorPatients = patients.filter((p) => p.doctorId === doctorId);
@@ -11,8 +11,8 @@ export function getNextTokenNumber(patients: Patient[], doctorId: string): numbe
 }
 
 /**
- * Returns the token currently being served (status = IN_CABIN).
- * If no one is inside the cabin, returns the next WAITING patient or 0 if none.
+- Returns the token currently being served (status = IN_CABIN).
+- If no one is inside the cabin, returns the next WAITING patient or 0 if none.
  */
 export function getCurrentlyServingToken(patients: Patient[], doctorId: string): number {
   const doctorPatients = patients.filter((p) => p.doctorId === doctorId);
@@ -24,14 +24,26 @@ export function getCurrentlyServingToken(patients: Patient[], doctorId: string):
 }
 
 /**
- * Calculates how many patients are ahead of a specific patient in the queue.
+- Calculates how many patients are ahead of a specific patient in the SAME date & shift queue.
  */
 export function getPatientsAheadCount(patients: Patient[], targetPatientId: string): number {
   const target = patients.find((p) => p.id === targetPatientId);
   if (!target) return 0;
   if (target.status === 'COMPLETED' || target.status === 'IN_CABIN') return 0;
 
-  const doctorPatients = patients.filter((p) => p.doctorId === target.doctorId);
+  const targetDate = target.appointmentDate || (target.createdAt ? target.createdAt.split('T')[0] : '');
+  const targetShift = ((target as any).selectedShift || (target as any).shift || 'Morning').trim().toLowerCase();
+  const isFullDay = targetShift === 'fullday' || targetShift === 'full_day';
+
+  const doctorPatients = patients.filter((p) => {
+    if (p.doctorId !== target.doctorId) return false;
+    const pDate = p.appointmentDate || (p.createdAt ? p.createdAt.split('T')[0] : '');
+    if (targetDate && pDate && pDate !== targetDate) return false;
+    if (isFullDay) return true;
+    const pShift = ((p as any).selectedShift || (p as any).shift || 'Morning').trim().toLowerCase();
+    if (pShift === 'fullday' || pShift === 'full_day') return true;
+    return pShift === targetShift;
+  });
   
   // Active queue consists of currently in cabin + waiting patients before this token
   const inCabinCount = doctorPatients.filter((p) => p.status === 'IN_CABIN').length;
@@ -47,15 +59,15 @@ export function getPatientsAheadCount(patients: Patient[], targetPatientId: stri
     if (target.isEmergency && !p.isEmergency) return false;
     
     // Otherwise earlier token is ahead
-    return p.tokenNumber < target.tokenNumber;
+    return Number(p.tokenNumber) < Number(target.tokenNumber);
   }).length;
 
   return inCabinCount + waitingAhead;
 }
 
 /**
- * Determines if an online booked patient should receive the automated Bot Call alert.
- * As requested: Trigger alert when 3 to 4 patients are left before their turn!
+- Determines if an online booked patient should receive the automated Bot Call alert.
+- As requested: Trigger alert when 3 to 4 patients are left before their turn!
  */
 export function shouldSendBotCallAlert(
   patients: Patient[],
@@ -72,9 +84,9 @@ export function shouldSendBotCallAlert(
 }
 
 /**
- * State transition for queue:
- * Slide Left-to-Right: Move patient into Doctor Cabin -> status = 'IN_CABIN' (BLUE)
- * If another patient was already in cabin, that previous patient is marked 'COMPLETED' (GREEN).
+- State transition for queue:
+- Slide Left-to-Right: Move patient into Doctor Cabin -> status = 'IN_CABIN' (BLUE)
+- If another patient was already in cabin, that previous patient is marked 'COMPLETED' (GREEN).
  */
 export function callPatientInCabin(patients: Patient[], patientId: string): Patient[] {
   const now = new Date().toISOString();
@@ -102,8 +114,8 @@ export function callPatientInCabin(patients: Patient[], patientId: string): Pati
 }
 
 /**
- * State transition for queue:
- * Slide Right-to-Left: Patient consultation done -> status = 'COMPLETED' (GREEN)
+- State transition for queue:
+- Slide Right-to-Left: Patient consultation done -> status = 'COMPLETED' (GREEN)
  */
 export function completePatientConsultation(patients: Patient[], patientId: string): Patient[] {
   const now = new Date().toISOString();
@@ -120,7 +132,7 @@ export function completePatientConsultation(patients: Patient[], patientId: stri
 }
 
 /**
- * Marks patient as Not Available / Skipped
+- Marks patient as Not Available / Skipped
  */
 export function markPatientNotAvailable(patients: Patient[], patientId: string): Patient[] {
   return patients.map((p) => {
@@ -135,7 +147,7 @@ export function markPatientNotAvailable(patients: Patient[], patientId: string):
 }
 
 /**
- * Marks patient as Emergency -> gives them urgent priority
+- Marks patient as Emergency -> gives them urgent priority
  */
 export function markPatientEmergency(patients: Patient[], patientId: string): Patient[] {
   return patients.map((p) => {
@@ -152,7 +164,7 @@ export function markPatientEmergency(patients: Patient[], patientId: string): Pa
 }
 
 /**
- * Re-activates a skipped / not-available patient back into the waiting queue
+- Re-activates a skipped / not-available patient back into the waiting queue
  */
 export function recallPatient(patients: Patient[], patientId: string): Patient[] {
   return patients.map((p) => {
@@ -167,7 +179,7 @@ export function recallPatient(patients: Patient[], patientId: string): Patient[]
 }
 
 /**
- * Computes summary reports for a doctor: Day, Week, Month, Year
+- Computes summary reports for a doctor: Day, Week, Month, Year
  */
 export function generateDoctorSummary(
   patients: Patient[],
@@ -223,8 +235,8 @@ export function generateDoctorSummary(
 }
 
 /**
- * Calculates platform SaaS analytics for Super Admin (Owner):
- * Revenue is 100% derived from ₹20 online booking fees.
+- Calculates platform SaaS analytics for Super Admin (Owner):
+- Revenue is 100% derived from ₹20 online booking fees.
  */
 export function calculatePlatformAnalytics(patients: Patient[], doctors: Doctor[]): AdminAnalytics {
   const now = new Date();
