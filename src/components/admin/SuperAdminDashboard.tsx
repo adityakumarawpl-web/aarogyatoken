@@ -4,7 +4,7 @@ import { calculatePlatformAnalytics } from '../../utils/queueLogic';
 import { voiceBot } from '../../utils/voiceBot';
 import { getAutoTagSuggestions } from '../../utils/tagEngine';
 import { db } from '../../firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import {
   Shield,
   TrendingUp,
@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 
 // ==========================================
-// TOTP (Google Authenticator) Helper via Web Crypto API (Zero external library needed)
+// TOTP (Google Authenticator) Helper via Web Crypto API
 // ==========================================
 const BASE32_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
@@ -91,7 +91,6 @@ async function generateTOTPCode(secret: string, counterOffset = 0): Promise<stri
 async function verifyTOTPCode(secret: string, inputCode: string): Promise<boolean> {
   const clean = inputCode.trim();
   if (!/^\d{6}$/.test(clean)) return false;
-  // Check current 30s window, previous 30s, and next 30s for clock drift tolerance
   for (const offset of [-1, 0, 1]) {
     const valid = await generateTOTPCode(secret, offset);
     if (valid === clean) return true;
@@ -106,7 +105,7 @@ interface AdminSecurityConfig {
   totpEnabled: boolean;
   backupPin: string;
   failedAttempts: number;
-  lockoutUntil: number; // timestamp in ms
+  lockoutUntil: number;
 }
 
 const DEFAULT_SECURITY_CONFIG: AdminSecurityConfig = {
@@ -121,6 +120,18 @@ const DEFAULT_SECURITY_CONFIG: AdminSecurityConfig = {
 
 const MAX_ATTEMPTS = 3;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes lock
+
+interface HospitalDoctorItem {
+  name: string;
+  degree: string;
+  specialty: string;
+  cabinNumber: string;
+  profilePic: string;
+  scheduleType: 'SHIFT_BASED' | 'FULL_DAY';
+  timings: string;
+  morningShift: string;
+  eveningShift: string;
+}
 
 export const SuperAdminDashboard: React.FC = () => {
   const {
@@ -141,7 +152,7 @@ export const SuperAdminDashboard: React.FC = () => {
     updateRazorpaySettings,
   } = useClinic();
 
-  // Real Security Config synced with Firestore
+  // Real Security Config synced live with Firestore
   const [securityConfig, setSecurityConfig] = useState<AdminSecurityConfig>(DEFAULT_SECURITY_CONFIG);
   const [isLoadingSecurity, setIsLoadingSecurity] = useState<boolean>(true);
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
@@ -152,21 +163,23 @@ export const SuperAdminDashboard: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const loadSecurityConfig = async () => {
-      try {
-        const snap = await getDoc(doc(db, 'platform_security', 'admin_master'));
+    const secDocRef = doc(db, 'platform_security', 'admin_master');
+    const unsubscribe = onSnapshot(
+      secDocRef,
+      async (snap) => {
         if (snap.exists()) {
           setSecurityConfig({ ...DEFAULT_SECURITY_CONFIG, ...(snap.data() as AdminSecurityConfig) });
         } else {
-          await setDoc(doc(db, 'platform_security', 'admin_master'), DEFAULT_SECURITY_CONFIG);
+          await setDoc(secDocRef, DEFAULT_SECURITY_CONFIG);
         }
-      } catch (err) {
-        console.error('Error loading admin security config:', err);
-      } finally {
+        setIsLoadingSecurity(false);
+      },
+      (err) => {
+        console.error('Error syncing admin security config:', err);
         setIsLoadingSecurity(false);
       }
-    };
-    loadSecurityConfig();
+    );
+    return () => unsubscribe();
   }, []);
 
   const persistSecurityConfig = async (updated: AdminSecurityConfig) => {
@@ -178,7 +191,7 @@ export const SuperAdminDashboard: React.FC = () => {
     }
   };
 
-  // Admin Login Form States (No pre-filled password in production)
+  // Admin Login Form States
   const [adminUsernameInput, setAdminUsernameInput] = useState('');
   const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [adminPinInput, setAdminPinInput] = useState('');
@@ -196,7 +209,7 @@ export const SuperAdminDashboard: React.FC = () => {
     setEditBackupPin(securityConfig.backupPin);
   }, [securityConfig.adminId, securityConfig.backupPin]);
 
-  // Default Tab is DOCTORS so revenue/transactions are hidden until explicitly clicked!
+  // Default Tab is DOCTORS so revenue/transactions are hidden until explicitly clicked
   const [adminTab, setAdminTab] = useState<'DOCTORS' | 'OVERVIEW' | 'RAZORPAY' | 'CALL_AUTOMATION' | 'SECURITY'>('DOCTORS');
 
   // Modals & UI states
@@ -215,7 +228,7 @@ export const SuperAdminDashboard: React.FC = () => {
   // Custom Tag Input State
   const [customTagInput, setCustomTagInput] = useState('');
 
-  // Type: Clinic ya Hospital & Schedule Type (Shift Wise vs Full Day)
+  // Type: Clinic ya Hospital & Schedule Type for Private Clinic
   const [establishmentType, setEstablishmentType] = useState<'CLINIC' | 'HOSPITAL'>('CLINIC');
   const [scheduleType, setScheduleType] = useState<'SHIFT_BASED' | 'FULL_DAY'>('SHIFT_BASED');
 
@@ -241,22 +254,16 @@ export const SuperAdminDashboard: React.FC = () => {
     avgTimePerPatientMinutes: 10,
   });
 
-  // Hospital ke liye multiple doctors ki list
-  const [hospitalDoctors, setHospitalDoctors] = useState<Array<{
-    name: string;
-    degree: string;
-    specialty: string;
-    cabinNumber: string;
-    profilePic: string;
-    morningShift: string;
-    eveningShift: string;
-  }>>([
+  // Hospital ke liye multiple doctors ki list (har doctor ka apna scheduleType aur timings)
+  const [hospitalDoctors, setHospitalDoctors] = useState<HospitalDoctorItem[]>([
     {
       name: '',
       degree: '',
       specialty: '',
       cabinNumber: 'Cabin 1',
       profilePic: '',
+      scheduleType: 'SHIFT_BASED',
+      timings: '10:00 AM - 05:00 PM',
       morningShift: '10:00 AM - 02:00 PM',
       eveningShift: '05:00 PM - 08:00 PM',
     },
@@ -393,7 +400,6 @@ export const SuperAdminDashboard: React.FC = () => {
                   failedAttempts: 0,
                   lockoutUntil: 0,
                 });
-                // Sync context auth state
                 adminLogin('admin', 'admin123');
                 setLoginError('');
               } else {
@@ -464,7 +470,7 @@ export const SuperAdminDashboard: React.FC = () => {
             </h2>
             <p className="mt-1 text-xs text-slate-400">
               {securityConfig.totpEnabled
-                ? 'Apne mobile Authenticator app mein dikh raha 6-digit code daalein'
+                ? 'Apne mobile Authenticator app mein dikh raha 6-digit code (ya Backup PIN) daalein'
                 : 'Apna Master 2FA Security PIN daalein'}
             </p>
           </div>
@@ -599,15 +605,18 @@ export const SuperAdminDashboard: React.FC = () => {
       ? `${newDoctorForm.address.trim()}, ${newDoctorForm.city.trim()}`
       : newDoctorForm.city.trim();
 
-    const finalMorning = scheduleType === 'FULL_DAY' ? newDoctorForm.timings : newDoctorForm.morningShift;
-    const finalEvening = scheduleType === 'FULL_DAY' ? '' : newDoctorForm.eveningShift;
-    const finalActiveShift = scheduleType === 'FULL_DAY' ? 'FullDay' : 'Morning';
-
     if (establishmentType === 'CLINIC') {
       if (!newDoctorForm.name.trim()) {
         alert('Kripya Doctor ka Naam bharein!');
         return;
       }
+
+      const finalMorning = scheduleType === 'FULL_DAY' ? newDoctorForm.timings : newDoctorForm.morningShift;
+      const finalEvening = scheduleType === 'FULL_DAY' ? '' : newDoctorForm.eveningShift;
+      const finalActiveShift = scheduleType === 'FULL_DAY' ? 'FullDay' : 'Morning';
+      const finalTimings = scheduleType === 'FULL_DAY'
+        ? newDoctorForm.timings
+        : `${newDoctorForm.morningShift} & ${newDoctorForm.eveningShift}`;
 
       const picToSave = newDoctorForm.profilePic?.trim() ? newDoctorForm.profilePic.trim() : defaultPic;
       const clinicBaseId = newDoctorForm.staffUsername.trim();
@@ -623,12 +632,13 @@ export const SuperAdminDashboard: React.FC = () => {
         tags: newDoctorForm.tags || [],
         profilePic: picToSave,
         clinicImages: newDoctorForm.clinicImages || ['', ''],
+        timings: finalTimings,
         morningShift: finalMorning,
         eveningShift: finalEvening,
         activeShift: finalActiveShift,
         scheduleType: scheduleType,
       } as any);
-      setSaveSuccessMsg(`Clinic "${newDoctorForm.clinicName}" created successfully with in-built Razorpay!`);
+      setSaveSuccessMsg(`Clinic "${newDoctorForm.clinicName}" created successfully!`);
     } else {
       const validDoctors = hospitalDoctors.filter((doc) => doc.name.trim());
       if (validDoctors.length === 0) {
@@ -639,6 +649,18 @@ export const SuperAdminDashboard: React.FC = () => {
       const hospitalBaseId = newDoctorForm.staffUsername.trim();
 
       validDoctors.forEach((doc, idx) => {
+        const docSchedule = doc.scheduleType || 'SHIFT_BASED';
+        const docMorning = docSchedule === 'FULL_DAY'
+          ? (doc.timings.trim() || '10:00 AM - 05:00 PM')
+          : (doc.morningShift.trim() || '10:00 AM - 02:00 PM');
+        const docEvening = docSchedule === 'FULL_DAY'
+          ? ''
+          : (doc.eveningShift.trim() || '05:00 PM - 08:00 PM');
+        const docTimings = docSchedule === 'FULL_DAY'
+          ? docMorning
+          : `${docMorning} & ${docEvening}`;
+        const docActiveShift = docSchedule === 'FULL_DAY' ? 'FullDay' : 'Morning';
+
         addNewDoctor({
           ...newDoctorForm,
           ...autoRazorpayData,
@@ -651,10 +673,11 @@ export const SuperAdminDashboard: React.FC = () => {
           specialty: doc.specialty.trim(),
           cabinNumber: doc.cabinNumber.trim() || `Cabin ${idx + 1}`,
           tags: newDoctorForm.tags || [],
-          morningShift: scheduleType === 'FULL_DAY' ? newDoctorForm.timings : (doc.morningShift || newDoctorForm.morningShift),
-          eveningShift: scheduleType === 'FULL_DAY' ? '' : (doc.eveningShift || newDoctorForm.eveningShift),
-          activeShift: finalActiveShift,
-          scheduleType: scheduleType,
+          timings: docTimings,
+          morningShift: docMorning,
+          eveningShift: docEvening,
+          activeShift: docActiveShift,
+          scheduleType: docSchedule,
           staffUsername: hospitalBaseId,
           staffPassword: newDoctorForm.staffPassword.trim() || 'hospital123',
           profilePic: doc.profilePic?.trim() ? doc.profilePic.trim() : defaultPic,
@@ -674,6 +697,8 @@ export const SuperAdminDashboard: React.FC = () => {
         specialty: '',
         cabinNumber: 'Cabin 1',
         profilePic: '',
+        scheduleType: 'SHIFT_BASED',
+        timings: '10:00 AM - 05:00 PM',
         morningShift: '10:00 AM - 02:00 PM',
         eveningShift: '05:00 PM - 08:00 PM',
       },
@@ -1098,6 +1123,9 @@ export const SuperAdminDashboard: React.FC = () => {
                           const docPatients = patients.filter((p) => p.doctorId === doc.id);
                           const isViewingPatients = selectedDoctorForPatients === doc.id;
                           const completed = docPatients.filter((p) => p.status === 'COMPLETED').length;
+                          const isDocFullDay =
+                            (doc as any).scheduleType === 'FULL_DAY' ||
+                            (doc.activeShift || '').toLowerCase() === 'fullday';
 
                           return (
                             <div
@@ -1112,10 +1140,19 @@ export const SuperAdminDashboard: React.FC = () => {
                                     className="h-11 w-11 rounded-xl object-cover border border-slate-200 shrink-0"
                                   />
                                   <div>
-                                    <div className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                                    <div className="font-bold text-sm text-slate-900 flex items-center gap-2 flex-wrap">
                                       <span>{doc.name}</span>
                                       <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-md">
                                         {doc.cabinNumber}
+                                      </span>
+                                      <span
+                                        className={`text-[9px] font-bold px-2 py-0.5 rounded-md ${
+                                          isDocFullDay
+                                            ? 'bg-indigo-100 text-indigo-800'
+                                            : 'bg-slate-100 text-slate-700'
+                                        }`}
+                                      >
+                                        {isDocFullDay ? 'Full Day OPD' : 'Shift Wise'}
                                       </span>
                                       <span
                                         className={`inline-flex items-center gap-1 rounded-full px-2 py-0.2 text-[9px] font-bold ${
@@ -1128,7 +1165,10 @@ export const SuperAdminDashboard: React.FC = () => {
                                       </span>
                                     </div>
                                     <div className="text-xs text-slate-500 mt-0.5">
-                                      {doc.specialty} • {doc.degree} • Shift: {doc.morningShift} {doc.eveningShift ? `& ${doc.eveningShift}` : ''}
+                                      {doc.specialty} • {doc.degree} •{' '}
+                                      {isDocFullDay
+                                        ? `Timing: ${doc.timings || doc.morningShift}`
+                                        : `Shift: ${doc.morningShift} ${doc.eveningShift ? `& ${doc.eveningShift}` : ''}`}
                                     </div>
                                   </div>
                                 </div>
@@ -1642,23 +1682,42 @@ export const SuperAdminDashboard: React.FC = () => {
                       </span>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const freshSecret = generateBase32Secret(16);
-                        await persistSecurityConfig({
-                          ...securityConfig,
-                          totpSecret: freshSecret,
-                          totpEnabled: false,
-                        });
-                        setSaveSuccessMsg('Naya Authenticator QR generate ho gaya hai. Scan karke verify karein.');
-                        setTimeout(() => setSaveSuccessMsg(''), 4000);
-                      }}
-                      className="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
-                    >
-                      <RefreshCw className="h-3 w-3" />
-                      <span>Generate New QR / Reset Secret</span>
-                    </button>
+                    <div className="flex flex-col gap-1.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const freshSecret = generateBase32Secret(16);
+                          await persistSecurityConfig({
+                            ...securityConfig,
+                            totpSecret: freshSecret,
+                            totpEnabled: false,
+                          });
+                          setSaveSuccessMsg('Naya Authenticator QR generate ho gaya hai. Scan karke verify karein.');
+                          setTimeout(() => setSaveSuccessMsg(''), 4000);
+                        }}
+                        className="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
+                      >
+                        <RefreshCw className="h-3 w-3" />
+                        <span>Generate New QR / Reset Secret</span>
+                      </button>
+
+                      {securityConfig.totpEnabled && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await persistSecurityConfig({
+                              ...securityConfig,
+                              totpEnabled: false,
+                            });
+                            setSaveSuccessMsg('Authenticator 2FA disable kar diya gaya hai. Ab Backup PIN se login hoga.');
+                            setTimeout(() => setSaveSuccessMsg(''), 4000);
+                          }}
+                          className="text-[11px] font-bold text-rose-600 hover:text-rose-800 text-left cursor-pointer"
+                        >
+                          Disable Authenticator 2FA (Use PIN only)
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -1769,47 +1828,57 @@ export const SuperAdminDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Schedule Type Selector */}
-              <div className="p-3.5 rounded-2xl bg-indigo-50/60 border border-indigo-200">
-                <span className="block text-xs font-bold uppercase tracking-wider text-indigo-900 mb-2">
-                  Clinic Working Schedule Type *
-                </span>
-                <div className="grid grid-cols-2 gap-3">
-                  <label className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition ${
-                    scheduleType === 'SHIFT_BASED' ? 'bg-white border-indigo-600 text-indigo-900 font-bold shadow-xs' : 'bg-white/50 border-slate-200 text-slate-600'
-                  }`}>
-                    <input
-                      type="radio"
-                      name="adminScheduleType"
-                      value="SHIFT_BASED"
-                      checked={scheduleType === 'SHIFT_BASED'}
-                      onChange={() => setScheduleType('SHIFT_BASED')}
-                      className="h-4 w-4 text-indigo-600"
-                    />
-                    <div>
-                      <span className="text-xs block leading-tight font-bold">Shift Wise</span>
-                      <span className="text-[10px] text-slate-500 font-normal">Morning & Evening Shifts</span>
-                    </div>
-                  </label>
+              {/* Schedule Type Selector — Only shown at top for Private Clinic (Hospital has per-doctor schedule inside each doctor card) */}
+              {establishmentType === 'CLINIC' && (
+                <div className="p-3.5 rounded-2xl bg-indigo-50/60 border border-indigo-200">
+                  <span className="block text-xs font-bold uppercase tracking-wider text-indigo-900 mb-2">
+                    Clinic Working Schedule Type *
+                  </span>
+                  <div className="grid grid-cols-2 gap-3">
+                    <label
+                      className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition ${
+                        scheduleType === 'SHIFT_BASED'
+                          ? 'bg-white border-indigo-600 text-indigo-900 font-bold shadow-xs'
+                          : 'bg-white/50 border-slate-200 text-slate-600'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="adminScheduleType"
+                        value="SHIFT_BASED"
+                        checked={scheduleType === 'SHIFT_BASED'}
+                        onChange={() => setScheduleType('SHIFT_BASED')}
+                        className="h-4 w-4 text-indigo-600"
+                      />
+                      <div>
+                        <span className="text-xs block leading-tight font-bold">Shift Wise</span>
+                        <span className="text-[10px] text-slate-500 font-normal">Morning & Evening Shifts</span>
+                      </div>
+                    </label>
 
-                  <label className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition ${
-                    scheduleType === 'FULL_DAY' ? 'bg-white border-indigo-600 text-indigo-900 font-bold shadow-xs' : 'bg-white/50 border-slate-200 text-slate-600'
-                  }`}>
-                    <input
-                      type="radio"
-                      name="adminScheduleType"
-                      value="FULL_DAY"
-                      checked={scheduleType === 'FULL_DAY'}
-                      onChange={() => setScheduleType('FULL_DAY')}
-                      className="h-4 w-4 text-indigo-600"
-                    />
-                    <div>
-                      <span className="text-xs block leading-tight font-bold">Full Day / Day OPD</span>
-                      <span className="text-[10px] text-slate-500 font-normal">Continuous (e.g. 10AM - 5PM)</span>
-                    </div>
-                  </label>
+                    <label
+                      className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition ${
+                        scheduleType === 'FULL_DAY'
+                          ? 'bg-white border-indigo-600 text-indigo-900 font-bold shadow-xs'
+                          : 'bg-white/50 border-slate-200 text-slate-600'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="adminScheduleType"
+                        value="FULL_DAY"
+                        checked={scheduleType === 'FULL_DAY'}
+                        onChange={() => setScheduleType('FULL_DAY')}
+                        className="h-4 w-4 text-indigo-600"
+                      />
+                      <div>
+                        <span className="text-xs block leading-tight font-bold">Full Day / Day OPD</span>
+                        <span className="text-[10px] text-slate-500 font-normal">Continuous (e.g. 10AM - 5PM)</span>
+                      </div>
+                    </label>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* 2. Common Establishment Info */}
               <div className="space-y-3">
@@ -1827,7 +1896,7 @@ export const SuperAdminDashboard: React.FC = () => {
                   />
                 </div>
 
-                {scheduleType === 'FULL_DAY' ? (
+                {establishmentType === 'CLINIC' && scheduleType === 'FULL_DAY' && (
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">Full Day Timing *</label>
                     <input
@@ -1839,7 +1908,7 @@ export const SuperAdminDashboard: React.FC = () => {
                       className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-blue-600 focus:outline-none font-mono"
                     />
                   </div>
-                ) : null}
+                )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
@@ -2023,7 +2092,7 @@ export const SuperAdminDashboard: React.FC = () => {
                 </div>
               )}
 
-              {/* 3B. MULTI-DOCTOR HOSPITAL SECTION */}
+              {/* 3B. MULTI-DOCTOR HOSPITAL SECTION (WITH INDIVIDUAL SCHEDULE TYPE PER DOCTOR) */}
               {establishmentType === 'HOSPITAL' && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
@@ -2032,7 +2101,7 @@ export const SuperAdminDashboard: React.FC = () => {
                         Hospital Doctors & Cabins ({hospitalDoctors.length})
                       </span>
                       <span className="text-[10px] text-slate-500">
-                        Har doctor ke liye cabin aur unki apni profile photo set karein
+                        Har doctor ke liye cabin, photo aur unka apna Schedule (Shift Wise ya Full Day) set karein
                       </span>
                     </div>
                     <button
@@ -2046,12 +2115,14 @@ export const SuperAdminDashboard: React.FC = () => {
                             specialty: '',
                             cabinNumber: `Cabin ${prev.length + 1}`,
                             profilePic: '',
+                            scheduleType: 'SHIFT_BASED',
+                            timings: '10:00 AM - 05:00 PM',
                             morningShift: '10:00 AM - 02:00 PM',
                             eveningShift: '05:00 PM - 08:00 PM',
                           },
                         ])
                       }
-                      className="rounded-xl bg-blue-600 text-white px-3 py-1.5 text-xs font-bold shadow-xs hover:bg-blue-700 transition cursor-pointer"
+                      className="rounded-xl bg-blue-600 text-white px-3 py-1.5 text-xs font-bold shadow-xs hover:bg-blue-700 transition cursor-pointer shrink-0"
                     >
                       + Add Another Doctor
                     </button>
@@ -2060,7 +2131,7 @@ export const SuperAdminDashboard: React.FC = () => {
                   {hospitalDoctors.map((doc, idx) => (
                     <div
                       key={idx}
-                      className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5 relative shadow-xs"
+                      className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 relative shadow-xs"
                     >
                       <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
                         <span className="text-xs font-black text-blue-900 bg-blue-100 px-2.5 py-0.5 rounded-md">
@@ -2151,6 +2222,121 @@ export const SuperAdminDashboard: React.FC = () => {
                             className="w-full rounded-xl border border-slate-300 px-3 py-1.5 text-xs bg-white focus:outline-none"
                           />
                         </div>
+                      </div>
+
+                      {/* Per-Doctor Schedule Type Selector */}
+                      <div className="p-2.5 rounded-xl bg-indigo-50/70 border border-indigo-200 space-y-2">
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-indigo-900">
+                          Doctor #{idx + 1} Schedule Type *
+                        </span>
+                        <div className="grid grid-cols-2 gap-2">
+                          <label
+                            className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition ${
+                              doc.scheduleType === 'SHIFT_BASED'
+                                ? 'bg-white border-indigo-600 text-indigo-900 font-bold shadow-2xs'
+                                : 'bg-white/60 border-slate-200 text-slate-600'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name={`hospitalDocSchedule_${idx}`}
+                              value="SHIFT_BASED"
+                              checked={doc.scheduleType === 'SHIFT_BASED'}
+                              onChange={() => {
+                                const updated = [...hospitalDoctors];
+                                updated[idx].scheduleType = 'SHIFT_BASED';
+                                setHospitalDoctors(updated);
+                              }}
+                              className="h-3.5 w-3.5 text-indigo-600"
+                            />
+                            <div>
+                              <span className="text-[11px] block leading-tight font-bold">Shift Wise</span>
+                              <span className="text-[9px] text-slate-500 font-normal">Morning & Evening</span>
+                            </div>
+                          </label>
+
+                          <label
+                            className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition ${
+                              doc.scheduleType === 'FULL_DAY'
+                                ? 'bg-white border-indigo-600 text-indigo-900 font-bold shadow-2xs'
+                                : 'bg-white/60 border-slate-200 text-slate-600'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name={`hospitalDocSchedule_${idx}`}
+                              value="FULL_DAY"
+                              checked={doc.scheduleType === 'FULL_DAY'}
+                              onChange={() => {
+                                const updated = [...hospitalDoctors];
+                                updated[idx].scheduleType = 'FULL_DAY';
+                                setHospitalDoctors(updated);
+                              }}
+                              className="h-3.5 w-3.5 text-indigo-600"
+                            />
+                            <div>
+                              <span className="text-[11px] block leading-tight font-bold">Full Day / Day OPD</span>
+                              <span className="text-[9px] text-slate-500 font-normal">Continuous Timing</span>
+                            </div>
+                          </label>
+                        </div>
+
+                        {doc.scheduleType === 'FULL_DAY' ? (
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-700 mb-1">
+                              Full Day Timing *
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={doc.timings}
+                              onChange={(e) => {
+                                const updated = [...hospitalDoctors];
+                                updated[idx].timings = e.target.value;
+                                setHospitalDoctors(updated);
+                              }}
+                              placeholder="e.g. 10:00 AM - 05:00 PM"
+                              className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs bg-white font-mono focus:outline-none"
+                            />
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-700 mb-1">
+                                Morning Shift *
+                              </label>
+                              <input
+                                type="text"
+                                required
+                                value={doc.morningShift}
+                                onChange={(e) => {
+                                  const updated = [...hospitalDoctors];
+                                  updated[idx].morningShift = e.target.value;
+                                  setHospitalDoctors(updated);
+                                }}
+                                placeholder="10:00 AM - 02:00 PM"
+                                className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs bg-white focus:outline-none"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-700 mb-1">
+                                Evening Shift *
+                              </label>
+                              <input
+                                type="text"
+                                required
+                                value={doc.eveningShift}
+                                onChange={(e) => {
+                                  const updated = [...hospitalDoctors];
+                                  updated[idx].eveningShift = e.target.value;
+                                  setHospitalDoctors(updated);
+                                }}
+                                placeholder="05:00 PM - 08:00 PM"
+                                className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs bg-white focus:outline-none"
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       <div>
